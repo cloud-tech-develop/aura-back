@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS third_parties (
+    id                  BIGSERIAL PRIMARY KEY,
+    user_id             BIGINT REFERENCES public.users(id),
+    first_name          VARCHAR(100),
+    last_name           VARCHAR(100),
+    document_number     VARCHAR(50) NOT NULL,
+    document_type       VARCHAR(20) NOT NULL,
+    personal_email      VARCHAR(150),
+    commercial_name     VARCHAR(255),
+    address             VARCHAR(255),
+    phone               VARCHAR(20),
+    additional_email    VARCHAR(150),
+    tax_responsibility  VARCHAR(20) NOT NULL CHECK (tax_responsibility IN ('RESPONSIBLE', 'NOT-RESPONSIBLE')),
+    is_client           BOOLEAN NOT NULL DEFAULT FALSE,
+    is_provider         BOOLEAN NOT NULL DEFAULT FALSE,
+    is_employee         BOOLEAN NOT NULL DEFAULT FALSE,
+    municipality_id     VARCHAR(10),
+    municipality        VARCHAR(255),
+    created_at          TIMESTAMPTZ DEFAULT NOW(),
+    deleted_at          TIMESTAMPTZ DEFAULT NULL
+);

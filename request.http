@@ -1,0 +1,25 @@
+### Create Enterprise
+POST http://localhost:8080/enterprises
+Content-Type: application/json
+
+{
+    "name": "Cloud Tecno SAS",
+    "commercial_name": "Cloud Tecno",
+    "slug": "cloud_tecno",
+    "sub_domain": "cloudtecno",
+    "email": "admin@cloudtecno.com",
+    "password": "securepassword123",
+    "dv": "1",
+    "phone": "5551234",
+    "municipality_id": "05001",
+    "municipality": "Medellin"
+}
+
+### Login
+POST http://localhost:8080/login
+Content-Type: application/json
+
+{
+    "email": "admin@cloudtecno.com",
+    "password": "securepassword123"
+}
