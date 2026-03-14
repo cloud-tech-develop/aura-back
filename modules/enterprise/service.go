@@ -1,0 +1,129 @@
+package enterprise
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
+	"github.com/cloud-tech-develop/aura-back/shared/events"
+)
+
+var validSlug = regexp.MustCompile(`^[a-z0-9_]+$`)
+
+type service struct {
+	repo     Repository
+	eventBus events.EventBus
+	migrator Migrator
+	rawDB    *sql.DB // used for schema dropping
+}
+
+func NewService(db *sql.DB, eventBus events.EventBus, migrator Migrator) Service {
+	return &service{
+		repo:     NewRepository(db),
+		eventBus: eventBus,
+		migrator: migrator,
+		rawDB:    db,
+	}
+}
+
+func (s *service) Create(ctx context.Context, e *Enterprise, passwordHash string) error {
+	e.Slug = strings.ToLower(e.Slug)
+	if e.SubDomain != "" {
+		e.SubDomain = strings.ToLower(e.SubDomain)
+	}
+	if !validSlug.MatchString(e.Slug) {
+		return fmt.Errorf("slug inválido: solo minúsculas, números y _")
+	}
+
+	// Check if slug already exists
+	existingSlug, err := s.repo.GetBySlug(ctx, e.Slug)
+	if err == nil && existingSlug != nil {
+		return fmt.Errorf("el slug %s ya está registrado", e.Slug)
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("verificando slug: %w", err)
+	}
+
+	// Check if subdomain already exists
+	if e.SubDomain != "" {
+		existingSubDomain, err := s.repo.GetBySubDomain(ctx, e.SubDomain)
+		if err == nil && existingSubDomain != nil {
+			return fmt.Errorf("el subdominio %s ya está registrado", e.SubDomain)
+		}
+		if err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("verificando subdominio: %w", err)
+		}
+	}
+
+	// Check if email already exists before creating
+	existing, err := s.repo.GetByEmail(ctx, e.Email)
+	if err == nil && existing != nil {
+		return fmt.Errorf("el email %s ya está registrado", e.Email)
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("verificando email: %w", err)
+	}
+
+	// CreateEnterprise via migrator handles schema + tenant + user + third_party
+	if s.migrator != nil {
+		if err := s.migrator.RunMigrations(ctx, e, passwordHash); err != nil {
+			return fmt.Errorf("crear esquema: %w", err)
+		}
+	}
+
+	s.publish(NewCreatedEvent(e))
+	return nil
+}
+
+func (s *service) GetBySlug(ctx context.Context, slug string) (*Enterprise, error) {
+	return s.repo.GetBySlug(ctx, slug)
+}
+
+func (s *service) GetBySubDomain(ctx context.Context, subDomain string) (*Enterprise, error) {
+	return s.repo.GetBySubDomain(ctx, subDomain)
+}
+
+func (s *service) GetByEmail(ctx context.Context, email vo.Email) (*Enterprise, error) {
+	return s.repo.GetByEmail(ctx, email)
+}
+
+func (s *service) List(ctx context.Context) ([]Enterprise, error) {
+	return s.repo.List(ctx)
+}
+
+func (s *service) Update(ctx context.Context, e *Enterprise) error {
+	e.UpdatedAt = time.Now()
+	if err := s.repo.Update(ctx, e); err != nil {
+		return err
+	}
+	s.publish(NewUpdatedEvent(e))
+	return nil
+}
+
+func (s *service) Delete(ctx context.Context, id int64) error {
+	e, err := s.repo.GetBySlug(ctx, fmt.Sprintf("%d", id))
+	if err != nil {
+		return err
+	}
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
+	}
+	if s.rawDB != nil {
+		s.rawDB.Exec(fmt.Sprintf("DROP SCHEMA IF EXISTS %q CASCADE", e.Slug))
+	}
+	s.publish(NewDeletedEvent(e))
+	return nil
+}
+
+func (s *service) publish(event events.Event) {
+	if s.eventBus == nil {
+		return
+	}
+	if err := s.eventBus.Publish(event); err != nil {
+		fmt.Printf("[enterprise.Service] warn: publish failed: %v\n", err)
+	}
+}

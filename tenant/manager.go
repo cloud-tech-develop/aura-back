@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
@@ -26,8 +27,8 @@ type Enterprise struct {
 	CommercialName string `json:"commercial_name"`
 	Slug           string
 	SubDomain      string `json:"sub_domain"`
-	Email          string
-	DV             string `json:"dv"`
+	Email          vo.Email
+	DV             vo.Document `json:"dv"`
 	Phone          string
 	MunicipalityID string `json:"municipality_id"`
 	Municipality   string
@@ -67,6 +68,19 @@ func (m *Manager) CreateEnterprise(ctx context.Context, e *Enterprise, passwordH
 	}
 	if !validSlug.MatchString(e.Slug) {
 		return fmt.Errorf("slug inválido: solo minúsculas, números y _")
+	}
+
+	// Check if email already exists before starting transaction
+	var existingID int64
+	err := m.db.QueryRowContext(ctx,
+		`SELECT id FROM public.enterprises WHERE email = $1 AND deleted_at IS NULL`,
+		e.Email,
+	).Scan(&existingID)
+	if err == nil {
+		return fmt.Errorf("el email %s ya está registrado", e.Email)
+	}
+	if err != sql.ErrNoRows {
+		return fmt.Errorf("verificando email: %w", err)
 	}
 
 	tx, err := m.db.BeginTx(ctx, nil)
@@ -201,7 +215,7 @@ func (m *Manager) Create(ctx context.Context, name, slug string) error {
 	return m.CreateEnterprise(ctx, &Enterprise{
 		Name:  name,
 		Slug:  slug,
-		Email: "",
+		Email: vo.Email(""),
 	}, "")
 }
 

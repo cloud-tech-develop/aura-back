@@ -1,13 +1,13 @@
 ### Create Enterprise
-POST http://localhost:8080/enterprises
+POST http://localhost:8081/enterprises
 Content-Type: application/json
 
 {
     "name": "Cloud Tecno SAS",
     "commercial_name": "Cloud Tecno",
-    "slug": "cloud_tecno",
-    "sub_domain": "cloudtecno",
-    "email": "admin@cloudtecno.com",
+    "slug": "cloud_tecno3",
+    "sub_domain": "cloudtecno3",
+    "email": "super-admincloudtecno.com",
     "password": "securepassword123",
     "dv": "1",
     "phone": "5551234",
@@ -16,7 +16,7 @@ Content-Type: application/json
 }
 
 ### Login
-POST http://localhost:8080/login
+POST http://localhost:8081/login
 Content-Type: application/json
 
 {

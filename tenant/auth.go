@@ -8,7 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/cloud-tech-develop/aura-back/domain/errors"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
+	"github.com/cloud-tech-develop/aura-back/shared/errors"
+	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -48,7 +50,7 @@ func GenerateToken(userID int64, e *Enterprise, roles []string, ip string) (stri
 		UserID:       userID,
 		EnterpriseID: e.ID,
 		Slug:         e.Slug,
-		Email:        e.Email,
+		Email:        e.Email.String(),
 		Roles:        roles,
 		IP:           ip,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -120,16 +122,16 @@ func AuthMiddleware() gin.HandlerFunc {
 func Login(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			Email    string `json:"email" binding:"required"`
-			Password string `json:"password" binding:"required"`
+			Email    vo.Email `json:"email" binding:"required"`
+			Password string   `json:"password" binding:"required"`
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": errors.ErrEmailPasswordRequired.Error()})
+			response.BadRequest(c, errors.ErrEmailPasswordRequired.Error())
 			return
 		}
 
-		email := req.Email
+		email := req.Email.String()
 		password := req.Password
 
 		// 1. Authenticate user and get enterprise info
@@ -146,42 +148,46 @@ func Login(db *sql.DB) gin.HandlerFunc {
 			SELECT u.id, u.password_hash, e.id, e.slug, e.status, u.active 
 			FROM public.users u
 			JOIN public.enterprises e ON u.enterprise_id = e.id
-			WHERE u.email = $1 AND u.deleted_at IS NULL AND e.deleted_at IS NULL`
+			WHERE u.email = $1 
+			AND u.deleted_at IS NULL 
+			AND e.deleted_at IS NULL`
 
 		err := db.QueryRowContext(c.Request.Context(), query, email).Scan(
 			&user.ID, &user.PasswordHash, &user.EnterpriseID, &user.Slug, &user.EntStatus, &user.UserActive,
 		)
 
 		if err == sql.ErrNoRows {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": errors.ErrInvalidCredentials.Error()})
+			response.Unauthorized(c, errors.ErrInvalidCredentials.Error())
 			return
 		}
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			response.InternalServerError(c, err.Error())
 			return
 		}
 
 		if user.EntStatus != "ACTIVE" {
-			c.JSON(http.StatusForbidden, gin.H{"error": errors.ErrEnterpriseInactive.Error()})
+			response.Forbidden(c, errors.ErrEnterpriseInactive.Error())
 			return
 		}
 
 		if !user.UserActive {
-			c.JSON(http.StatusForbidden, gin.H{"error": "usuario inactivo"})
+			response.Forbidden(c, errors.ErrUserInactive.Error())
 			return
 		}
 
 		if !CheckPassword(password, user.PasswordHash) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": errors.ErrInvalidCredentials.Error()})
+			response.Unauthorized(c, errors.ErrInvalidCredentials.Error())
 			return
 		}
 
 		// 2. Fetch roles from public schema
 		roles := []string{}
 		roleRows, err := db.QueryContext(c.Request.Context(), `
-			SELECT r.name FROM public.roles r
+			SELECT r.name 
+			FROM public.roles r
 			JOIN public.user_roles ur ON ur.role_id = r.id
-			WHERE ur.user_id = $1 AND r.deleted_at IS NULL`, user.ID)
+			WHERE ur.user_id = $1
+			AND r.deleted_at IS NULL`, user.ID)
 		if err == nil {
 			defer roleRows.Close()
 			for roleRows.Next() {
@@ -210,17 +216,17 @@ func Login(db *sql.DB) gin.HandlerFunc {
 		ent := Enterprise{
 			ID:    user.EnterpriseID,
 			Slug:  user.Slug,
-			Email: email,
+			Email: vo.Email(email),
 		}
 
 		clientIP := getClientIP(c)
 		token, err := GenerateToken(user.ID, &ent, roles, clientIP)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": errors.ErrTokenGeneration.Error()})
+			response.InternalServerError(c, errors.ErrTokenGeneration.Error())
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{
+		response.OK(c, gin.H{
 			"token": token,
 			"user": gin.H{
 				"id":         user.ID,

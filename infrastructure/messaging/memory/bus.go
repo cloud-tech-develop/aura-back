@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloud-tech-develop/aura-back/domain/events"
+	"github.com/cloud-tech-develop/aura-back/shared/events"
 )
 
 type subscription struct {
