@@ -570,6 +570,25 @@ paths:
           description: Unauthorized
         '404':
           description: User not found
+  /roles:
+    get:
+      summary: List roles available for current user
+      description: Returns roles filtered by the current user's role level. Only roles with level >= user's level are returned.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+        '401':
+          description: Unauthorized
   /products:
     post:
       summary: Create product
@@ -1101,6 +1120,9 @@ components:
           type: string
         description:
           type: string
+        level:
+          type: integer
+          description: Role hierarchy level (0=highest, e.g. SUPERADMIN)
     ThirdParty:
       type: object
       properties:

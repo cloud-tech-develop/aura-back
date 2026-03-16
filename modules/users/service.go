@@ -138,7 +138,18 @@ func (s *service) UpdateStatus(ctx context.Context, id int64, active bool) error
 	return s.repo.UpdateStatus(ctx, id, active)
 }
 
-func (s *service) AssignRoles(ctx context.Context, userID int64, roleIDs []int64) error {
+func (s *service) AssignRoles(ctx context.Context, userID int64, roleIDs []int64, minLevel int) error {
+	// Validate that all roles have level >= minLevel
+	for _, roleID := range roleIDs {
+		roleLevel, err := s.getRoleLevel(ctx, roleID)
+		if err != nil {
+			return fmt.Errorf("rol %d no encontrado", roleID)
+		}
+		if roleLevel < minLevel {
+			return fmt.Errorf("no tiene permiso para asignar el rol con nivel %d", roleLevel)
+		}
+	}
+
 	// Start transaction for role assignment
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -165,6 +176,22 @@ func (s *service) AssignRoles(ctx context.Context, userID int64, roleIDs []int64
 	}
 
 	return nil
+}
+
+func (s *service) getRoleLevel(ctx context.Context, roleID int64) (int, error) {
+	var level int
+	err := s.db.QueryRowContext(ctx, `SELECT level FROM public.roles WHERE id = $1 AND deleted_at IS NULL`, roleID).Scan(&level)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return -1, sql.ErrNoRows
+		}
+		return -1, err
+	}
+	return level, nil
+}
+
+func (s *service) ListRolesByMinLevel(ctx context.Context, minLevel int) ([]Role, error) {
+	return s.repo.ListRolesByMinLevel(ctx, minLevel)
 }
 
 func (s *service) publish(event events.Event) {

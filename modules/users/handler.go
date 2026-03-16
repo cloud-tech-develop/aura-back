@@ -87,7 +87,8 @@ func (h *Handler) Create(c *gin.Context) {
 
 	// Assign roles if provided
 	if len(req.Roles) > 0 {
-		if err := h.svc.AssignRoles(c.Request.Context(), user.ID, req.Roles); err != nil {
+		roleLevel := c.GetInt("role_level")
+		if err := h.svc.AssignRoles(c.Request.Context(), user.ID, req.Roles, roleLevel); err != nil {
 			// Log error but don't fail the request? Or fail it?
 			// For now, return error.
 			response.BadRequest(c, fmt.Sprintf("usuario creado pero error al asignar roles: %v", err))
@@ -324,7 +325,10 @@ func (h *Handler) AssignRoles(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.AssignRoles(c.Request.Context(), id, req.RoleIDs); err != nil {
+	// Get role level from JWT to validate permissions
+	roleLevel := c.GetInt("role_level")
+
+	if err := h.svc.AssignRoles(c.Request.Context(), id, req.RoleIDs, roleLevel); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
@@ -354,4 +358,23 @@ func containsHelper(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// ─── GET /roles ───────────────────────────────────────────────────────────
+
+func (h *Handler) ListRoles(c *gin.Context) {
+	// Get role level from JWT claims (set by middleware)
+	roleLevel := c.GetInt("role_level")
+	if roleLevel == 0 {
+		// If not set, default to 0 (SUPERADMIN can see all)
+		roleLevel = 0
+	}
+
+	roles, err := h.svc.ListRolesByMinLevel(c.Request.Context(), roleLevel)
+	if err != nil {
+		response.InternalServerError(c, err.Error())
+		return
+	}
+
+	response.OK(c, roles)
 }

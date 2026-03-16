@@ -11,4 +11,5 @@ func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
 	protected.PUT("/users/:id", h.Update)
 	protected.PATCH("/users/:id/status", h.UpdateStatus)
 	protected.PATCH("/users/:id/roles", h.AssignRoles)
+	protected.GET("/roles", h.ListRoles)
 }

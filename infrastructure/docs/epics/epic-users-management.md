@@ -68,6 +68,7 @@ No incluye:
 - [ ] HU-009 - Actualizar datos de usuario
 - [ ] HU-010 - Cambiar estado del usuario (activo/inactivo)
 - [ ] HU-011 - Asignar roles a usuario
+- [ ] HU-012 - Listar roles disponibles
 
 ---
 

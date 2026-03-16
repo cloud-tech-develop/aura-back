@@ -159,3 +159,32 @@ func (r *repository) UpdateStatus(ctx context.Context, id int64, active bool) er
 	}
 	return nil
 }
+
+func (r *repository) ListRolesByMinLevel(ctx context.Context, minLevel int) ([]Role, error) {
+	query := `
+		SELECT id, name, description, level
+		FROM public.roles 
+		WHERE level >= $1 AND deleted_at IS NULL
+		ORDER BY level ASC`
+
+	rows, err := r.q.QueryContext(ctx, query, minLevel)
+	if err != nil {
+		return nil, fmt.Errorf("repository: failed to list roles: %w", err)
+	}
+	defer rows.Close()
+
+	var roles []Role
+	for rows.Next() {
+		var role Role
+		if err := rows.Scan(&role.ID, &role.Name, &role.Description, &role.Level); err != nil {
+			return nil, fmt.Errorf("repository: failed to scan role: %w", err)
+		}
+		roles = append(roles, role)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repository: rows error: %w", err)
+	}
+
+	return roles, nil
+}

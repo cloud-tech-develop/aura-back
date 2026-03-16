@@ -36,6 +36,14 @@ type User struct {
 	IsEmployee        bool
 }
 
+// Role represents a role entity in the public.roles table.
+type Role struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Level       int    `json:"level"`
+}
+
 // Repository defines the data access operations for users.
 type Repository interface {
 	Create(ctx context.Context, user *User) error
@@ -44,6 +52,7 @@ type Repository interface {
 	ListByEnterprise(ctx context.Context, enterpriseID int64, limit, offset int) ([]User, error)
 	Update(ctx context.Context, user *User) error
 	UpdateStatus(ctx context.Context, id int64, active bool) error
+	ListRolesByMinLevel(ctx context.Context, minLevel int) ([]Role, error)
 }
 
 // Service defines the business logic for users.
@@ -53,5 +62,6 @@ type Service interface {
 	ListByEnterprise(ctx context.Context, enterpriseID int64, page, limit int) ([]User, error)
 	Update(ctx context.Context, user *User) error
 	UpdateStatus(ctx context.Context, id int64, active bool) error
-	AssignRoles(ctx context.Context, userID int64, roleIDs []int64) error
+	AssignRoles(ctx context.Context, userID int64, roleIDs []int64, minLevel int) error
+	ListRolesByMinLevel(ctx context.Context, minLevel int) ([]Role, error)
 }
