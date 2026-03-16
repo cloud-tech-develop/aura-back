@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/cloud-tech-develop/aura-back/modules/enterprise"
+	"github.com/cloud-tech-develop/aura-back/modules/users"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/gin-gonic/gin"
@@ -35,6 +36,7 @@ func NewServer(db *sql.DB, tenantMgr *tenant.Manager) *Server {
 // To add a new module, call its Register() here.
 func (s *Server) RegisterModules(
 	enterpriseH *enterprise.Handler,
+	userH *users.Handler,
 ) {
 	// ── Auth ─────────────────────────────────────────────────────────────────
 	s.router.POST("/login", tenant.Login(s.db))
@@ -51,6 +53,7 @@ func (s *Server) RegisterModules(
 
 	// ── Feature Modules ───────────────────────────────────────────────────────
 	enterprise.Register(public, protected, enterpriseH)
+	users.Register(public, protected, userH)
 
 	// To add a new module:
 	// product.Register(public, protected, productH)
