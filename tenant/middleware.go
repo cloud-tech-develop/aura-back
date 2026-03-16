@@ -14,12 +14,17 @@ const TenantKey contextKey = "tenant"
 
 func Middleware(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		slug := c.GetHeader("X-Tenant")
-		if slug == "" {
+		// 1. First, try to get tenant from JWT token (set by AuthMiddleware)
+		slug, hasSlug := SlugFromContext(c)
+
+		// 2. If not in token, try to resolve from subdomain
+		if !hasSlug || slug == "" {
 			slug = resolveSubDomain(c)
 		}
+
+		// 3. If still no tenant, require authentication
 		if slug == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "header X-Tenant o subdominio requerido"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "tenant no encontrado. Inicie sesión para acceder a un tenant"})
 			return
 		}
 

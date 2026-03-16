@@ -78,6 +78,7 @@ func (a *enterpriseMigratorAdapter) RunMigrations(ctx context.Context, e *enterp
 		Slug:           e.Slug,
 		SubDomain:      e.SubDomain,
 		Email:          e.Email,
+		Document:       e.Document.String(),
 		DV:             e.DV,
 		Phone:          e.Phone,
 		MunicipalityID: e.MunicipalityID,

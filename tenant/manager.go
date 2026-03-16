@@ -26,9 +26,10 @@ type Enterprise struct {
 	Name           string `json:"name"` // Razón social
 	CommercialName string `json:"commercial_name"`
 	Slug           string
-	SubDomain      string `json:"sub_domain"`
-	Email          vo.Email
-	DV             vo.Document `json:"dv"`
+	SubDomain      string   `json:"sub_domain"`
+	Email          vo.Email `json:"email"`
+	Document       string   `json:"document"`
+	DV             string   `json:"dv"`
 	Phone          string
 	MunicipalityID string `json:"municipality_id"`
 	Municipality   string
@@ -68,6 +69,11 @@ func (m *Manager) CreateEnterprise(ctx context.Context, e *Enterprise, passwordH
 	}
 	if !validSlug.MatchString(e.Slug) {
 		return fmt.Errorf("slug inválido: solo minúsculas, números y _")
+	}
+
+	// Validate slug length (HU-001)
+	if len(e.Slug) < 3 || len(e.Slug) > 50 {
+		return fmt.Errorf("slug debe tener entre 3 y 50 caracteres")
 	}
 
 	// Check if email already exists before starting transaction
@@ -134,6 +140,16 @@ func (m *Manager) CreateEnterprise(ctx context.Context, e *Enterprise, passwordH
 	).Scan(&userID)
 	if err != nil {
 		return fmt.Errorf("crear usuario inicial en public: %w", err)
+	}
+
+	// 4.1 Assign ADMIN role to the initial user (HU-003)
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO public.user_roles (user_id, role_id) VALUES ($1, 1)
+		 ON CONFLICT DO NOTHING`,
+		userID,
+	)
+	if err != nil {
+		return fmt.Errorf("asignar rol ADMIN: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

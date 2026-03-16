@@ -19,6 +19,7 @@ import (
 type Claims struct {
 	UserID       int64    `json:"user_id"`
 	EnterpriseID int64    `json:"enterprise_id"`
+	TenantID     int64    `json:"tenant_id"` // Agregado: ID del tenant
 	Slug         string   `json:"slug"`
 	Email        string   `json:"email"`
 	Roles        []string `json:"roles"`
@@ -49,6 +50,7 @@ func GenerateToken(userID int64, e *Enterprise, roles []string, ip string) (stri
 	claims := Claims{
 		UserID:       userID,
 		EnterpriseID: e.ID,
+		TenantID:     e.TenantID, // Include tenant ID
 		Slug:         e.Slug,
 		Email:        e.Email.String(),
 		Roles:        roles,
@@ -139,13 +141,14 @@ func Login(db *sql.DB) gin.HandlerFunc {
 			ID           int64
 			PasswordHash string
 			EnterpriseID int64
+			TenantID     int64
 			Slug         string
 			EntStatus    string
 			UserActive   bool
 		}
 
 		query := `
-			SELECT u.id, u.password_hash, e.id, e.slug, e.status, u.active 
+			SELECT u.id, u.password_hash, e.id, e.tenant_id, e.slug, e.status, u.active 
 			FROM public.users u
 			JOIN public.enterprises e ON u.enterprise_id = e.id
 			WHERE u.email = $1 
@@ -153,7 +156,7 @@ func Login(db *sql.DB) gin.HandlerFunc {
 			AND e.deleted_at IS NULL`
 
 		err := db.QueryRowContext(c.Request.Context(), query, email).Scan(
-			&user.ID, &user.PasswordHash, &user.EnterpriseID, &user.Slug, &user.EntStatus, &user.UserActive,
+			&user.ID, &user.PasswordHash, &user.EnterpriseID, &user.TenantID, &user.Slug, &user.EntStatus, &user.UserActive,
 		)
 
 		if err == sql.ErrNoRows {
@@ -214,9 +217,10 @@ func Login(db *sql.DB) gin.HandlerFunc {
 
 		// 4. Generate JWT
 		ent := Enterprise{
-			ID:    user.EnterpriseID,
-			Slug:  user.Slug,
-			Email: vo.Email(email),
+			ID:       user.EnterpriseID,
+			TenantID: user.TenantID,
+			Slug:     user.Slug,
+			Email:    vo.Email(email),
 		}
 
 		clientIP := getClientIP(c)
@@ -236,8 +240,9 @@ func Login(db *sql.DB) gin.HandlerFunc {
 				"roles":      roles,
 			},
 			"enterprise": gin.H{
-				"id":   user.EnterpriseID,
-				"slug": user.Slug,
+				"id":        user.EnterpriseID,
+				"tenant_id": user.TenantID,
+				"slug":      user.Slug,
 			},
 		})
 	}

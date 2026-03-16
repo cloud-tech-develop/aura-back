@@ -14,7 +14,7 @@ MigrateAll()     →  migra esquemas de todos los tenants existentes
     ↓
 POST /tenants    →  Create() → nuevo esquema + migraciones automáticas
     ↓
-GET /me con X-Tenant: empresa_uno
+GET /me con JWT.slug: empresa_uno
     →  Middleware valida → handler opera en esquema empresa_uno
 ```
 

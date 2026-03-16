@@ -53,6 +53,11 @@ func NotFound(c *gin.Context, msg string) {
 	c.JSON(http.StatusNotFound, gin.H{"message": msg, "success": false, "data": nil})
 }
 
+// Conflict sends a 409 JSON error response.
+func Conflict(c *gin.Context, msg string) {
+	c.JSON(http.StatusConflict, gin.H{"error": "conflict", "message": msg, "success": false, "data": nil})
+}
+
 // Internal sends a 500 JSON error response.
 func InternalServerError(c *gin.Context, msg string) {
 	c.JSON(http.StatusInternalServerError, gin.H{"message": msg, "success": false, "data": nil})

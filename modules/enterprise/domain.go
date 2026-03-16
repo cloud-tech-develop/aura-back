@@ -26,7 +26,8 @@ type Enterprise struct {
 	Slug           string                 `json:"slug"`
 	SubDomain      string                 `json:"sub_domain"`
 	Email          vo.Email               `json:"email"`
-	DV             vo.Document            `json:"dv"`
+	Document       vo.Document            `json:"document"`
+	DV             string                 `json:"dv"`
 	Phone          string                 `json:"phone"`
 	MunicipalityID string                 `json:"municipality_id"`
 	Municipality   string                 `json:"municipality"`
@@ -53,12 +54,34 @@ func (e *Enterprise) ToEventPayload() map[string]interface{} {
 
 // ─── Repository Interface ─────────────────────────────────────────────────────
 
+// ListParams holds pagination and filter parameters
+type ListParams struct {
+	Page   int
+	Limit  int
+	Status string
+}
+
+// ListResult holds the paginated result
+type ListResult struct {
+	Data       []Enterprise `json:"data"`
+	Pagination Pagination   `json:"pagination"`
+}
+
+// Pagination holds pagination metadata
+type Pagination struct {
+	Page       int   `json:"page"`
+	Limit      int   `json:"limit"`
+	Total      int64 `json:"total"`
+	TotalPages int64 `json:"totalPages"`
+}
+
 type Repository interface {
 	Create(ctx context.Context, e *Enterprise) error
 	GetBySlug(ctx context.Context, slug string) (*Enterprise, error)
 	GetBySubDomain(ctx context.Context, subDomain string) (*Enterprise, error)
 	GetByEmail(ctx context.Context, email vo.Email) (*Enterprise, error)
-	List(ctx context.Context) ([]Enterprise, error)
+	EmailExistsInUsers(ctx context.Context, email vo.Email) (bool, error)
+	List(ctx context.Context, params ListParams) (ListResult, error)
 	Update(ctx context.Context, e *Enterprise) error
 	Delete(ctx context.Context, id int64) error
 }
@@ -70,7 +93,7 @@ type Service interface {
 	GetBySlug(ctx context.Context, slug string) (*Enterprise, error)
 	GetBySubDomain(ctx context.Context, subDomain string) (*Enterprise, error)
 	GetByEmail(ctx context.Context, email vo.Email) (*Enterprise, error)
-	List(ctx context.Context) ([]Enterprise, error)
+	List(ctx context.Context, params ListParams) (ListResult, error)
 	Update(ctx context.Context, e *Enterprise) error
 	Delete(ctx context.Context, id int64) error
 }

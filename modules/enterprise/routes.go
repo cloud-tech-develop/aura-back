@@ -11,4 +11,6 @@ func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
 	// Protected — behind AuthMiddleware
 	protected.GET("/enterprises", h.List)
 	protected.GET("/enterprises/:slug", h.GetBySlug)
+	protected.PUT("/enterprises/:slug", h.Update)
+	protected.PATCH("/enterprises/:slug/status", h.UpdateStatus)
 }

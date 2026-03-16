@@ -14,6 +14,13 @@ import (
 
 var validSlug = regexp.MustCompile(`^[a-z0-9_]+$`)
 
+// Constants for validation
+const (
+	MinSlugLength     = 3
+	MaxSlugLength     = 50
+	MinPasswordLength = 8
+)
+
 type service struct {
 	repo     Repository
 	eventBus events.EventBus
@@ -37,6 +44,16 @@ func (s *service) Create(ctx context.Context, e *Enterprise, passwordHash string
 	}
 	if !validSlug.MatchString(e.Slug) {
 		return fmt.Errorf("slug inválido: solo minúsculas, números y _")
+	}
+
+	// Validate slug length (HU-001)
+	if len(e.Slug) < MinSlugLength || len(e.Slug) > MaxSlugLength {
+		return fmt.Errorf("slug debe tener entre %d y %d caracteres", MinSlugLength, MaxSlugLength)
+	}
+
+	// Validate subdomain length if provided
+	if e.SubDomain != "" && (len(e.SubDomain) < MinSlugLength || len(e.SubDomain) > MaxSlugLength) {
+		return fmt.Errorf("el subdominio debe tener entre %d y %d caracteres", MinSlugLength, MaxSlugLength)
 	}
 
 	// Check if slug already exists
@@ -68,6 +85,15 @@ func (s *service) Create(ctx context.Context, e *Enterprise, passwordHash string
 		return fmt.Errorf("verificando email: %w", err)
 	}
 
+	// Check if email already exists in public.users (HU-002)
+	emailExistsInUsers, err := s.repo.EmailExistsInUsers(ctx, e.Email)
+	if err != nil {
+		return fmt.Errorf("verificando email en usuarios: %w", err)
+	}
+	if emailExistsInUsers {
+		return fmt.Errorf("el correo electrónico %s ya está registrado", e.Email)
+	}
+
 	// CreateEnterprise via migrator handles schema + tenant + user + third_party
 	if s.migrator != nil {
 		if err := s.migrator.RunMigrations(ctx, e, passwordHash); err != nil {
@@ -91,8 +117,8 @@ func (s *service) GetByEmail(ctx context.Context, email vo.Email) (*Enterprise, 
 	return s.repo.GetByEmail(ctx, email)
 }
 
-func (s *service) List(ctx context.Context) ([]Enterprise, error) {
-	return s.repo.List(ctx)
+func (s *service) List(ctx context.Context, params ListParams) (ListResult, error) {
+	return s.repo.List(ctx, params)
 }
 
 func (s *service) Update(ctx context.Context, e *Enterprise) error {

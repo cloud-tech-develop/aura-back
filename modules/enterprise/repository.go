@@ -96,13 +96,45 @@ func (r *postgresRepository) GetByEmail(ctx context.Context, email vo.Email) (*E
 	return &e, nil
 }
 
-func (r *postgresRepository) List(ctx context.Context) ([]Enterprise, error) {
-	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, name, commercial_name, slug, sub_domain, email, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at 
-		 FROM public.enterprises WHERE deleted_at IS NULL ORDER BY created_at DESC`,
-	)
+func (r *postgresRepository) List(ctx context.Context, params ListParams) (ListResult, error) {
+	// Set defaults
+	if params.Page < 1 {
+		params.Page = 1
+	}
+	if params.Limit < 1 {
+		params.Limit = 10
+	}
+	if params.Limit > 100 {
+		params.Limit = 100
+	}
+
+	// Build query with filters
+	baseQuery := "FROM public.enterprises WHERE deleted_at IS NULL"
+	var args []interface{}
+	argIndex := 1
+
+	if params.Status != "" {
+		baseQuery += fmt.Sprintf(" AND status = $%d", argIndex)
+		args = append(args, params.Status)
+		argIndex++
+	}
+
+	// Count total
+	var total int64
+	countQuery := "SELECT COUNT(*) " + baseQuery
+	err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
-		return nil, err
+		return ListResult{}, err
+	}
+
+	// Get paginated data
+	offset := (params.Page - 1) * params.Limit
+	dataQuery := fmt.Sprintf("SELECT id, name, commercial_name, slug, sub_domain, email, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d", baseQuery, argIndex, argIndex+1)
+	args = append(args, params.Limit, offset)
+
+	rows, err := r.db.QueryContext(ctx, dataQuery, args...)
+	if err != nil {
+		return ListResult{}, err
 	}
 	defer rows.Close()
 
@@ -113,12 +145,26 @@ func (r *postgresRepository) List(ctx context.Context) ([]Enterprise, error) {
 		if err := rows.Scan(&e.ID, &e.Name, &e.CommercialName, &e.Slug, &e.SubDomain,
 			&e.Email, &e.DV, &e.Phone, &e.MunicipalityID, &e.Municipality, &e.Status,
 			&settingsJSON, &e.CreatedAt, &e.UpdatedAt); err != nil {
-			return nil, err
+			return ListResult{}, err
 		}
 		_ = json.Unmarshal(settingsJSON, &e.Settings)
 		list = append(list, e)
 	}
-	return list, nil
+
+	totalPages := total / int64(params.Limit)
+	if total%int64(params.Limit) > 0 {
+		totalPages++
+	}
+
+	return ListResult{
+		Data: list,
+		Pagination: Pagination{
+			Page:       params.Page,
+			Limit:      params.Limit,
+			Total:      total,
+			TotalPages: totalPages,
+		},
+	}, nil
 }
 
 func (r *postgresRepository) Update(ctx context.Context, e *Enterprise) error {
@@ -148,4 +194,24 @@ func (r *postgresRepository) Delete(ctx context.Context, id int64) error {
 // dropSchema is an internal helper used by service.
 func (r *postgresRepository) dropSchema(slug string) {
 	r.db.Exec(fmt.Sprintf("DROP SCHEMA IF EXISTS %q CASCADE", slug))
+}
+
+// EmailExistsInUsers checks if email already exists in public.users (HU-002)
+func (r *postgresRepository) EmailExistsInUsers(ctx context.Context, email vo.Email) (bool, error) {
+	var exists bool
+	err := r.db.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM public.users WHERE email = $1)`,
+		email,
+	).Scan(&exists)
+	return exists, err
+}
+
+// EnterpriseExistsByStatus checks if an enterprise exists with given status
+func (r *postgresRepository) EnterpriseExistsByStatus(ctx context.Context, slug string, status string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM public.enterprises WHERE slug = $1 AND status = $2 AND deleted_at IS NULL)`,
+		slug, status,
+	).Scan(&exists)
+	return exists, err
 }
