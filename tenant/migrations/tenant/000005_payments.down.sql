@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS cash_drawer;
+DROP TABLE IF EXISTS payment;

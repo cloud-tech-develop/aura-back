@@ -9,6 +9,7 @@ import (
 	"github.com/cloud-tech-develop/aura-back/infrastructure/messaging/memory"
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/modules/enterprise"
+	"github.com/cloud-tech-develop/aura-back/modules/products"
 	"github.com/cloud-tech-develop/aura-back/modules/users"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/joho/godotenv"
@@ -67,9 +68,12 @@ func main() {
 	_ = eventBus.Subscribe(users.EventUpdated, usersLogger)
 	// _ = eventBus.Subscribe(users.EventDeleted, usersLogger) // If implemented
 
+	// Products module
+	productsHandler := products.NewHandler(database.DB)
+
 	// ── HTTP Server ──────────────────────────────────────────────────────────
 	srv := server.NewServer(database.DB, tenantMgr)
-	srv.RegisterModules(enterpriseHandler, usersHandler)
+	srv.RegisterModules(enterpriseHandler, usersHandler, productsHandler)
 
 	log.Println("servidor en :" + port)
 	if err := srv.Run(":" + port); err != nil {
