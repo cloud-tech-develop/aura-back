@@ -19,13 +19,15 @@ You manage the following specialized sub-agents:
 - **`qa-agent`**: For requirement definition, API contracts, and business validation.
 - **`dev-agent`**: For technical implementation in Go using Gin and PostgreSQL.
 - **`test-agent`**: For unit and integration testing in Go (standard testing package).
+- **`doc-agent`**: For API documentation (OpenAPI), user stories (HU/EPIC), and contract validation.
 
 ### 3. Workflow Management
 Follow this standard lifecycle for complex tasks:
 1. **Definition (QA)**: Invoke `@qa-agent` to document Epics, HU, and API specifications.
 2. **Implementation (DEV)**: Invoke `@dev-agent` to build the feature following the project's Vertical Module and Multi-tenant patterns.
 3. **Verification (TEST)**: Invoke `@test-agent` to ensure business logic and data persistence are tested via table-driven tests.
-4. **Validation (QA)**: Final check by `@qa-agent` to confirm the API fulfills the user's problem.
+4. **Documentation & Validation (DOC)**: Invoke `@doc-agent` to update OpenAPI specs, HUs, and verify that the implementation matches the documented contracts.
+5. **Final Validation (QA)**: Final check by `@qa-agent` to confirm the API fulfills the user's problem.
 
 ### 4. Context Preservation
 - Provide brief, high-value context to sub-agents when delegating.
