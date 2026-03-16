@@ -294,6 +294,282 @@ paths:
           description: Unauthorized
         '404':
           description: Enterprise not found
+  /users:
+    post:
+      summary: Create user
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - name
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+                password:
+                  type: string
+                  description: Minimum 8 characters
+                roles:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                document_number:
+                  type: string
+                document_type:
+                  type: string
+                  enum: [CC, CE, NIT, PASSPORT]
+                personal_email:
+                  type: string
+                  format: email
+                tax_responsibility:
+                  type: string
+                is_employee:
+                  type: boolean
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Bad Request
+        '409':
+          description: Conflict (Email already exists)
+    get:
+      summary: List users for enterprise
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Items per page
+        - in: query
+          name: status
+          schema:
+            type: string
+          description: Filter by status (active/inactive)
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  pagination:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                      limit:
+                        type: integer
+                      total:
+                        type: integer
+        '401':
+          description: Unauthorized
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: User ID
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+        '404':
+          description: User not found
+    put:
+      summary: Update user
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: User ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                document_number:
+                  type: string
+                document_type:
+                  type: string
+                personal_email:
+                  type: string
+                  format: email
+                tax_responsibility:
+                  type: string
+                is_employee:
+                  type: boolean
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+        '404':
+          description: User not found
+        '409':
+          description: Conflict (Email already exists)
+    patch:
+      summary: Update user status
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: User ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - active
+              properties:
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  active:
+                    type: boolean
+        '401':
+          description: Unauthorized
+        '404':
+          description: User not found
+  /users/{id}/roles:
+    patch:
+      summary: Assign roles to user
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: User ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role_ids
+              properties:
+                role_ids:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+      responses:
+        '200':
+          description: Roles assigned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  role_ids:
+                    type: array
+                    items:
+                      type: integer
+                      format: int64
+        '401':
+          description: Unauthorized
+        '404':
+          description: User not found
 components:
   securitySchemes:
     bearerAuth:
@@ -334,5 +610,76 @@ components:
           type: string
           format: date-time
         updated_at:
+          type: string
+          format: date-time
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        enterprise_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        third_party:
+          $ref: '#/components/schemas/ThirdParty'
+    Role:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+    ThirdParty:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        user_id:
+          type: integer
+          format: int64
+        first_name:
+          type: string
+        last_name:
+          type: string
+        document_number:
+          type: string
+        document_type:
+          type: string
+        personal_email:
+          type: string
+          format: email
+        tax_responsibility:
+          type: string
+        is_employee:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        deleted_at:
           type: string
           format: date-time
