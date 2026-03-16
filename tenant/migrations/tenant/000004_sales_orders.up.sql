@@ -2,7 +2,7 @@
 CREATE TABLE sales_order (
     id BIGSERIAL PRIMARY KEY,
     order_number VARCHAR(50) NOT NULL,
-    customer_id BIGINT REFERENCES public.third_parties(id),
+    customer_id BIGINT REFERENCES third_parties(id),
     user_id BIGINT NOT NULL REFERENCES public.users(id),
     branch_id BIGINT NOT NULL REFERENCES public.branches(id),
     empresa_id BIGINT NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE sales_order (
     
     CONSTRAINT sales_order_empresa_fk FOREIGN KEY (empresa_id) REFERENCES public.enterprises(id),
     CONSTRAINT sales_order_user_fk FOREIGN KEY (user_id) REFERENCES public.users(id),
-    CONSTRAINT sales_order_customer_fk FOREIGN KEY (customer_id) REFERENCES public.third_parties(id),
+    CONSTRAINT sales_order_customer_fk FOREIGN KEY (customer_id) REFERENCES third_parties(id),
     CONSTRAINT sales_order_number_unique UNIQUE (empresa_id, branch_id, order_number)
 );
 

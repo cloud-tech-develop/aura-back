@@ -2,7 +2,7 @@
 CREATE TABLE cart (
     id BIGSERIAL PRIMARY KEY,
     cart_code VARCHAR(50) NOT NULL,
-    customer_id BIGINT REFERENCES public.third_parties(id), -- Referencia a tercero (cliente)
+    customer_id BIGINT,
     user_id BIGINT NOT NULL REFERENCES public.users(id),
     branch_id BIGINT NOT NULL REFERENCES public.branches(id),
     empresa_id BIGINT NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE cart (
     
     CONSTRAINT cart_empresa_fk FOREIGN KEY (empresa_id) REFERENCES public.enterprises(id),
     CONSTRAINT cart_user_fk FOREIGN KEY (user_id) REFERENCES public.users(id),
-    CONSTRAINT cart_customer_fk FOREIGN KEY (customer_id) REFERENCES public.third_parties(id),
+    CONSTRAINT cart_customer_fk FOREIGN KEY (customer_id) REFERENCES third_parties(id),
     CONSTRAINT cart_code_unique UNIQUE (empresa_id, cart_code)
 );
 

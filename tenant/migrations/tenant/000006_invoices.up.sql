@@ -19,7 +19,7 @@ CREATE TABLE invoice (
     prefix VARCHAR(10) NOT NULL,
     sequence BIGINT NOT NULL,
     sales_order_id BIGINT NOT NULL REFERENCES sales_order(id),
-    customer_id BIGINT REFERENCES public.third_parties(id),
+    customer_id BIGINT REFERENCES third_parties(id),
     user_id BIGINT NOT NULL REFERENCES public.users(id),
     branch_id BIGINT NOT NULL,
     empresa_id BIGINT NOT NULL,
@@ -39,7 +39,7 @@ CREATE TABLE invoice (
     CONSTRAINT invoice_branch_fk FOREIGN KEY (branch_id) REFERENCES public.branches(id),
     CONSTRAINT invoice_user_fk FOREIGN KEY (user_id) REFERENCES public.users(id),
     CONSTRAINT invoice_sales_order_fk FOREIGN KEY (sales_order_id) REFERENCES sales_order(id),
-    CONSTRAINT invoice_customer_fk FOREIGN KEY (customer_id) REFERENCES public.third_parties(id),
+    CONSTRAINT invoice_customer_fk FOREIGN KEY (customer_id) REFERENCES third_parties(id),
     CONSTRAINT invoice_number_unique UNIQUE (empresa_id, invoice_number),
     CONSTRAINT invoice_sequence_unique UNIQUE (empresa_id, branch_id, prefix, sequence)
 );
