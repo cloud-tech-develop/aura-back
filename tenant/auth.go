@@ -89,7 +89,7 @@ func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": errors.ErrAuthHeaderRequired.Error()})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"data": nil, "success": false, "message": errors.ErrAuthHeaderRequired.Error()})
 			return
 		}
 
@@ -104,13 +104,13 @@ func AuthMiddleware() gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": errors.ErrTokenInvalid.Error()})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"data": nil, "success": false, "message": errors.ErrTokenInvalid.Error()})
 			return
 		}
 
 		clientIP := getClientIP(c)
 		if claims.IP != "" && claims.IP != clientIP {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": errors.ErrIPNotValid.Error()})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"data": nil, "success": false, "message": errors.ErrIPNotValid.Error()})
 			return
 		}
 

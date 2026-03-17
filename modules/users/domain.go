@@ -16,24 +16,24 @@ const (
 // User represents a user entity in the public.users table.
 // It also carries data for the associated third_party in the tenant schema.
 type User struct {
-	ID           int64
-	EnterpriseID int64
-	Name         string // Maps to public.users.name
-	Email        vo.Email
-	PasswordHash string
-	Active       bool
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	DeletedAt    *time.Time
+	ID           int64      `json:"id"`
+	EnterpriseID int64      `json:"enterprise_id"`
+	Name         string     `json:"name"` // Maps to public.users.name
+	Email        vo.Email   `json:"email"`
+	PasswordHash string     `json:"-"` // no visible en json
+	Active       bool       `json:"active"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"-"` // no visible en json
+	DeletedAt    *time.Time `json:"-"` // no visible en json
 
 	// Third party fields (not stored in public.users, but used for tenant.third_parties)
-	FirstName         string
-	LastName          string
-	DocumentNumber    string
-	DocumentType      string
-	PersonalEmail     string
-	TaxResponsibility string
-	IsEmployee        bool
+	FirstName         string `json:"first_name"`
+	LastName          string `json:"last_name"`
+	DocumentNumber    string `json:"document_number"`
+	DocumentType      string `json:"document_type"`
+	PersonalEmail     string `json:"personal_email"`
+	TaxResponsibility string `json:"tax_responsibility"`
+	IsEmployee        bool   `json:"is_employee"`
 }
 
 // Role represents a role entity in the public.roles table.
