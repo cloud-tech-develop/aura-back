@@ -1,6 +1,7 @@
 # HU-SALES-002 - Shopping Cart / Quote Management
 
 ## 📌 General Information
+
 - ID: HU-SALES-002
 - Epic: EPIC-SALES-001
 - Priority: High
@@ -22,6 +23,7 @@
 ## 🧠 Functional Description
 
 The system must allow creating temporary shopping carts that can be converted to sales orders. Carts should support:
+
 - Adding/removing products with quantities
 - Applying discounts at cart or item level
 - Calculating taxes automatically
@@ -35,6 +37,7 @@ Carts are temporary until converted to sales orders, after which they become per
 ## ✅ Acceptance Criteria
 
 ### Scenario 1: Create a new shopping cart
+
 - Given that I am logged in as a cashier
 - When I start a new sale
 - Then a new cart must be created with:
@@ -45,30 +48,35 @@ Carts are temporary until converted to sales orders, after which they become per
   - Branch ID from JWT
 
 ### Scenario 2: Add products to cart
+
 - Given that a cart exists
 - When I add a product with quantity
 - Then the product must be added to the cart items
 - And the cart total must be recalculated including taxes
 
 ### Scenario 3: Update cart item quantities
+
 - Given that a product is in the cart
 - When I change the quantity
 - Then the item total must be recalculated
 - And the cart grand total must be updated
 
 ### Scenario 4: Apply discount to cart
+
 - Given that a cart has items
 - When I apply a discount percentage or fixed amount
 - Then the discount must be applied to the total
 - And the discount must be validated against user permissions
 
 ### Scenario 5: Save quote for later
+
 - Given that I have a cart with items
 - When I save the cart as a quote
 - Then the quote must be stored with customer information
 - And I can retrieve it later to continue editing
 
 ### Scenario 6: Convert quote to sale
+
 - Given that I have a saved quote
 - When I convert it to a sale
 - Then a sales order must be created
@@ -99,6 +107,7 @@ Carts are temporary until converted to sales orders, after which they become per
 ## 🗄️ Database Schema (PostgreSQL)
 
 ### Table: cart
+
 ```sql
 CREATE TABLE cart (
     id BIGSERIAL PRIMARY KEY,
@@ -106,7 +115,7 @@ CREATE TABLE cart (
     customer_id INTEGER REFERENCES customer(id),
     user_id INTEGER NOT NULL REFERENCES usuario(id),
     branch_id INTEGER NOT NULL REFERENCES branch(id),
-    empresa_id INTEGER NOT NULL REFERENCES empresa(id),
+    enterprise_id INTEGER NOT NULL REFERENCES empresa(id),
     subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
     discount DECIMAL(12,2) NOT NULL DEFAULT 0,
     tax_total DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -114,20 +123,21 @@ CREATE TABLE cart (
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SAVED', 'CONVERTED', 'EXPIRED')),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP,
-    
-    CONSTRAINT cart_empresa_fk FOREIGN KEY (empresa_id) REFERENCES empresa(id),
+
+    CONSTRAINT cart_empresa_fk FOREIGN KEY (enterprise_id) REFERENCES empresa(id),
     CONSTRAINT cart_user_fk FOREIGN KEY (user_id) REFERENCES usuario(id),
     CONSTRAINT cart_branch_fk FOREIGN KEY (branch_id) REFERENCES branch(id),
     CONSTRAINT cart_customer_fk FOREIGN KEY (customer_id) REFERENCES customer(id),
-    CONSTRAINT cart_code_unique UNIQUE (empresa_id, cart_code)
+    CONSTRAINT cart_code_unique UNIQUE (enterprise_id, cart_code)
 );
 
-CREATE INDEX idx_cart_empresa ON cart(empresa_id);
+CREATE INDEX idx_cart_empresa ON cart(enterprise_id);
 CREATE INDEX idx_cart_user ON cart(user_id);
 CREATE INDEX idx_cart_status ON cart(status);
 ```
 
 ### Table: cart_item
+
 ```sql
 CREATE TABLE cart_item (
     id BIGSERIAL PRIMARY KEY,
@@ -142,7 +152,7 @@ CREATE TABLE cart_item (
     total DECIMAL(12,2) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP,
-    
+
     CONSTRAINT cart_item_cart_fk FOREIGN KEY (cart_id) REFERENCES cart(id) ON DELETE CASCADE,
     CONSTRAINT cart_item_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
 );
@@ -168,12 +178,13 @@ CREATE INDEX idx_cart_item_product ON cart_item(product_id);
 ### Entities (Java)
 
 **CartEntity:**
+
 - id (Long, PK)
 - cart_code (String, unique)
 - customer_id (Long, FK, nullable)
 - user_id (Long, FK)
 - branch_id (Long, FK)
-- empresa_id (Long, FK)
+- enterprise_id (Long, FK)
 - subtotal (BigDecimal)
 - discount (BigDecimal)
 - tax_total (BigDecimal)
@@ -183,6 +194,7 @@ CREATE INDEX idx_cart_item_product ON cart_item(product_id);
 - updated_at (LocalDateTime)
 
 **CartItemEntity:**
+
 - id (Long, PK)
 - cart_id (Long, FK)
 - product_id (Long, FK)

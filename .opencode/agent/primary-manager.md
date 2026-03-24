@@ -33,7 +33,8 @@ Follow this standard lifecycle for complex tasks:
 - Provide brief, high-value context to sub-agents when delegating.
 - Maintain consistency between documentation, database schema, and code.
 
-## Decision Support
+## Decision Support & Skills
+- Use **`db-table-creator`** for any task involving database schema design or table creation.
 - Use `generate-service` (backend version) when creating new infrastructure.
 - Monitor console logs for SQL queries and Hibernate behavior.
 

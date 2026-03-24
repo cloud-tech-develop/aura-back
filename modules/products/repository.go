@@ -22,11 +22,11 @@ func NewCategoryRepository(db *sql.DB) CategoryRepository {
 
 func (r *categoryRepository) Create(ctx context.Context, c *Category) error {
 	query := `
-		INSERT INTO category (name, description, parent_id, empresa_id)
+		INSERT INTO category (name, description, parent_id, enterprise_id)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at`
 
-	err := r.db.QueryRowContext(ctx, query, c.Name, c.Description, c.ParentID, c.EmpresaID).
+	err := r.db.QueryRowContext(ctx, query, c.Name, c.Description, c.ParentID, c.EnterpriseID).
 		Scan(&c.ID, &c.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create category: %w", err)
@@ -37,11 +37,11 @@ func (r *categoryRepository) Create(ctx context.Context, c *Category) error {
 func (r *categoryRepository) GetByID(ctx context.Context, id int64) (*Category, error) {
 	c := &Category{}
 	query := `
-		SELECT id, name, description, parent_id, empresa_id, created_at, updated_at, deleted_at
+		SELECT id, name, description, parent_id, enterprise_id, created_at, updated_at, deleted_at
 		FROM category WHERE id = $1 AND deleted_at IS NULL`
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&c.ID, &c.Name, &c.Description, &c.ParentID, &c.EmpresaID,
+		&c.ID, &c.Name, &c.Description, &c.ParentID, &c.EnterpriseID,
 		&c.CreatedAt, &c.UpdatedAt, &c.DeletedAt,
 	)
 	if err != nil {
@@ -53,13 +53,13 @@ func (r *categoryRepository) GetByID(ctx context.Context, id int64) (*Category, 
 	return c, nil
 }
 
-func (r *categoryRepository) List(ctx context.Context, empresaID int64) ([]Category, error) {
+func (r *categoryRepository) List(ctx context.Context, enterpriseID int64) ([]Category, error) {
 	query := `
-		SELECT id, name, description, parent_id, empresa_id, created_at, updated_at, deleted_at
-		FROM category WHERE empresa_id = $1 AND deleted_at IS NULL
+		SELECT id, name, description, parent_id, enterprise_id, created_at, updated_at, deleted_at
+		FROM category WHERE enterprise_id = $1 AND deleted_at IS NULL
 		ORDER BY name`
 
-	rows, err := r.db.QueryContext(ctx, query, empresaID)
+	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list categories: %w", err)
 	}
@@ -68,7 +68,7 @@ func (r *categoryRepository) List(ctx context.Context, empresaID int64) ([]Categ
 	var categories []Category
 	for rows.Next() {
 		var c Category
-		if err := rows.Scan(&c.ID, &c.Name, &c.Description, &c.ParentID, &c.EmpresaID,
+		if err := rows.Scan(&c.ID, &c.Name, &c.Description, &c.ParentID, &c.EnterpriseID,
 			&c.CreatedAt, &c.UpdatedAt, &c.DeletedAt); err != nil {
 			return nil, err
 		}
@@ -109,11 +109,11 @@ func NewBrandRepository(db *sql.DB) BrandRepository {
 
 func (r *brandRepository) Create(ctx context.Context, b *Brand) error {
 	query := `
-		INSERT INTO brand (name, description, empresa_id)
+		INSERT INTO brand (name, description, enterprise_id)
 		VALUES ($1, $2, $3)
 		RETURNING id, created_at`
 
-	err := r.db.QueryRowContext(ctx, query, b.Name, b.Description, b.EmpresaID).
+	err := r.db.QueryRowContext(ctx, query, b.Name, b.Description, b.EnterpriseID).
 		Scan(&b.ID, &b.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create brand: %w", err)
@@ -124,11 +124,11 @@ func (r *brandRepository) Create(ctx context.Context, b *Brand) error {
 func (r *brandRepository) GetByID(ctx context.Context, id int64) (*Brand, error) {
 	b := &Brand{}
 	query := `
-		SELECT id, name, description, empresa_id, created_at, updated_at, deleted_at
+		SELECT id, name, description, enterprise_id, created_at, updated_at, deleted_at
 		FROM brand WHERE id = $1 AND deleted_at IS NULL`
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&b.ID, &b.Name, &b.Description, &b.EmpresaID,
+		&b.ID, &b.Name, &b.Description, &b.EnterpriseID,
 		&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt,
 	)
 	if err != nil {
@@ -140,13 +140,13 @@ func (r *brandRepository) GetByID(ctx context.Context, id int64) (*Brand, error)
 	return b, nil
 }
 
-func (r *brandRepository) List(ctx context.Context, empresaID int64) ([]Brand, error) {
+func (r *brandRepository) List(ctx context.Context, enterpriseID int64) ([]Brand, error) {
 	query := `
-		SELECT id, name, description, empresa_id, created_at, updated_at, deleted_at
-		FROM brand WHERE empresa_id = $1 AND deleted_at IS NULL
+		SELECT id, name, description, enterprise_id, created_at, updated_at, deleted_at
+		FROM brand WHERE enterprise_id = $1 AND deleted_at IS NULL
 		ORDER BY name`
 
-	rows, err := r.db.QueryContext(ctx, query, empresaID)
+	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list brands: %w", err)
 	}
@@ -155,7 +155,7 @@ func (r *brandRepository) List(ctx context.Context, empresaID int64) ([]Brand, e
 	var brands []Brand
 	for rows.Next() {
 		var b Brand
-		if err := rows.Scan(&b.ID, &b.Name, &b.Description, &b.EmpresaID,
+		if err := rows.Scan(&b.ID, &b.Name, &b.Description, &b.EnterpriseID,
 			&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt); err != nil {
 			return nil, err
 		}
@@ -196,12 +196,12 @@ func NewProductRepository(db *sql.DB) ProductRepository {
 
 func (r *productRepository) Create(ctx context.Context, p *Product) error {
 	query := `
-		INSERT INTO product (sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, empresa_id)
+		INSERT INTO product (sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING id, created_at`
 
 	err := r.db.QueryRowContext(ctx, query, p.SKU, p.Name, p.Description, p.CategoryID, p.BrandID,
-		p.CostPrice, p.SalePrice, p.TaxRate, p.MinStock, p.CurrentStock, p.ImageURL, p.Status, p.EmpresaID).
+		p.CostPrice, p.SalePrice, p.TaxRate, p.MinStock, p.CurrentStock, p.ImageURL, p.Status, p.EnterpriseID).
 		Scan(&p.ID, &p.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create product: %w", err)
@@ -212,13 +212,13 @@ func (r *productRepository) Create(ctx context.Context, p *Product) error {
 func (r *productRepository) GetByID(ctx context.Context, id int64) (*Product, error) {
 	p := &Product{}
 	query := `
-		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, empresa_id, created_at, updated_at, deleted_at
+		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id, created_at, updated_at, deleted_at
 		FROM product WHERE id = $1 AND deleted_at IS NULL`
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&p.ID, &p.SKU, &p.Name, &p.Description, &p.CategoryID, &p.BrandID,
 		&p.CostPrice, &p.SalePrice, &p.TaxRate, &p.MinStock, &p.CurrentStock,
-		&p.ImageURL, &p.Status, &p.EmpresaID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+		&p.ImageURL, &p.Status, &p.EnterpriseID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -229,16 +229,16 @@ func (r *productRepository) GetByID(ctx context.Context, id int64) (*Product, er
 	return p, nil
 }
 
-func (r *productRepository) GetBySKU(ctx context.Context, sku string, empresaID int64) (*Product, error) {
+func (r *productRepository) GetBySKU(ctx context.Context, sku string, enterpriseID int64) (*Product, error) {
 	p := &Product{}
 	query := `
-		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, empresa_id, created_at, updated_at, deleted_at
-		FROM product WHERE sku = $1 AND empresa_id = $2 AND deleted_at IS NULL`
+		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id, created_at, updated_at, deleted_at
+		FROM product WHERE sku = $1 AND enterprise_id = $2 AND deleted_at IS NULL`
 
-	err := r.db.QueryRowContext(ctx, query, sku, empresaID).Scan(
+	err := r.db.QueryRowContext(ctx, query, sku, enterpriseID).Scan(
 		&p.ID, &p.SKU, &p.Name, &p.Description, &p.CategoryID, &p.BrandID,
 		&p.CostPrice, &p.SalePrice, &p.TaxRate, &p.MinStock, &p.CurrentStock,
-		&p.ImageURL, &p.Status, &p.EmpresaID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+		&p.ImageURL, &p.Status, &p.EnterpriseID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -249,12 +249,12 @@ func (r *productRepository) GetBySKU(ctx context.Context, sku string, empresaID 
 	return p, nil
 }
 
-func (r *productRepository) List(ctx context.Context, empresaID int64, filters ListFilters) ([]Product, error) {
+func (r *productRepository) List(ctx context.Context, enterpriseID int64, filters ListFilters) ([]Product, error) {
 	query := `
-		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, empresa_id, created_at, updated_at, deleted_at
-		FROM product WHERE empresa_id = $1 AND deleted_at IS NULL`
+		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id, created_at, updated_at, deleted_at
+		FROM product WHERE enterprise_id = $1 AND deleted_at IS NULL`
 
-	args := []interface{}{empresaID}
+	args := []interface{}{enterpriseID}
 	argPos := 2
 
 	if filters.Search != "" {
@@ -296,7 +296,7 @@ func (r *productRepository) List(ctx context.Context, empresaID int64, filters L
 		if err := rows.Scan(
 			&p.ID, &p.SKU, &p.Name, &p.Description, &p.CategoryID, &p.BrandID,
 			&p.CostPrice, &p.SalePrice, &p.TaxRate, &p.MinStock, &p.CurrentStock,
-			&p.ImageURL, &p.Status, &p.EmpresaID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+			&p.ImageURL, &p.Status, &p.EnterpriseID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 		); err != nil {
 			return nil, err
 		}

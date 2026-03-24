@@ -2,27 +2,37 @@
 CREATE TABLE cart (
     id BIGSERIAL PRIMARY KEY,
     cart_code VARCHAR(50) NOT NULL,
+    cart_type VARCHAR(20) NOT NULL DEFAULT 'SALE' CHECK (cart_type IN ('SALE', 'QUOTATION')),
     customer_id BIGINT,
     user_id BIGINT NOT NULL REFERENCES public.users(id),
     branch_id BIGINT NOT NULL REFERENCES public.branches(id),
-    empresa_id BIGINT NOT NULL,
+    enterprise_id BIGINT NOT NULL,
     subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
     discount DECIMAL(12,2) NOT NULL DEFAULT 0,
     tax_total DECIMAL(12,2) NOT NULL DEFAULT 0,
     total DECIMAL(12,2) NOT NULL DEFAULT 0,
-    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SAVED', 'CONVERTED', 'EXPIRED')),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SAVED', 'CONVERTED', 'EXPIRED', 'CANCELLED')),
+    notes TEXT,
+    valid_until TIMESTAMP,
+    converted_at TIMESTAMP,
+    reference_id BIGINT,
+    reference_type VARCHAR(50),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
+    deleted_at TIMESTAMPTZ,
     
-    CONSTRAINT cart_empresa_fk FOREIGN KEY (empresa_id) REFERENCES public.enterprises(id),
+    CONSTRAINT cart_enterprise_fk FOREIGN KEY (enterprise_id) REFERENCES public.enterprises(id),
     CONSTRAINT cart_user_fk FOREIGN KEY (user_id) REFERENCES public.users(id),
     CONSTRAINT cart_customer_fk FOREIGN KEY (customer_id) REFERENCES third_parties(id),
-    CONSTRAINT cart_code_unique UNIQUE (empresa_id, cart_code)
+    CONSTRAINT cart_code_unique UNIQUE (enterprise_id, cart_code)
 );
 
-CREATE INDEX idx_cart_empresa ON cart(empresa_id);
+CREATE INDEX idx_cart_enterprise ON cart(enterprise_id);
 CREATE INDEX idx_cart_user ON cart(user_id);
 CREATE INDEX idx_cart_status ON cart(status);
+CREATE INDEX idx_cart_type ON cart(cart_type);
+CREATE INDEX idx_cart_customer ON cart(customer_id) WHERE customer_id IS NOT NULL;
+CREATE INDEX idx_cart_expired ON cart(valid_until) WHERE status = 'ACTIVE' AND valid_until IS NOT NULL;
 
 -- Tabla de Items del Carrito
 CREATE TABLE cart_item (

@@ -1,6 +1,7 @@
 # HU-SALES-005 - Invoice Generation
 
 ## 📌 General Information
+
 - ID: HU-SALES-005
 - Epic: EPIC-SALES-001
 - Priority: High
@@ -22,6 +23,7 @@
 ## 🧠 Functional Description
 
 The system must generate invoices for completed sales orders. Invoices include:
+
 - Invoice number with prefix and sequence
 - Customer information
 - Complete item breakdown with taxes
@@ -36,6 +38,7 @@ Invoices are generated automatically when a sale is completed, but can also be g
 ## ✅ Acceptance Criteria
 
 ### Scenario 1: Automatic invoice generation
+
 - Given that a sales order is completed with payment
 - When the payment is processed successfully
 - Then an invoice must be automatically generated with:
@@ -49,24 +52,28 @@ Invoices are generated automatically when a sale is completed, but can also be g
 - And the invoice must be linked to the sales order
 
 ### Scenario 2: Invoice number sequencing
+
 - Given that multiple invoices exist
 - When a new invoice is generated
 - Then the invoice number must be sequential
 - And the prefix must be configurable per branch
 
 ### Scenario 3: Manual invoice generation
+
 - Given that a sales order exists without an invoice
 - When I manually generate an invoice
 - Then the invoice must be created with all required data
 - And linked to the original sales order
 
 ### Scenario 4: Invoice retrieval and printing
+
 - Given that an invoice exists
 - When I search for the invoice
 - Then I can view all details
 - And I can print or download the invoice
 
 ### Scenario 5: Tax calculation on invoice
+
 - Given that products have different tax rates
 - When the invoice is generated
 - Then taxes must be calculated per item
@@ -97,6 +104,7 @@ Invoices are generated automatically when a sale is completed, but can also be g
 ## 🗄️ Database Schema (PostgreSQL)
 
 ### Table: invoice
+
 ```sql
 CREATE TABLE invoice (
     id BIGSERIAL PRIMARY KEY,
@@ -107,7 +115,7 @@ CREATE TABLE invoice (
     customer_id INTEGER REFERENCES customer(id),
     user_id INTEGER NOT NULL REFERENCES usuario(id),
     branch_id INTEGER NOT NULL REFERENCES branch(id),
-    empresa_id INTEGER NOT NULL REFERENCES empresa(id),
+    enterprise_id INTEGER NOT NULL REFERENCES empresa(id),
     subtotal DECIMAL(12,2) NOT NULL,
     discount DECIMAL(12,2) NOT NULL DEFAULT 0,
     tax_total DECIMAL(12,2) NOT NULL,
@@ -119,17 +127,17 @@ CREATE TABLE invoice (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP,
     deleted_at TIMESTAMP,
-    
-    CONSTRAINT invoice_empresa_fk FOREIGN KEY (empresa_id) REFERENCES empresa(id),
+
+    CONSTRAINT invoice_empresa_fk FOREIGN KEY (enterprise_id) REFERENCES empresa(id),
     CONSTRAINT invoice_branch_fk FOREIGN KEY (branch_id) REFERENCES branch(id),
     CONSTRAINT invoice_user_fk FOREIGN KEY (user_id) REFERENCES usuario(id),
     CONSTRAINT invoice_sales_order_fk FOREIGN KEY (sales_order_id) REFERENCES sales_order(id),
     CONSTRAINT invoice_customer_fk FOREIGN KEY (customer_id) REFERENCES customer(id),
-    CONSTRAINT invoice_number_unique UNIQUE (empresa_id, invoice_number),
-    CONSTRAINT invoice_sequence_unique UNIQUE (empresa_id, branch_id, prefix, sequence)
+    CONSTRAINT invoice_number_unique UNIQUE (enterprise_id, invoice_number),
+    CONSTRAINT invoice_sequence_unique UNIQUE (enterprise_id, branch_id, prefix, sequence)
 );
 
-CREATE INDEX idx_invoice_empresa ON invoice(empresa_id);
+CREATE INDEX idx_invoice_empresa ON invoice(enterprise_id);
 CREATE INDEX idx_invoice_branch ON invoice(branch_id);
 CREATE INDEX idx_invoice_customer ON invoice(customer_id);
 CREATE INDEX idx_invoice_number ON invoice(invoice_number);
@@ -138,6 +146,7 @@ CREATE INDEX idx_invoice_deleted_at ON invoice(deleted_at) WHERE deleted_at IS N
 ```
 
 ### Table: invoice_item
+
 ```sql
 CREATE TABLE invoice_item (
     id BIGSERIAL PRIMARY KEY,
@@ -152,7 +161,7 @@ CREATE TABLE invoice_item (
     tax_amount DECIMAL(12,2) NOT NULL,
     total DECIMAL(12,2) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    
+
     CONSTRAINT invoice_item_invoice_fk FOREIGN KEY (invoice_id) REFERENCES invoice(id) ON DELETE CASCADE,
     CONSTRAINT invoice_item_product_fk FOREIGN KEY (product_id) REFERENCES product(id),
     CONSTRAINT invoice_item_sales_order_item_fk FOREIGN KEY (sales_order_item_id) REFERENCES sales_order_item(id)
@@ -163,21 +172,22 @@ CREATE INDEX idx_invoice_item_product ON invoice_item(product_id);
 ```
 
 ### Table: invoice_prefix
+
 ```sql
 CREATE TABLE invoice_prefix (
     id BIGSERIAL PRIMARY KEY,
     branch_id INTEGER NOT NULL REFERENCES branch(id),
-    empresa_id INTEGER NOT NULL REFERENCES empresa(id),
+    enterprise_id INTEGER NOT NULL REFERENCES empresa(id),
     prefix VARCHAR(10) NOT NULL,
     next_sequence BIGINT NOT NULL DEFAULT 1,
     description VARCHAR(100),
-    
+
     CONSTRAINT invoice_prefix_branch_fk FOREIGN KEY (branch_id) REFERENCES branch(id),
-    CONSTRAINT invoice_prefix_empresa_fk FOREIGN KEY (empresa_id) REFERENCES empresa(id),
-    CONSTRAINT invoice_prefix_unique UNIQUE (empresa_id, branch_id, prefix)
+    CONSTRAINT invoice_prefix_empresa_fk FOREIGN KEY (enterprise_id) REFERENCES empresa(id),
+    CONSTRAINT invoice_prefix_unique UNIQUE (enterprise_id, branch_id, prefix)
 );
 
-CREATE INDEX idx_invoice_prefix_empresa ON invoice_prefix(empresa_id);
+CREATE INDEX idx_invoice_prefix_empresa ON invoice_prefix(enterprise_id);
 CREATE INDEX idx_invoice_prefix_branch ON invoice_prefix(branch_id);
 ```
 
@@ -198,6 +208,7 @@ CREATE INDEX idx_invoice_prefix_branch ON invoice_prefix(branch_id);
 ### Entities (Java)
 
 **InvoiceEntity:**
+
 - id (Long, PK)
 - invoice_number (String, unique)
 - prefix (String)
@@ -206,7 +217,7 @@ CREATE INDEX idx_invoice_prefix_branch ON invoice_prefix(branch_id);
 - customer_id (Long, FK, nullable)
 - user_id (Long, FK)
 - branch_id (Long, FK)
-- empresa_id (Long, FK)
+- enterprise_id (Long, FK)
 - subtotal (BigDecimal)
 - discount (BigDecimal)
 - tax_total (BigDecimal)
@@ -220,9 +231,10 @@ CREATE INDEX idx_invoice_prefix_branch ON invoice_prefix(branch_id);
 - deleted_at (LocalDateTime, nullable)
 
 **InvoicePrefixEntity:**
+
 - id (Long, PK)
 - branch_id (Long, FK)
-- empresa_id (Long, FK)
+- enterprise_id (Long, FK)
 - prefix (String)
 - next_sequence (Long)
 - description (String, nullable)

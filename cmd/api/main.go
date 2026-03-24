@@ -8,8 +8,15 @@ import (
 	"github.com/cloud-tech-develop/aura-back/cmd/server"
 	"github.com/cloud-tech-develop/aura-back/infrastructure/messaging/memory"
 	"github.com/cloud-tech-develop/aura-back/internal/db"
+	"github.com/cloud-tech-develop/aura-back/modules/cart"
 	"github.com/cloud-tech-develop/aura-back/modules/enterprise"
+	"github.com/cloud-tech-develop/aura-back/modules/inventory"
+	"github.com/cloud-tech-develop/aura-back/modules/invoices"
+	"github.com/cloud-tech-develop/aura-back/modules/payments"
 	"github.com/cloud-tech-develop/aura-back/modules/products"
+	"github.com/cloud-tech-develop/aura-back/modules/reports"
+	"github.com/cloud-tech-develop/aura-back/modules/sales"
+	"github.com/cloud-tech-develop/aura-back/modules/third-parties"
 	"github.com/cloud-tech-develop/aura-back/modules/users"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/joho/godotenv"
@@ -71,9 +78,30 @@ func main() {
 	// Products module
 	productsHandler := products.NewHandler(database.DB)
 
+	// Cart module
+	cartHandler := cart.NewHandler(database.DB)
+
+	// Sales module
+	salesHandler := sales.NewHandler(database.DB)
+
+	// Payments module
+	paymentsHandler := payments.NewHandler(database.DB)
+
+	// Invoices module
+	invoicesHandler := invoices.NewHandler(database.DB)
+
+	// Reports module
+	reportsHandler := reports.NewHandler(database.DB)
+
+	// Third Parties module
+	thirdPartiesHandler := thirdparties.NewHandler(database.DB)
+
+	// Inventory module
+	inventoryHandler := inventory.NewHandler(database.DB)
+
 	// ── HTTP Server ──────────────────────────────────────────────────────────
 	srv := server.NewServer(database.DB, tenantMgr)
-	srv.RegisterModules(enterpriseHandler, usersHandler, productsHandler)
+	srv.RegisterModules(enterpriseHandler, usersHandler, productsHandler, cartHandler, salesHandler, paymentsHandler, invoicesHandler, reportsHandler, thirdPartiesHandler, inventoryHandler)
 
 	log.Println("servidor en :" + port)
 	if err := srv.Run(":" + port); err != nil {

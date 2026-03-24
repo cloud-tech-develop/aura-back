@@ -1,6 +1,7 @@
 # HU-SALES-001 - Product Catalog Management
 
 ## 📌 General Information
+
 - ID: HU-SALES-001
 - Epic: EPIC-SALES-001
 - Priority: High
@@ -22,6 +23,7 @@
 ## 🧠 Functional Description
 
 The system must allow complete management of the product catalog including:
+
 - Product creation with SKU, name, description, and images
 - Category organization with hierarchical structure
 - Brand management
@@ -36,6 +38,7 @@ All products must be filterable and searchable by multiple criteria.
 ## ✅ Acceptance Criteria
 
 ### Scenario 1: Create a new product
+
 - Given that I am logged in as a manager with product creation permissions
 - When I create a new product with:
   - SKU: "PROD-001"
@@ -52,24 +55,28 @@ All products must be filterable and searchable by multiple criteria.
   - Status: ACTIVE
 
 ### Scenario 2: Update product information
+
 - Given that a product exists in the catalog
 - When I update the product details (price, description, category)
 - Then the changes must be persisted with updated_at timestamp
 - And the history of price changes must be auditable
 
 ### Scenario 3: Search and filter products
+
 - Given that the catalog contains multiple products
 - When I search by name, SKU, or category
 - Then the system returns matching products with pagination
 - And allows filtering by price range, brand, or stock status
 
 ### Scenario 4: Manage product categories
+
 - Given that categories exist in a hierarchical structure
 - When I create a new subcategory
 - Then it must be linked to the parent category
 - And products can be assigned to the appropriate category level
 
 ### Scenario 5: Inventory tracking
+
 - Given that a product has stock
 - When a sale is completed
 - Then the inventory must be updated automatically
@@ -100,6 +107,7 @@ All products must be filterable and searchable by multiple criteria.
 ## 🗄️ Database Schema (PostgreSQL)
 
 ### Table: product
+
 ```sql
 CREATE TABLE product (
     id BIGSERIAL PRIMARY KEY,
@@ -115,19 +123,19 @@ CREATE TABLE product (
     current_stock INTEGER DEFAULT 0,
     image_url VARCHAR(500),
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE', 'DISCONTINUED')),
-    empresa_id INTEGER NOT NULL REFERENCES empresa(id),
+    enterprise_id INTEGER NOT NULL REFERENCES empresa(id),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP,
     deleted_at TIMESTAMP,
-    
-    CONSTRAINT product_empresa_fk FOREIGN KEY (empresa_id) REFERENCES empresa(id),
+
+    CONSTRAINT product_empresa_fk FOREIGN KEY (enterprise_id) REFERENCES empresa(id),
     CONSTRAINT product_category_fk FOREIGN KEY (category_id) REFERENCES category(id),
     CONSTRAINT product_brand_fk FOREIGN KEY (brand_id) REFERENCES brand(id),
-    CONSTRAINT product_sku_unique UNIQUE (empresa_id, sku),
+    CONSTRAINT product_sku_unique UNIQUE (enterprise_id, sku),
     CONSTRAINT product_price_check CHECK (sale_price >= cost_price)
 );
 
-CREATE INDEX idx_product_empresa ON product(empresa_id);
+CREATE INDEX idx_product_empresa ON product(enterprise_id);
 CREATE INDEX idx_product_category ON product(category_id);
 CREATE INDEX idx_product_sku ON product(sku);
 CREATE INDEX idx_product_status ON product(status);
@@ -135,40 +143,42 @@ CREATE INDEX idx_product_deleted_at ON product(deleted_at) WHERE deleted_at IS N
 ```
 
 ### Table: category
+
 ```sql
 CREATE TABLE category (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
     parent_id INTEGER REFERENCES category(id),
-    empresa_id INTEGER NOT NULL REFERENCES empresa(id),
+    enterprise_id INTEGER NOT NULL REFERENCES empresa(id),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP,
-    
-    CONSTRAINT category_empresa_fk FOREIGN KEY (empresa_id) REFERENCES empresa(id),
+
+    CONSTRAINT category_empresa_fk FOREIGN KEY (enterprise_id) REFERENCES empresa(id),
     CONSTRAINT category_parent_fk FOREIGN KEY (parent_id) REFERENCES category(id),
-    CONSTRAINT category_name_unique UNIQUE (empresa_id, name)
+    CONSTRAINT category_name_unique UNIQUE (enterprise_id, name)
 );
 
-CREATE INDEX idx_category_empresa ON category(empresa_id);
+CREATE INDEX idx_category_empresa ON category(enterprise_id);
 CREATE INDEX idx_category_parent ON category(parent_id);
 ```
 
 ### Table: brand
+
 ```sql
 CREATE TABLE brand (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    empresa_id INTEGER NOT NULL REFERENCES empresa(id),
+    enterprise_id INTEGER NOT NULL REFERENCES empresa(id),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP,
-    
-    CONSTRAINT brand_empresa_fk FOREIGN KEY (empresa_id) REFERENCES empresa(id),
-    CONSTRAINT brand_name_unique UNIQUE (empresa_id, name)
+
+    CONSTRAINT brand_empresa_fk FOREIGN KEY (enterprise_id) REFERENCES empresa(id),
+    CONSTRAINT brand_name_unique UNIQUE (enterprise_id, name)
 );
 
-CREATE INDEX idx_brand_empresa ON brand(empresa_id);
+CREATE INDEX idx_brand_empresa ON brand(enterprise_id);
 ```
 
 ---
@@ -188,6 +198,7 @@ CREATE INDEX idx_brand_empresa ON brand(empresa_id);
 ### Entities (Java)
 
 **ProductEntity:**
+
 - id (Long, PK, autoincrement)
 - sku (String, VARCHAR 50)
 - name (String, VARCHAR 200)
@@ -201,7 +212,7 @@ CREATE INDEX idx_brand_empresa ON brand(empresa_id);
 - current_stock (Integer)
 - image_url (String, VARCHAR 500)
 - status (String): ACTIVE, INACTIVE, DISCONTINUED
-- empresa_id (Long, FK)
+- enterprise_id (Long, FK)
 - created_at (LocalDateTime)
 - updated_at (LocalDateTime, nullable)
 - deleted_at (LocalDateTime, nullable)

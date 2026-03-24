@@ -4,17 +4,17 @@ CREATE TABLE category (
     name VARCHAR(100) NOT NULL,
     description TEXT,
     parent_id BIGINT REFERENCES category(id),
-    empresa_id BIGINT NOT NULL,
+    enterprise_id BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
     deleted_at TIMESTAMPTZ,
 
-    CONSTRAINT category_empresa_fk FOREIGN KEY (empresa_id) REFERENCES public.enterprises(id),
+    CONSTRAINT category_enterprise_fk FOREIGN KEY (enterprise_id) REFERENCES public.enterprises(id),
     CONSTRAINT category_parent_fk FOREIGN KEY (parent_id) REFERENCES category(id),
-    CONSTRAINT category_name_unique UNIQUE (empresa_id, name)
+    CONSTRAINT category_name_unique UNIQUE (enterprise_id, name)
 );
 
-CREATE INDEX idx_category_empresa ON category(empresa_id);
+CREATE INDEX idx_category_enterprise ON category(enterprise_id);
 CREATE INDEX idx_category_parent ON category(parent_id);
 CREATE INDEX idx_category_deleted_at ON category(deleted_at) WHERE deleted_at IS NULL;
 
@@ -23,16 +23,16 @@ CREATE TABLE brand (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    empresa_id BIGINT NOT NULL,
+    enterprise_id BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
     deleted_at TIMESTAMPTZ,
 
-    CONSTRAINT brand_empresa_fk FOREIGN KEY (empresa_id) REFERENCES public.enterprises(id),
-    CONSTRAINT brand_name_unique UNIQUE (empresa_id, name)
+    CONSTRAINT brand_enterprise_fk FOREIGN KEY (enterprise_id) REFERENCES public.enterprises(id),
+    CONSTRAINT brand_name_unique UNIQUE (enterprise_id, name)
 );
 
-CREATE INDEX idx_brand_empresa ON brand(empresa_id);
+CREATE INDEX idx_brand_enterprise ON brand(enterprise_id);
 CREATE INDEX idx_brand_deleted_at ON brand(deleted_at) WHERE deleted_at IS NULL;
 
 -- Tabla de Productos
@@ -50,19 +50,19 @@ CREATE TABLE product (
     current_stock INTEGER DEFAULT 0,
     image_url VARCHAR(500),
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE', 'DISCONTINUED')),
-    empresa_id BIGINT NOT NULL,
+    enterprise_id BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
     deleted_at TIMESTAMPTZ,
 
-    CONSTRAINT product_empresa_fk FOREIGN KEY (empresa_id) REFERENCES public.enterprises(id),
+    CONSTRAINT product_enterprise_fk FOREIGN KEY (enterprise_id) REFERENCES public.enterprises(id),
     CONSTRAINT product_category_fk FOREIGN KEY (category_id) REFERENCES category(id),
     CONSTRAINT product_brand_fk FOREIGN KEY (brand_id) REFERENCES brand(id),
-    CONSTRAINT product_sku_unique UNIQUE (empresa_id, sku),
+    CONSTRAINT product_sku_unique UNIQUE (enterprise_id, sku),
     CONSTRAINT product_price_check CHECK (sale_price >= cost_price)
 );
 
-CREATE INDEX idx_product_empresa ON product(empresa_id);
+CREATE INDEX idx_product_enterprise ON product(enterprise_id);
 CREATE INDEX idx_product_category ON product(category_id);
 CREATE INDEX idx_product_brand ON product(brand_id);
 CREATE INDEX idx_product_sku ON product(sku);

@@ -3,8 +3,15 @@ package server
 import (
 	"database/sql"
 
+	"github.com/cloud-tech-develop/aura-back/modules/cart"
 	"github.com/cloud-tech-develop/aura-back/modules/enterprise"
+	"github.com/cloud-tech-develop/aura-back/modules/inventory"
+	"github.com/cloud-tech-develop/aura-back/modules/invoices"
+	"github.com/cloud-tech-develop/aura-back/modules/payments"
 	"github.com/cloud-tech-develop/aura-back/modules/products"
+	"github.com/cloud-tech-develop/aura-back/modules/reports"
+	"github.com/cloud-tech-develop/aura-back/modules/sales"
+	"github.com/cloud-tech-develop/aura-back/modules/third-parties"
 	"github.com/cloud-tech-develop/aura-back/modules/users"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/cloud-tech-develop/aura-back/tenant"
@@ -39,6 +46,13 @@ func (s *Server) RegisterModules(
 	enterpriseH *enterprise.Handler,
 	userH *users.Handler,
 	productsH *products.Handler,
+	cartH *cart.Handler,
+	salesH *sales.Handler,
+	paymentsH *payments.Handler,
+	invoicesH *invoices.Handler,
+	reportsH *reports.Handler,
+	thirdPartiesH *thirdparties.Handler,
+	inventoryH *inventory.Handler,
 ) {
 	// ── Auth ─────────────────────────────────────────────────────────────────
 	s.router.POST("/login", tenant.Login(s.db))
@@ -57,9 +71,13 @@ func (s *Server) RegisterModules(
 	enterprise.Register(public, protected, enterpriseH)
 	users.Register(public, protected, userH)
 	products.Register(public, protected, productsH)
-
-	// To add a new module:
-	// sale.Register(public, protected, saleH)
+	cart.Register(public, protected, cartH)
+	sales.Register(public, protected, salesH)
+	payments.Register(public, protected, paymentsH)
+	invoices.Register(public, protected, invoicesH)
+	reports.Register(public, protected, reportsH)
+	thirdparties.Register(public, protected, thirdPartiesH)
+	inventory.Register(public, protected, inventoryH)
 }
 
 // Run starts the HTTP server on the given address.

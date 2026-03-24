@@ -1,6 +1,7 @@
 # HU-SALES-006 - Sales Reporting
 
 ## 📌 General Information
+
 - ID: HU-SALES-006
 - Epic: EPIC-SALES-001
 - Priority: High
@@ -22,6 +23,7 @@
 ## 🧠 Functional Description
 
 The system must provide comprehensive sales reporting capabilities including:
+
 - Daily, weekly, monthly, and yearly sales summaries
 - Sales by product, category, or brand
 - Sales by employee/cashier
@@ -37,6 +39,7 @@ Reports must be filterable by date range, branch, and other criteria.
 ## ✅ Acceptance Criteria
 
 ### Scenario 1: Daily sales summary
+
 - Given that I want to view today's sales
 - When I request the daily sales report
 - Then the system must return:
@@ -47,6 +50,7 @@ Reports must be filterable by date range, branch, and other criteria.
   - Tax totals
 
 ### Scenario 2: Sales by product
+
 - Given that I want to analyze product performance
 - When I request product sales report
 - Then the system must return:
@@ -56,6 +60,7 @@ Reports must be filterable by date range, branch, and other criteria.
   - Top performing products
 
 ### Scenario 3: Sales by employee
+
 - Given that I want to evaluate cashier performance
 - When I request employee sales report
 - Then the system must return:
@@ -64,6 +69,7 @@ Reports must be filterable by date range, branch, and other criteria.
   - Average transaction value per employee
 
 ### Scenario 4: Tax report
+
 - Given that I need tax documentation
 - When I request a tax report for a period
 - Then the system must return:
@@ -72,6 +78,7 @@ Reports must be filterable by date range, branch, and other criteria.
   - Taxable and non-taxable sales
 
 ### Scenario 5: Sales trends
+
 - Given that I want to analyze sales patterns
 - When I request trend analysis
 - Then the system must return:
@@ -103,6 +110,7 @@ Reports must be filterable by date range, branch, and other criteria.
 ## 🗄️ Database Schema (PostgreSQL)
 
 No new tables required. Reports will be generated using existing tables:
+
 - sales_order
 - sales_order_item
 - payment
@@ -115,23 +123,25 @@ No new tables required. Reports will be generated using existing tables:
 ### Query Examples
 
 **Daily Sales Summary:**
+
 ```sql
-SELECT 
+SELECT
     DATE(so.created_at) as sale_date,
     COUNT(DISTINCT so.id) as transaction_count,
     SUM(so.total) as total_sales,
     SUM(so.tax_total) as total_tax,
     COUNT(DISTINCT so.user_id) as cashiers_count
 FROM sales_order so
-WHERE so.empresa_id = :empresaId
+WHERE so.enterprise_id = :empresaId
   AND DATE(so.created_at) = :saleDate
   AND so.status IN ('PAID', 'COMPLETED')
 GROUP BY DATE(so.created_at);
 ```
 
 **Product Sales Report:**
+
 ```sql
-SELECT 
+SELECT
     p.id as product_id,
     p.sku,
     p.name as product_name,
@@ -142,7 +152,7 @@ SELECT
 FROM sales_order_item roi
 JOIN product p ON roi.product_id = p.id
 JOIN category c ON p.category_id = c.id
-WHERE p.empresa_id = :empresaId
+WHERE p.enterprise_id = :empresaId
   AND roi.created_at BETWEEN :startDate AND :endDate
 GROUP BY p.id, p.sku, p.name, c.name
 ORDER BY total_revenue DESC;
@@ -165,6 +175,7 @@ ORDER BY total_revenue DESC;
 ### DTOs (Java)
 
 **SalesSummaryDto:**
+
 - total_sales (BigDecimal)
 - transaction_count (Integer)
 - average_transaction (BigDecimal)
@@ -172,6 +183,7 @@ ORDER BY total_revenue DESC;
 - payment_method_breakdown (Map<String, BigDecimal>)
 
 **ProductSalesDto:**
+
 - product_id (Long)
 - sku (String)
 - product_name (String)
@@ -181,6 +193,7 @@ ORDER BY total_revenue DESC;
 - avg_price (BigDecimal)
 
 **EmployeeSalesDto:**
+
 - user_id (Long)
 - user_name (String)
 - total_sales (BigDecimal)

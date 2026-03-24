@@ -2,10 +2,11 @@ package enterprise
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
-	"github.com/cloud-tech-develop/aura-back/shared/errors"
+	errs "github.com/cloud-tech-develop/aura-back/shared/errors"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/gin-gonic/gin"
@@ -39,7 +40,7 @@ type createRequest struct {
 func (h *Handler) Create(c *gin.Context) {
 	var req createRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, errors.ErrFieldsRequired.Error()+".\n Error: "+err.Error())
+		response.BadRequest(c, errs.ErrFieldsRequired.Error()+".\n Error: "+err.Error())
 		return
 	}
 
@@ -69,6 +70,11 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	if err := h.svc.Create(c.Request.Context(), e, hash); err != nil {
+		// Return 403 Forbidden if plan limit reached (HU-008)
+		if errors.Is(err, ErrPlanLimitReached) {
+			response.Forbidden(c, err.Error())
+			return
+		}
 		// Return 409 Conflict for duplicate entries
 		if isConflictError(err) {
 			response.Conflict(c, err.Error())

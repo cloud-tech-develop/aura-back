@@ -50,7 +50,7 @@ POST /login
 | HU-005 | Obtener empresa por slug | ✅ 3/3 |
 | HU-006 | Actualizar información de empresa | ✅ 5/5 |
 | HU-007 | Cambiar estado de empresa (suspensión) | ✅ 4/4 |
-| HU-008 | Validar límite de empresas según plan | ⏳ 0/4 |
+| HU-008 | Validar límite de empresas según plan | ✅ 4/4 |
 | HU-009 | Resolución de tenant por token JWT | ✅ 4/4 |
 | HU-010 | Logging de auditoría de creación de empresa | ⏳ 0/3 |
 
@@ -99,6 +99,34 @@ POST /login
 
 ---
 
+## API Endpoints
+
+### Autenticación
+```
+POST   /login                    → Iniciar sesión (genera JWT)
+```
+
+### Empresas (Público)
+```
+POST   /enterprises              → Crear nueva empresa (registro público)
+```
+
+### Empresas (Protegido)
+```
+GET    /enterprises              → Listar empresas (paginado, filtros)
+GET    /enterprises/:slug        → Obtener empresa por slug
+PUT    /enterprises/:slug        → Actualizar información de empresa
+PATCH  /enterprises/:slug/status → Cambiar estado de empresa
+```
+
+### Validación de Plan
+```
+- Se valida automáticamente antes de crear empresa
+- Retorna 403 si se alcanza el límite del plan
+```
+
+---
+
 ## Pendiente
 
 ### HU-008: Validar plan
@@ -112,5 +140,5 @@ POST /login
 
 ## Resumen
 - **Total de HU**: 10
-- **Completadas**: 8 (HU-001 a HU-007, HU-009)
-- **Pendientes**: 2 (HU-008, HU-010)
+- **Completadas**: 9 (HU-001 a HU-009)
+- **Pendientes**: 1 (HU-010)

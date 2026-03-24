@@ -66,6 +66,19 @@ func (m *MockRepository) Update(ctx context.Context, e *Enterprise) error {
 	return args.Error(0)
 }
 
+func (m *MockRepository) GetPlanByEnterpriseID(ctx context.Context, enterpriseID int64) (*Plan, error) {
+	args := m.Called(ctx, enterpriseID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*Plan), args.Error(1)
+}
+
+func (m *MockRepository) CountEnterprisesByTenant(ctx context.Context, tenantID int64) (int64, error) {
+	args := m.Called(ctx, tenantID)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 func (m *MockRepository) ListOld(ctx context.Context) ([]Enterprise, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]Enterprise), args.Error(1)

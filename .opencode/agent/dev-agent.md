@@ -33,10 +33,11 @@ You are a Senior Go Developer. Your primary mission is to implement technical re
     - Always check errors immediately.
     - Wrap errors with `fmt.Errorf("context: %w", err)`.
     - Use `shared/errors/` for domain-specific errors.
-- **Database**:
+- **Database & Migrations**:
     - Use `database/sql` with `QueryContext` or `ExecContext`.
     - Always `defer rows.Close()` after queries.
     - Use PostgreSQL with `lib/pq`.
+    - **Migrations**: Always use the **`db-table-creator`** skill to define new tables, ensuring English naming, snake_case, and Spanish comments.
 
 ### 3. Vertical Modules
 - Keep modules decoupled; avoid cross-module imports.

@@ -16,6 +16,20 @@ const (
 	EventDeleted = "enterprise.deleted"
 )
 
+// ─── Plan Entity ────────────────────────────────────────────────────────────────
+
+// Plan represents a subscription plan for an enterprise
+type Plan struct {
+	ID             int64      `json:"id"`
+	EnterpriseID   int64      `json:"enterprise_id"`
+	MaxUsers       *int       `json:"max_users,omitempty"`
+	MaxEnterprises *int       `json:"max_enterprises,omitempty"`
+	TrialUntil     *time.Time `json:"trial_until,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	DeletedAt      *time.Time `json:"deleted_at,omitempty"`
+}
+
 // ─── Entity ───────────────────────────────────────────────────────────────────
 
 type Enterprise struct {
@@ -84,6 +98,8 @@ type Repository interface {
 	List(ctx context.Context, params ListParams) (ListResult, error)
 	Update(ctx context.Context, e *Enterprise) error
 	Delete(ctx context.Context, id int64) error
+	GetPlanByEnterpriseID(ctx context.Context, enterpriseID int64) (*Plan, error)
+	CountEnterprisesByTenant(ctx context.Context, tenantID int64) (int64, error)
 }
 
 // ─── Service Interface ────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ package enterprise
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -11,6 +12,9 @@ import (
 	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	"github.com/cloud-tech-develop/aura-back/shared/events"
 )
+
+// ErrPlanLimitReached returned when enterprise limit is reached
+var ErrPlanLimitReached = errors.New("ha alcanzado el límite de empresas de su plan")
 
 var validSlug = regexp.MustCompile(`^[a-z0-9_]+$`)
 
@@ -54,6 +58,23 @@ func (s *service) Create(ctx context.Context, e *Enterprise, passwordHash string
 	// Validate subdomain length if provided
 	if e.SubDomain != "" && (len(e.SubDomain) < MinSlugLength || len(e.SubDomain) > MaxSlugLength) {
 		return fmt.Errorf("el subdominio debe tener entre %d y %d caracteres", MinSlugLength, MaxSlugLength)
+	}
+
+	// Validate plan limit before creating enterprise (HU-008)
+	if e.TenantID > 0 {
+		plan, err := s.repo.GetPlanByEnterpriseID(ctx, e.TenantID)
+		if err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("verificando plan: %w", err)
+		}
+		if plan != nil && plan.MaxEnterprises != nil {
+			currentCount, err := s.repo.CountEnterprisesByTenant(ctx, e.TenantID)
+			if err != nil {
+				return fmt.Errorf("contando empresas: %w", err)
+			}
+			if currentCount >= int64(*plan.MaxEnterprises) {
+				return ErrPlanLimitReached
+			}
+		}
 	}
 
 	// Check if slug already exists

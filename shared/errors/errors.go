@@ -27,4 +27,6 @@ var (
 	ErrInvalidEmail     = "Formato de email inválido"
 	ErrDocumentRequired = "Documento es requerido"
 	ErrInvalidDocument  = "Documento debe contener entre 5 y 20 caracteres alfanuméricos o guiones"
+
+	InternalError = "Error interno del servidor"
 )

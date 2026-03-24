@@ -24,9 +24,9 @@ func NewHandler(db *sql.DB) *Handler {
 
 // Category Handlers
 func (h *Handler) CreateCategory(c *gin.Context) {
-	empresaID := c.GetInt64("empresa_id")
-	if empresaID == 0 {
-		response.BadRequest(c, "empresa_id not found")
+	enterpriseID := c.GetInt64("enterprise_id")
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id not found")
 		return
 	}
 
@@ -44,7 +44,7 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 		Name:        req.Name,
 		Description: req.Description,
 		ParentID:    req.ParentID,
-		EmpresaID:   empresaID,
+		EnterpriseID:   enterpriseID,
 	}
 
 	if err := h.categorySvc.Create(c.Request.Context(), category); err != nil {
@@ -56,13 +56,13 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 }
 
 func (h *Handler) ListCategories(c *gin.Context) {
-	empresaID := c.GetInt64("empresa_id")
-	if empresaID == 0 {
-		response.BadRequest(c, "empresa_id not found")
+	enterpriseID := c.GetInt64("enterprise_id")
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id not found")
 		return
 	}
 
-	categories, err := h.categorySvc.List(c.Request.Context(), empresaID)
+	categories, err := h.categorySvc.List(c.Request.Context(), enterpriseID)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -130,9 +130,9 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 
 // Brand Handlers
 func (h *Handler) CreateBrand(c *gin.Context) {
-	empresaID := c.GetInt64("empresa_id")
-	if empresaID == 0 {
-		response.BadRequest(c, "empresa_id not found")
+	enterpriseID := c.GetInt64("enterprise_id")
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id not found")
 		return
 	}
 
@@ -148,7 +148,7 @@ func (h *Handler) CreateBrand(c *gin.Context) {
 	brand := &Brand{
 		Name:        req.Name,
 		Description: req.Description,
-		EmpresaID:   empresaID,
+		EnterpriseID:   enterpriseID,
 	}
 
 	if err := h.brandSvc.Create(c.Request.Context(), brand); err != nil {
@@ -160,13 +160,13 @@ func (h *Handler) CreateBrand(c *gin.Context) {
 }
 
 func (h *Handler) ListBrands(c *gin.Context) {
-	empresaID := c.GetInt64("empresa_id")
-	if empresaID == 0 {
-		response.BadRequest(c, "empresa_id not found")
+	enterpriseID := c.GetInt64("enterprise_id")
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id not found")
 		return
 	}
 
-	brands, err := h.brandSvc.List(c.Request.Context(), empresaID)
+	brands, err := h.brandSvc.List(c.Request.Context(), enterpriseID)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -232,9 +232,9 @@ func (h *Handler) UpdateBrand(c *gin.Context) {
 
 // Product Handlers
 func (h *Handler) CreateProduct(c *gin.Context) {
-	empresaID := c.GetInt64("empresa_id")
-	if empresaID == 0 {
-		response.BadRequest(c, "empresa_id not found")
+	enterpriseID := c.GetInt64("enterprise_id")
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id not found")
 		return
 	}
 
@@ -265,7 +265,7 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 		TaxRate:    req.TaxRate,
 		MinStock:   req.MinStock,
 		ImageURL:   req.ImageURL,
-		EmpresaID:  empresaID,
+		EnterpriseID:  enterpriseID,
 	}
 
 	if err := h.productSvc.Create(c.Request.Context(), product); err != nil {
@@ -277,9 +277,9 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 }
 
 func (h *Handler) ListProducts(c *gin.Context) {
-	empresaID := c.GetInt64("empresa_id")
-	if empresaID == 0 {
-		response.BadRequest(c, "empresa_id not found")
+	enterpriseID := c.GetInt64("enterprise_id")
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id not found")
 		return
 	}
 
@@ -307,7 +307,7 @@ func (h *Handler) ListProducts(c *gin.Context) {
 		BrandID:    brandID,
 	}
 
-	products, err := h.productSvc.List(c.Request.Context(), empresaID, filters)
+	products, err := h.productSvc.List(c.Request.Context(), enterpriseID, filters)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return

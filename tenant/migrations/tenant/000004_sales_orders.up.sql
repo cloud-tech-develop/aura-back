@@ -5,7 +5,7 @@ CREATE TABLE sales_order (
     customer_id BIGINT REFERENCES third_parties(id),
     user_id BIGINT NOT NULL REFERENCES public.users(id),
     branch_id BIGINT NOT NULL REFERENCES public.branches(id),
-    empresa_id BIGINT NOT NULL,
+    enterprise_id BIGINT NOT NULL,
     subtotal DECIMAL(12,2) NOT NULL,
     discount DECIMAL(12,2) NOT NULL DEFAULT 0,
     tax_total DECIMAL(12,2) NOT NULL,
@@ -15,13 +15,13 @@ CREATE TABLE sales_order (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,
     
-    CONSTRAINT sales_order_empresa_fk FOREIGN KEY (empresa_id) REFERENCES public.enterprises(id),
+    CONSTRAINT sales_order_enterprise_fk FOREIGN KEY (enterprise_id) REFERENCES public.enterprises(id),
     CONSTRAINT sales_order_user_fk FOREIGN KEY (user_id) REFERENCES public.users(id),
     CONSTRAINT sales_order_customer_fk FOREIGN KEY (customer_id) REFERENCES third_parties(id),
-    CONSTRAINT sales_order_number_unique UNIQUE (empresa_id, branch_id, order_number)
+    CONSTRAINT sales_order_number_unique UNIQUE (enterprise_id, branch_id, order_number)
 );
 
-CREATE INDEX idx_sales_order_empresa ON sales_order(empresa_id);
+CREATE INDEX idx_sales_order_enterprise ON sales_order(enterprise_id);
 CREATE INDEX idx_sales_order_branch ON sales_order(branch_id);
 CREATE INDEX idx_sales_order_customer ON sales_order(customer_id);
 CREATE INDEX idx_sales_order_status ON sales_order(status);

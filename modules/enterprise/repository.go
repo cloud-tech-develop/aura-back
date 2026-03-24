@@ -215,3 +215,27 @@ func (r *postgresRepository) EnterpriseExistsByStatus(ctx context.Context, slug 
 	).Scan(&exists)
 	return exists, err
 }
+
+// GetPlanByEnterpriseID retrieves the plan for a given enterprise
+func (r *postgresRepository) GetPlanByEnterpriseID(ctx context.Context, enterpriseID int64) (*Plan, error) {
+	var p Plan
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, enterprise_id, max_users, max_enterprises, trial_until, created_at, updated_at 
+		 FROM public.plans WHERE enterprise_id = $1 AND deleted_at IS NULL`,
+		enterpriseID,
+	).Scan(&p.ID, &p.EnterpriseID, &p.MaxUsers, &p.MaxEnterprises, &p.TrialUntil, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+// CountEnterprisesByTenant counts the number of enterprises for a tenant
+func (r *postgresRepository) CountEnterprisesByTenant(ctx context.Context, tenantID int64) (int64, error) {
+	var count int64
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM public.enterprises WHERE tenant_id = $1 AND deleted_at IS NULL`,
+		tenantID,
+	).Scan(&count)
+	return count, err
+}

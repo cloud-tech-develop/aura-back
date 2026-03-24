@@ -1,247 +1,204 @@
 # AGENTS.md - Agent Coding Guidelines for aura-back
 
-This document provides guidelines for AI agents working on this codebase.
-
 ## Project Overview
 
-- **Language**: Go 1.26.1
-- **Database**: PostgreSQL with `lib/pq` driver
-- **Migrations**: `golang-migrate/v4` with embedded SQL files
-- **HTTP**: Standard library `net/http` (no framework)
+- **Language**: Go 1.26.1 | **Framework**: Gin (github.com/gin-gonic/gin)
+- **Database**: PostgreSQL with `lib/pq` driver | **Migrations**: golang-migrate/v4
 - **Architecture**: Multi-tenant SaaS with schema-per-tenant pattern
-- **Web Framework**: Gin (github.com/gin-gonic/gin)
-- **Go Version**: 1.26.1
+- **Testing**: stretchr/testify + DATA-DOG/go-sqlmock
 
-## Project Structure
+## Essential Commands
 
-```
-aura-back/
-├── cmd/
-│   ├── api/main.go            # Dependency wiring & entry point
-│   └── server/server.go       # Router, middleware & module registration
-├── infrastructure/            # Infrastructure implementations
-│   └── messaging/             # Message bus implementations
-│       └── memory/            # In-memory event bus
-├── internal/
-│   └── db/db.go               # Database connection pool
-├── shared/                    # Cross-cutting concerns
-│   ├── errors/                # Domain-specific errors
-│   ├── events/                # Event bus interfaces & base types
-│   ├── logging/               # Generic logging handlers
-│   └── response/              # Standard HTTP response helpers
-├── tenant/
-│   ├── manager.go             # Multi-tenant logic (migrations, CRUD)
-│   ├── auth.go                # JWT, Login & AuthMiddleware
-│   ├── middleware.go          # Tenant middleware
-│   └── migrations/            # PostgreSQL migrations (public + tenant)
-├── modules/                   # Vertical Feature Modules (Self-contained)
-│   └── enterprise/            # Example: Enterprise management
-│       ├── domain.go          # Domain entity, Repository & Service interfaces
-│       ├── service.go         # Business logic implementation
-│       ├── repository.go      # PostgreSQL implementation of repository
-│       ├── handler.go         # HTTP handlers
-│       ├── routes.go          # Module route registration
-│       └── logger.go          # Module-specific event logging
-└── go.mod
-```
-
-### Module Guidelines
-- Each POS feature (Sales, Products, etc.) must be its own module in `modules/`.
-- Modules should be decoupled; avoid cross-module imports where possible.
-- Use `shared/` for truly global logic and interfaces.
-- Always use `context.Context` for repository and service methods.
-- Modules should register their routes via a `RegisterRoutes` function.
-
-## Build, Lint & Test Commands
-
-### Running the Application
 ```bash
+# Run the application
 go run ./cmd/api/main.go
-```
 
-### Build
-```bash
+# Build
 go build ./...
-```
 
-### Run Tests
-```bash
+# Run all tests
 go test ./...
-```
 
-### Run Single Test
-```bash
-go test -run TestName ./...
-go test -v -run TestName ./...
-```
+# Run single test (most important for agents)
+go test -v -run TestService_Create_ValidSlugFormat ./modules/enterprise/...
+go test -v -run TestListRolesByMinLevel ./modules/users/...
 
-### Run Tests with Coverage
-```bash
+# Run tests with race detection
+go test -race ./...
+
+# Run tests with coverage
 go test -cover ./...
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
-```
+go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out
 
-### Formatting & Vetting
-```bash
+# Formatting & vetting (run these before committing)
 go fmt ./...
 go vet ./...
 go mod tidy
 ```
 
-### Linting (if golangci-lint is installed)
-```bash
-golangci-lint run
+## Project Structure
+
+```
+aura-back/
+├── cmd/api/main.go              # Entry point & dependency wiring
+├── cmd/server/server.go         # Router, middleware, module registration
+├── internal/db/db.go            # Database connection pool
+├── shared/                      # Cross-cutting: errors, events, response, domain/vo
+├── tenant/                      # Multi-tenant: Manager, Auth, Middleware, migrations/
+│   ├── migrations/public/       # Public schema migrations
+│   └── migrations/tenant/       # Tenant schema migrations
+├── modules/                     # Feature modules (self-contained)
+│   └── enterprise/              # Each module: domain.go, service.go, repository.go, handler.go, routes.go
+└── infrastructure/messaging/    # Event bus implementations
 ```
 
-### Migrations (using golang-migrate CLI)
-```bash
-migrate create -ext sql -dir tenant/migrations -seq migration_name
-migrate -path tenant/migrations -database "postgres://user:pass@localhost/db?sslmode=disable" up
-migrate -path tenant/migrations -database "postgres://user:pass@localhost/db?sslmode=disable" down
+## Module Pattern
+
+Each feature module in `modules/` follows this structure:
+- `domain.go` - Entity, Repository interface, Service interface, events
+- `service.go` - Business logic (unexported struct, constructor returns interface)
+- `repository.go` - PostgreSQL implementation with `querier` interface for DB/Tx support
+- `handler.go` - Gin HTTP handlers with request/response types
+- `routes.go` - `Register(public, protected gin.IRouter, h *Handler)` function
+
+## Code Style
+
+### Imports (3 groups, blank line between)
+```go
+import (
+    "context"
+    "database/sql"
+    "fmt"
+
+    "github.com/gin-gonic/gin"
+    "github.com/lib/pq"
+
+    "github.com/cloud-tech-develop/aura-back/shared/errors"
+    "github.com/cloud-tech-develop/aura-back/tenant"
+)
 ```
 
-## Code Style Guidelines
-
-### Imports
-- Standard library first, then external packages
-- Grouped with blank line between groups:
-  ```go
-  import (
-      "context"
-      "fmt"
-      "net/http"
-      
-      "github.com/golang-migrate/migrate/v4"
-      "github.com/lib/pq"
-      "github.com/joho/godotenv"
-  )
-  ```
-- Internal packages use the full module path:
-  ```go
-  "github.com/cloud-tech-develop/aura-back/internal/db"
-  ```
-- Use blank lines between groups (standard, external, internal)
-
-### Naming Conventions
-- **Types/Functions**: PascalCase (e.g., `Manager`, `NewManager`)
-- **Variables/Fields**: camelCase (e.g., `db`, `slug`)
-- **Constants**: PascalCase or camelCase with prefix (e.g., `TenantKey`)
-- **Packages**: short, lowercase, no underscores
-- **SQL Schemas**: lowercase with underscores (e.g., `empresa_uno`)
-- **Interface Names**: Should end with -er when they have one method (e.g., `Migrator`, `Logger`)
-- **Struct Fields**: Use camelCase, export only when needed
+### Naming
+- **Exported**: PascalCase (`Service`, `NewHandler`, `TenantKey`)
+- **Unexported**: camelCase (`repository`, `eventBus`, `validSlug`)
+- **Packages**: lowercase, no underscores (`shared`, `enterprise`, `vo`)
+- **Interfaces**: -er suffix for single methods (`Migrator`, `Logger`)
+- **Constants**: Group in `const` blocks; event names as `"module.action"` strings
 
 ### Error Handling
-- Always check errors immediately after calls
-- Wrap errors with `fmt.Errorf("context: %w", err)` for proper error chains
-- Return errors rather than logging unless it's the final entry point
-- Use sentinel errors only when necessary (defined in `shared/errors/`)
-- Handle specific errors with `errors.Is()` and `errors.As()` when appropriate
-- Return `sql.ErrNoRows` from repository methods when no data is found
+```go
+// Wrap with context using %w
+if err != nil {
+    return fmt.Errorf("crear tenant: %w", err)
+}
 
-### Context Usage
-- Pass `context.Context` as first parameter to functions that may timeout/cancel
-- Use `context.WithValue` for request-scoped values (like tenant slug)
-- Check for cancellation: `if ctx.Err() != nil { return ctx.Err() }`
-- Never store contexts in struct types; pass them explicitly
-- Use `context.Background()` only at the top level (main, tests)
+// Use sql.ErrNoRows for "not found" - callers check with errors.Is()
+if err == sql.ErrNoRows {
+    return nil, sql.ErrNoRows
+}
+
+// Sentinel errors in shared/errors/ for common cases
+// Service returns domain errors; handler maps to HTTP status
+if errors.Is(err, ErrPlanLimitReached) {
+    response.Forbidden(c, err.Error())
+    return
+}
+```
 
 ### Database Operations
-- Use prepared statements or parameterized queries to prevent SQL injection
-- Always close rows with `defer rows.Close()` after Query/QueryRow
-- Use transactions for multi-step operations requiring atomicity
-- Set `search_path` per-tenant for schema isolation
-- Handle `sql.ErrNoRows` appropriately
-- Use `QueryRowContext` and `ExecContext` when context is available
+- Always use `QueryRowContext`/`ExecContext` with context parameter
+- Use parameterized queries (`$1, $2`) - never string interpolation
+- Close rows: `defer rows.Close()` immediately after Query
+- Use transactions for multi-step operations: `tx, err := db.BeginTx(ctx, nil)`
+- Support both DB and Tx via `querier` interface pattern
 
 ### HTTP Handlers
-- Read tenant from context, not directly from header (middleware already extracted it)
-- Return proper HTTP status codes (200, 201, 400, 404, 500)
-- Log errors appropriately before returning
-- Use helper functions from `shared/response/` for consistent responses
-- Validate request bodies early and return 400 for invalid input
-- Use `context.WithTimeout` for outgoing HTTP calls
+```go
+// Read tenant from context (middleware sets it)
+slug, ok := tenant.SlugFromContext(c)
+enterpriseID := c.GetInt64("enterprise_id")
 
-### Multi-Tenant Pattern
-- Each tenant gets a PostgreSQL schema named after their slug
-- Tenant slug must match regex: `^[a-z0-9_]+$` (lowercase, numbers, underscores)
-- Use `X-Tenant` header to identify tenant per request
-- All tenant-specific queries run against their schema via search_path
-- Tenant middleware should set the search_path and validate the slug
-- Public tables (in public schema) are shared across tenants
-- When creating tenants, run migrations against their schema
-- Email validation: Check email uniqueness across all enterprises (in public schema)
+// Use shared/response helpers for consistent responses
+response.OK(c, data)
+response.Created(c, data)
+response.BadRequest(c, msg)
+response.NotFound(c, msg)
+response.Conflict(c, msg)
 
-### Code Organization
-- Keep business logic in `internal/` or `tenant/` packages
-- Entry point in `cmd/`
-- Use `embed.FS` for embedding static files (migrations)
-- Avoid global state; pass dependencies explicitly
-- Group related constants in `const` blocks
-- Use receiver methods appropriately (value vs pointer)
-- Keep functions focused and under 50 lines when possible
+// Bind and validate JSON
+var req createRequest
+if err := c.ShouldBindJSON(&req); err != nil {
+    response.BadRequest(c, err.Error())
+    return
+}
+```
 
-### Testing (when adding tests)
-- Test files: `*_test.go` in same package
-- Use table-driven tests for multiple cases
-- Mock database operations with interfaces
-- Test name format: `Test<Function>_<Scenario>`
-- Test both success and error paths
-- Use `t.Parallel()` for independent tests
-- Set up test data in `TestMain` when needed for the package
-- Don't test private functions directly; test through public interface
+### Context Usage
+- Always pass `ctx context.Context` as first parameter
+- Use `c.Request.Context()` in handlers (never `context.Background()`)
+- Never store contexts in structs
 
-### Event Bus Usage
-- Use the event bus from `shared/events/` for loose coupling
-- Define event types as constants
-- Publishers should not know about subscribers
-- Handle event processing errors gracefully
-- Use synchronous processing for critical paths
-- Consider dead letter queues for failed events
+## Multi-Tenant Pattern
 
-### Logging
-- Use the logger from `shared/logging/`
-- Log at appropriate levels (debug, info, warn, error)
-- Include context in logs (request ID, tenant ID, etc.)
-- Don't log sensitive information (passwords, tokens)
-- Use structured logging when possible
-- Pass logger as dependency rather than using globals
+- Tenant identified by slug in JWT claims or subdomain
+- Each tenant gets PostgreSQL schema named after slug (`empresa_uno`)
+- Tenant middleware validates slug and sets context
+- Public tables (users, enterprises, roles) in `public` schema
+- Tenant tables (third_parties, products) in tenant schema
+- Email uniqueness enforced across all tenants at service level
 
-## Dependency Management
-- Use `go mod tidy` regularly to clean up dependencies
-- Pin versions in go.mod for reproducible builds
-- Vendoring is not used; rely on module proxy
-- Update dependencies with `go get -u ./...`
-- Check for outdated packages with `go list -m -u all`
+## Testing Conventions
 
-## Security Guidelines
-- Never hardcode credentials; use environment variables
-- Validate all input (both syntactic and semantic)
-- Use parameterized queries to prevent SQL injection
-- Set secure flags on cookies when using them
-- Implement rate limiting at the middleware level
-- Hash passwords using bcrypt or similar (see `tenant/auth.go`)
-- Use environment-specific configuration
-- Regularly update dependencies to patch vulnerabilities
-- Email uniqueness validation must be enforced at service level
+```go
+// Test naming: Test<Component>_<Method>_<Scenario>
+func TestService_Create_DuplicateSlug(t *testing.T) { ... }
+func TestListRolesByMinLevel_SuperAdmin(t *testing.T) { ... }
 
-## Docker Guidelines (if applicable)
-- Use multi-stage builds to minimize image size
-- Run as non-root user in containers
-- Cache dependency downloads
-- Expose only necessary ports
-- Use healthchecks
-- Don't store secrets in images; use secrets management
+// Use table-driven tests for multiple cases
+tests := []struct {
+    name    string
+    slug    string
+    wantErr bool
+}{
+    {"valid lowercase", "empresa_uno", false},
+    {"invalid chars", "empresa@test", true},
+}
+for _, tt := range tests {
+    t.Run(tt.name, func(t *testing.T) { ... })
+}
 
-## CI/CD Considerations
-- Run `go vet` and `go fmt -l` in CI to catch style issues
-- Run tests with race detector: `go test -race ./...`
-- Build for multiple platforms if needed: `GOOS=linux GOARCH=amd64 go build`
-- Tag Docker images with git SHA and version
-- Use blue-green deployments for zero-downtime releases
+// Mock repositories with testify/mock
+type MockRepository struct { mock.Mock }
+func (m *MockRepository) GetBySlug(ctx context.Context, slug string) (*Enterprise, error) {
+    args := m.Called(ctx, slug)
+    if args.Get(0) == nil { return nil, args.Error(1) }
+    return args.Get(0).(*Enterprise), args.Error(1)
+}
 
-## AGENTS.md Guidelines
-- This file should be kept up to date with any architectural or process changes
-- New agents should read this file before making changes to the codebase
-- If there are specific rules for AI agents (e.g., Cursor rules, Copilot instructions), include them here
+// Use go-sqlmock for repository tests
+db, mock, err := sqlmock.New()
+```
+
+## Adding a New Module
+
+1. Create `modules/<name>/` with domain.go, service.go, repository.go, handler.go, routes.go
+2. Define entity, repository interface, service interface in domain.go
+3. Implement service (unexported struct, `NewService` returns interface)
+4. Implement repository with `querier` interface for transaction support
+5. Create handler with `ShouldBindJSON` for request validation
+6. Add routes in `Register(public, protected gin.IRouter, h *Handler)`
+7. Create migration SQL files in `tenant/migrations/tenant/`
+8. Register handler in `cmd/api/main.go` and `cmd/server/server.go`
+
+## Security
+
+- Never hardcode credentials; use `.env` + `os.Getenv()`
+- Passwords hashed with bcrypt (`tenant.HashPassword`)
+- JWT includes user_id, enterprise_id, slug, roles, role_level, ip
+- IP validation in JWT claims (prevents token theft)
+- Parameterized queries prevent SQL injection
+- Input validation at handler level, business validation at service level
+
+## Dependencies
+
+Key packages: `gin-gonic/gin`, `lib/pq`, `golang-migrate/v4`, `golang-jwt/jwt/v5`, `stretchr/testify`, `DATA-DOG/go-sqlmock`, `joho/godotenv`

@@ -8,16 +8,16 @@
 
 ## Criterios de Aceptación
 
-- [ ] Antes de crear empresa, verificar el plan activo (**FALTA**)
-- [ ] Contar empresas actuales vs límite del plan (**FALTA**)
-- [ ] Retornar 403 Forbidden si se alcanzó el límite (**FALTA**)
-- [ ] Mensaje claro: "Ha alcanzado el límite de empresas de su plan" (**FALTA**)
+- [x] Antes de crear empresa, verificar el plan activo (**IMPLEMENTADO**)
+- [x] Contar empresas actuales vs límite del plan (**IMPLEMENTADO**)
+- [x] Retornar 403 Forbidden si se alcanzó el límite (**IMPLEMENTADO**)
+- [x] Mensaje claro: "Ha alcanzado el límite de empresas de su plan" (**IMPLEMENTADO**)
 
 ---
 
-## Estado: 0/4 implementados
+## Estado: 4/4 implementados
 
-### Issues Técnicos a Resolver
+### Issues Técnicos Resueltos
 | ID | Descripción | Severidad |
 |----|-------------|-----------|
 | #008-001 | Crear validación de plan antes de crear empresa | Alta |
@@ -28,9 +28,23 @@
 
 ## Notas Técnicas
 
-- La tabla `public.plans` existe pero no se usa durante la creación
-- No hay verificación de cuota antes de crear una empresa
-- El campo `maxEnterprises` debería estar en la tabla plans
+- La tabla `public.plans` ahora tiene el campo `max_enterprises`
+- La validación se realiza en el servicio enterprise antes de crear
+- Se consulta el plan del tenant y se cuentan las empresas actuales
+- Si se alcanza el límite, se retorna error `ErrPlanLimitReached`
+
+---
+
+## Cambios Realizados
+
+### Migration
+- `000008_add_max_enterprises_to_plans.up.sql`: Agrega columna `max_enterprises` a `public.plans`
+
+### Código
+- `domain.go`: Agregada estructura `Plan` y métodos al `Repository`
+- `repository.go`: Implementados `GetPlanByEnterpriseID` y `CountEnterprisesByTenant`
+- `service.go`: Agregada validación de límite en `Create`
+- `handler.go`: Retorna 403 cuando `ErrPlanLimitReached`
 
 ---
 
@@ -39,7 +53,8 @@
 ### Response (403 Forbidden)
 ```json
 {
-  "error": "forbidden",
-  "message": "Ha alcanzado el límite de empresas de su plan"
+  "success": false,
+  "message": "Ha alcanzado el límite de empresas de su plan",
+  "data": null
 }
 ```

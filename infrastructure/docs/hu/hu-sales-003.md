@@ -1,6 +1,7 @@
 # HU-SALES-003 - Sale/Order Creation
 
 ## 📌 General Information
+
 - ID: HU-SALES-003
 - Epic: EPIC-SALES-001
 - Priority: High
@@ -22,6 +23,7 @@
 ## 🧠 Functional Description
 
 The system must convert a shopping cart into a permanent sales order. The sales order includes:
+
 - Customer information (if applicable)
 - Complete item list with pricing
 - Tax calculations
@@ -36,6 +38,7 @@ The process must be atomic to ensure data consistency.
 ## ✅ Acceptance Criteria
 
 ### Scenario 1: Create sales order from cart
+
 - Given that a cart exists with items
 - When I convert the cart to a sales order
 - Then a sales order must be created with:
@@ -48,24 +51,28 @@ The process must be atomic to ensure data consistency.
 - And inventory must be updated for all items
 
 ### Scenario 2: Tax calculation
+
 - Given that products have different tax rates
 - When the sales order is created
 - Then taxes must be calculated per item
 - And the total tax must be the sum of all item taxes
 
 ### Scenario 3: Inventory update
+
 - Given that products have current stock
 - When a sales order is completed
 - Then stock levels must be decremented
 - And low stock alerts must be triggered if needed
 
 ### Scenario 4: Order status management
+
 - Given that a sales order exists
 - When payment is processed
 - Then the order status must update to PAID
 - And the order must be marked as completed
 
 ### Scenario 5: Multi-payment support
+
 - Given that a customer wants to split payment
 - When multiple payment methods are used
 - Then the sales order must track all payments
@@ -95,6 +102,7 @@ The process must be atomic to ensure data consistency.
 ## 🗄️ Database Schema (PostgreSQL)
 
 ### Table: sales_order
+
 ```sql
 CREATE TABLE sales_order (
     id BIGSERIAL PRIMARY KEY,
@@ -102,7 +110,7 @@ CREATE TABLE sales_order (
     customer_id INTEGER REFERENCES customer(id),
     user_id INTEGER NOT NULL REFERENCES usuario(id),
     branch_id INTEGER NOT NULL REFERENCES branch(id),
-    empresa_id INTEGER NOT NULL REFERENCES empresa(id),
+    enterprise_id INTEGER NOT NULL REFERENCES empresa(id),
     subtotal DECIMAL(12,2) NOT NULL,
     discount DECIMAL(12,2) NOT NULL DEFAULT 0,
     tax_total DECIMAL(12,2) NOT NULL,
@@ -111,21 +119,22 @@ CREATE TABLE sales_order (
     notes TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP,
-    
-    CONSTRAINT sales_order_empresa_fk FOREIGN KEY (empresa_id) REFERENCES empresa(id),
+
+    CONSTRAINT sales_order_empresa_fk FOREIGN KEY (enterprise_id) REFERENCES empresa(id),
     CONSTRAINT sales_order_user_fk FOREIGN KEY (user_id) REFERENCES usuario(id),
     CONSTRAINT sales_order_branch_fk FOREIGN KEY (branch_id) REFERENCES branch(id),
     CONSTRAINT sales_order_customer_fk FOREIGN KEY (customer_id) REFERENCES customer(id),
-    CONSTRAINT sales_order_number_unique UNIQUE (empresa_id, branch_id, order_number)
+    CONSTRAINT sales_order_number_unique UNIQUE (enterprise_id, branch_id, order_number)
 );
 
-CREATE INDEX idx_sales_order_empresa ON sales_order(empresa_id);
+CREATE INDEX idx_sales_order_empresa ON sales_order(enterprise_id);
 CREATE INDEX idx_sales_order_branch ON sales_order(branch_id);
 CREATE INDEX idx_sales_order_customer ON sales_order(customer_id);
 CREATE INDEX idx_sales_order_status ON sales_order(status);
 ```
 
 ### Table: sales_order_item
+
 ```sql
 CREATE TABLE sales_order_item (
     id BIGSERIAL PRIMARY KEY,
@@ -139,7 +148,7 @@ CREATE TABLE sales_order_item (
     tax_amount DECIMAL(12,2) NOT NULL,
     total DECIMAL(12,2) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    
+
     CONSTRAINT sales_order_item_order_fk FOREIGN KEY (sales_order_id) REFERENCES sales_order(id) ON DELETE CASCADE,
     CONSTRAINT sales_order_item_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
 );
@@ -165,12 +174,13 @@ CREATE INDEX idx_sales_order_item_product ON sales_order_item(product_id);
 ### Entities (Java)
 
 **SalesOrderEntity:**
+
 - id (Long, PK)
 - order_number (String, unique)
 - customer_id (Long, FK, nullable)
 - user_id (Long, FK)
 - branch_id (Long, FK)
-- empresa_id (Long, FK)
+- enterprise_id (Long, FK)
 - subtotal (BigDecimal)
 - discount (BigDecimal)
 - tax_total (BigDecimal)
@@ -181,6 +191,7 @@ CREATE INDEX idx_sales_order_item_product ON sales_order_item(product_id);
 - updated_at (LocalDateTime)
 
 **SalesOrderItemEntity:**
+
 - id (Long, PK)
 - sales_order_id (Long, FK)
 - product_id (Long, FK)
