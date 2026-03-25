@@ -11,6 +11,7 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/products"
 	"github.com/cloud-tech-develop/aura-back/modules/reports"
 	"github.com/cloud-tech-develop/aura-back/modules/sales"
+	"github.com/cloud-tech-develop/aura-back/modules/sync"
 	"github.com/cloud-tech-develop/aura-back/modules/third-parties"
 	"github.com/cloud-tech-develop/aura-back/modules/users"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
@@ -53,9 +54,16 @@ func (s *Server) RegisterModules(
 	reportsH *reports.Handler,
 	thirdPartiesH *thirdparties.Handler,
 	inventoryH *inventory.Handler,
+	syncH *sync.Handler,
 ) {
 	// ── Auth ─────────────────────────────────────────────────────────────────
 	s.router.POST("/login", tenant.Login(s.db))
+
+	// ── Static Files ──────────────────────────────────────────────────────────
+	s.router.Static("/static", "./static")
+	s.router.GET("/download/offline-pos", func(c *gin.Context) {
+		c.FileAttachment("./static/bin/aura-pos-offline.exe", "aura-pos-offline.exe")
+	})
 
 	// ── Public routes (no middleware) ─────────────────────────────────────────
 	public := s.router.Group("/")
@@ -78,6 +86,7 @@ func (s *Server) RegisterModules(
 	reports.Register(public, protected, reportsH)
 	thirdparties.Register(public, protected, thirdPartiesH)
 	inventory.Register(public, protected, inventoryH)
+	sync.Register(public, protected, syncH)
 }
 
 // Run starts the HTTP server on the given address.

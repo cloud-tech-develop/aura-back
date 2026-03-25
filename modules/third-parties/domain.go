@@ -24,6 +24,9 @@ type ThirdParty struct {
 	IsEmployee        bool       `json:"is_employee"`
 	MunicipalityID    string     `json:"municipality_id"`
 	Municipality      string     `json:"municipality"`
+	GlobalID          string     `json:"global_id"`
+	SyncStatus        string     `json:"sync_status"`
+	LastSyncedAt      *time.Time `json:"last_synced_at,omitempty"`
 	CreatedAt         time.Time  `json:"created_at"`
 	DeletedAt         *time.Time `json:"deleted_at,omitempty"`
 }

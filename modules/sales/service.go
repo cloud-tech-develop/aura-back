@@ -6,14 +6,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/google/uuid"
 )
 
 type repository struct {
-	db *sql.DB
+	db db.Querier
 }
 
-func NewRepository(db *sql.DB) Repository {
+func NewRepository(db db.Querier) Repository {
 	return &repository{db: db}
 }
 
@@ -204,7 +205,7 @@ type service struct {
 	repo Repository
 }
 
-func NewService(db *sql.DB) Service {
+func NewService(db db.Querier) Service {
 	return &service{repo: NewRepository(db)}
 }
 

@@ -7,25 +7,31 @@ import (
 
 // Category entity
 type Category struct {
-	ID          int64      `json:"id"`
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	ParentID    *int64     `json:"parent_id,omitempty"`
-	EnterpriseID   int64      `json:"enterprise_id"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
-	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
+	ID           int64      `json:"id"`
+	Name         string     `json:"name"`
+	Description  string     `json:"description"`
+	ParentID     *int64     `json:"parent_id,omitempty"`
+	EnterpriseID int64      `json:"enterprise_id"`
+	GlobalID     string     `json:"global_id"`
+	SyncStatus   string     `json:"sync_status"`
+	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
+	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
 }
 
 // Brand entity
 type Brand struct {
-	ID          int64      `json:"id"`
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	EnterpriseID   int64      `json:"enterprise_id"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
-	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
+	ID           int64      `json:"id"`
+	Name         string     `json:"name"`
+	Description  string     `json:"description"`
+	EnterpriseID int64      `json:"enterprise_id"`
+	GlobalID     string     `json:"global_id"`
+	SyncStatus   string     `json:"sync_status"`
+	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
+	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
 }
 
 // Product entity
@@ -44,9 +50,12 @@ type Product struct {
 	ImageURL     string     `json:"image_url"`
 	Status       string     `json:"status"`
 	EnterpriseID    int64      `json:"enterprise_id"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
-	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
+	GlobalID        string     `json:"global_id"`
+	SyncStatus      string     `json:"sync_status"`
+	LastSyncedAt    *time.Time `json:"last_synced_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
+	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
 }
 
 // Repository interfaces

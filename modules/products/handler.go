@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"strconv"
 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/gin-gonic/gin"
 )
@@ -14,11 +15,14 @@ type Handler struct {
 	productSvc  ProductService
 }
 
-func NewHandler(db *sql.DB) *Handler {
+func NewHandler(database *db.DB) *Handler {
+	// Wrap the database connection to automatically adapt queries
+	q := database.Wrap(database.DB)
+	
 	return &Handler{
-		categorySvc: NewCategoryService(db),
-		brandSvc:    NewBrandService(db),
-		productSvc:  NewProductService(db),
+		categorySvc: NewCategoryService(q),
+		brandSvc:    NewBrandService(q),
+		productSvc:  NewProductService(q),
 	}
 }
 

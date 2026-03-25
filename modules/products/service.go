@@ -4,13 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 )
 
 type categoryService struct {
 	repo CategoryRepository
 }
 
-func NewCategoryService(db *sql.DB) CategoryService {
+func NewCategoryService(db db.Querier) CategoryService {
 	return &categoryService{repo: NewCategoryRepository(db)}
 }
 
@@ -49,7 +51,7 @@ type brandService struct {
 	repo BrandRepository
 }
 
-func NewBrandService(db *sql.DB) BrandService {
+func NewBrandService(db db.Querier) BrandService {
 	return &brandService{repo: NewBrandRepository(db)}
 }
 
@@ -88,7 +90,7 @@ type productService struct {
 	repo ProductRepository
 }
 
-func NewProductService(db *sql.DB) ProductService {
+func NewProductService(db db.Querier) ProductService {
 	return &productService{repo: NewProductRepository(db)}
 }
 

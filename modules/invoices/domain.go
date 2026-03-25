@@ -18,6 +18,9 @@ type InvoicePrefix struct {
 	ValidUntil      *time.Time `json:"valid_until,omitempty"`
 	Description     string     `json:"description,omitempty"`
 	IsActive        bool       `json:"is_active"`
+	GlobalID        string     `json:"global_id"`
+	SyncStatus      string     `json:"sync_status"`
+	LastSyncedAt    *time.Time `json:"last_synced_at,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       *time.Time `json:"updated_at,omitempty"`
 }
@@ -55,6 +58,9 @@ type Invoice struct {
 	CancelledBy     *int64       `json:"cancelled_by,omitempty"`
 	CancellationReason string    `json:"cancellation_reason,omitempty"`
 	CreditNoteID    *int64       `json:"credit_note_id,omitempty"`
+	GlobalID        string       `json:"global_id"`
+	SyncStatus      string       `json:"sync_status"`
+	LastSyncedAt    *time.Time   `json:"last_synced_at,omitempty"`
 	CreatedAt       time.Time    `json:"created_at"`
 	UpdatedAt       *time.Time   `json:"updated_at,omitempty"`
 	DeletedAt       *time.Time   `json:"deleted_at,omitempty"`

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"strconv"
 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/gin-gonic/gin"
 )
@@ -12,8 +13,9 @@ type Handler struct {
 	svc Service
 }
 
-func NewHandler(db *sql.DB) *Handler {
-	return &Handler{svc: NewService(db)}
+func NewHandler(database *db.DB) *Handler {
+	q := database.Wrap(database.DB)
+	return &Handler{svc: NewService(q)}
 }
 
 // CreateCart - POST /carts

@@ -4,19 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 )
 
-type querier interface {
-	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
-}
+type querier = db.Querier
 
 type categoryRepository struct {
 	db querier
 }
 
-func NewCategoryRepository(db *sql.DB) CategoryRepository {
+func NewCategoryRepository(db querier) CategoryRepository {
 	return &categoryRepository{db: db}
 }
 
@@ -103,7 +101,7 @@ type brandRepository struct {
 	db querier
 }
 
-func NewBrandRepository(db *sql.DB) BrandRepository {
+func NewBrandRepository(db querier) BrandRepository {
 	return &brandRepository{db: db}
 }
 
@@ -190,7 +188,7 @@ type productRepository struct {
 	db querier
 }
 
-func NewProductRepository(db *sql.DB) ProductRepository {
+func NewProductRepository(db querier) ProductRepository {
 	return &productRepository{db: db}
 }
 

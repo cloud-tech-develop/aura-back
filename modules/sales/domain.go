@@ -19,6 +19,9 @@ type SalesOrder struct {
 	Total        float64      `json:"total"`
 	Status       string       `json:"status"`
 	Notes        string       `json:"notes"`
+	GlobalID     string       `json:"global_id"`
+	SyncStatus   string       `json:"sync_status"`
+	LastSyncedAt *time.Time   `json:"last_synced_at,omitempty"`
 	CreatedAt    time.Time    `json:"created_at"`
 	UpdatedAt    *time.Time   `json:"updated_at,omitempty"`
 	Items        []SalesOrderItem `json:"items,omitempty"`

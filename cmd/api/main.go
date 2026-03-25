@@ -16,10 +16,12 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/products"
 	"github.com/cloud-tech-develop/aura-back/modules/reports"
 	"github.com/cloud-tech-develop/aura-back/modules/sales"
+	"github.com/cloud-tech-develop/aura-back/modules/sync"
 	"github.com/cloud-tech-develop/aura-back/modules/third-parties"
 	"github.com/cloud-tech-develop/aura-back/modules/users"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/joho/godotenv"
+	"os/exec"
 )
 
 func main() {
@@ -28,13 +30,21 @@ func main() {
 	}
 
 	dsn := os.Getenv("DATABASE_URL")
+	driver := os.Getenv("DATABASE_DRIVER")
+	if driver == "" {
+		driver = "postgres" // Default
+	}
+	if driver == "sqlite" && dsn == "" {
+		dsn = "aura_pos.db" // Default local db
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8081"
 	}
 
 	// ── Database ────────────────────────────────────────────────────────────
-	database, err := db.New(dsn)
+	database, err := db.New(driver, dsn)
 	if err != nil {
 		log.Fatal("DB:", err)
 	}
@@ -76,37 +86,61 @@ func main() {
 	// _ = eventBus.Subscribe(users.EventDeleted, usersLogger) // If implemented
 
 	// Products module
-	productsHandler := products.NewHandler(database.DB)
+	productsHandler := products.NewHandler(database)
 
 	// Cart module
-	cartHandler := cart.NewHandler(database.DB)
+	cartHandler := cart.NewHandler(database)
 
 	// Sales module
-	salesHandler := sales.NewHandler(database.DB)
+	salesHandler := sales.NewHandler(database)
 
 	// Payments module
-	paymentsHandler := payments.NewHandler(database.DB)
+	paymentsHandler := payments.NewHandler(database)
 
 	// Invoices module
-	invoicesHandler := invoices.NewHandler(database.DB)
+	invoicesHandler := invoices.NewHandler(database)
 
 	// Reports module
-	reportsHandler := reports.NewHandler(database.DB)
+	reportsHandler := reports.NewHandler(database)
 
 	// Third Parties module
-	thirdPartiesHandler := thirdparties.NewHandler(database.DB)
+	thirdPartiesHandler := thirdparties.NewHandler(database)
 
 	// Inventory module
-	inventoryHandler := inventory.NewHandler(database.DB)
+	inventoryHandler := inventory.NewHandler(database)
+
+	// Sync module
+	syncHandler := sync.NewHandler(database)
 
 	// ── HTTP Server ──────────────────────────────────────────────────────────
 	srv := server.NewServer(database.DB, tenantMgr)
-	srv.RegisterModules(enterpriseHandler, usersHandler, productsHandler, cartHandler, salesHandler, paymentsHandler, invoicesHandler, reportsHandler, thirdPartiesHandler, inventoryHandler)
+	srv.RegisterModules(enterpriseHandler, usersHandler, productsHandler, cartHandler, salesHandler, paymentsHandler, invoicesHandler, reportsHandler, thirdPartiesHandler, inventoryHandler, syncHandler)
 
 	log.Println("servidor en :" + port)
+	
+	// Generate offline binary in background
+	go buildOfflineBinary()
+
 	if err := srv.Run(":" + port); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func buildOfflineBinary() {
+	log.Println("Generating offline binary...")
+	
+	// Create static directory if it doesn't exist
+	_ = os.MkdirAll("static/bin", 0755)
+
+	cmd := exec.Command("go", "build", "-o", "static/bin/aura-pos-offline.exe", "cmd/api/main.go")
+	cmd.Env = append(os.Environ(), "GOOS=windows", "GOARCH=amd64", "CGO_ENABLED=0")
+	
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Error building offline binary: %v\nOutput: %s", err, string(output))
+		return
+	}
+	log.Println("Offline binary generated successfully at static/bin/aura-pos-offline.exe")
 }
 
 // enterpriseMigratorAdapter adapts tenant.Manager to enterprise.Migrator.
