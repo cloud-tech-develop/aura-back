@@ -56,6 +56,11 @@ func (s *Server) RegisterModules(
 	inventoryH *inventory.Handler,
 	syncH *sync.Handler,
 ) {
+	// ── Health Check ──────────────────────────────────────────────────────────
+	s.router.GET("/", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "hello world", "status": "ok"})
+	})
+
 	// ── Auth ─────────────────────────────────────────────────────────────────
 	s.router.POST("/login", tenant.Login(s.db))
 

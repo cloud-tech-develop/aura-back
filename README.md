@@ -67,11 +67,13 @@ aura-back/
 ### Configuración
 
 1. Crear archivo `.env` desde el ejemplo:
+
 ```bash
 cp .env.example .env
 ```
 
 2. Configurar las variables de entorno:
+
 ```env
 DATABASE_URL=postgres://user:pass@localhost:5432/aura?sslmode=disable
 JWT_SECRET=tu-secreto-jwt-aqui
@@ -79,6 +81,7 @@ PORT=8081
 ```
 
 3. Ejecutar la aplicación:
+
 ```bash
 go run ./cmd/api/main.go
 ```
@@ -111,6 +114,22 @@ go vet ./...
 go mod tidy
 ```
 
+### Docker
+
+```bash
+# Build the image
+docker build -t aura-back .
+
+# Run the container
+docker run -p 8081:8081 --env-file .env aura-back
+```
+
+### Docker Compose
+
+```bash
+docker-compose up --build
+```
+
 ## Arquitectura Multi-Tenant
 
 El sistema utiliza el patrón **schema-per-tenant** de PostgreSQL:
@@ -138,13 +157,13 @@ El sistema utiliza el patrón **schema-per-tenant** de PostgreSQL:
 
 Cada módulo sigue esta estructura consistente:
 
-| Archivo | Responsabilidad |
-|---------|-----------------|
-| `domain.go` | Entidades, interfaces de Repository y Service, eventos |
-| `service.go` | Lógica de negocio (struct no exportado, constructor retorna interface) |
+| Archivo         | Responsabilidad                                                                 |
+| --------------- | ------------------------------------------------------------------------------- |
+| `domain.go`     | Entidades, interfaces de Repository y Service, eventos                          |
+| `service.go`    | Lógica de negocio (struct no exportado, constructor retorna interface)          |
 | `repository.go` | Implementación PostgreSQL con interface `querier` para soporte de transacciones |
-| `handler.go` | HTTP handlers de Gin con tipos de request/response |
-| `routes.go` | Función `Register(public, protected, handler)` |
+| `handler.go`    | HTTP handlers de Gin con tipos de request/response                              |
+| `routes.go`     | Función `Register(public, protected, handler)`                                  |
 
 ### Agregar un nuevo módulo
 
@@ -169,6 +188,7 @@ migrate create -ext sql -dir tenant/migrations/tenant -seq nombre_migracion
 ```
 
 Esto genera dos archivos:
+
 ```
 000009_nombre_migracion.up.sql    ← Aplica los cambios
 000009_nombre_migracion.down.sql  ← Revierte los cambios
@@ -185,16 +205,17 @@ Las migraciones se aplican automáticamente al iniciar el servidor.
 
 ### Roles y permisos
 
-| Nivel | Rol | Descripción |
-|-------|-----|-------------|
-| 0 | SUPERADMIN | Acceso total al sistema |
-| 1 | ADMIN | Administrador de empresa |
-| 2 | SUPERVISOR | Supervisor con permisos extendidos |
-| 3+ | USER | Usuario estándar |
+| Nivel | Rol        | Descripción                        |
+| ----- | ---------- | ---------------------------------- |
+| 0     | SUPERADMIN | Acceso total al sistema            |
+| 1     | ADMIN      | Administrador de empresa           |
+| 2     | SUPERVISOR | Supervisor con permisos extendidos |
+| 3+    | USER       | Usuario estándar                   |
 
 ## Testing
 
 Los tests utilizan:
+
 - **testify/assert**: Para aserciones legibles
 - **testify/mock**: Para mocks de interfaces
 - **go-sqlmock**: Para simular operaciones de base de datos
@@ -221,12 +242,12 @@ func (m *MockRepository) GetBySlug(ctx context.Context, slug string) (*Enterpris
 
 ## Dependencias Principales
 
-| Paquete | Uso |
-|---------|-----|
-| `gin-gonic/gin` | Framework HTTP |
-| `lib/pq` | Driver PostgreSQL |
-| `golang-migrate/v4` | Migraciones de base de datos |
-| `golang-jwt/jwt/v5` | Autenticación JWT |
-| `stretchr/testify` | Assertions y mocks para testing |
-| `DATA-DOG/go-sqlmock` | Mock de SQL para tests |
-| `joho/godotenv` | Carga de variables de entorno |
+| Paquete               | Uso                             |
+| --------------------- | ------------------------------- |
+| `gin-gonic/gin`       | Framework HTTP                  |
+| `lib/pq`              | Driver PostgreSQL               |
+| `golang-migrate/v4`   | Migraciones de base de datos    |
+| `golang-jwt/jwt/v5`   | Autenticación JWT               |
+| `stretchr/testify`    | Assertions y mocks para testing |
+| `DATA-DOG/go-sqlmock` | Mock de SQL para tests          |
+| `joho/godotenv`       | Carga de variables de entorno   |

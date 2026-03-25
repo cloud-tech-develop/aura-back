@@ -1,0 +1,14 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    environment:
+      # These can override settings in .env
+      - PORT=8081
+    # If the database is on localhost of the HOST machine, 
+    # use extra_hosts to map it to 'host.docker.internal'
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
