@@ -8,17 +8,12 @@ import (
 	"github.com/cloud-tech-develop/aura-back/cmd/server"
 	"github.com/cloud-tech-develop/aura-back/infrastructure/messaging/memory"
 	"github.com/cloud-tech-develop/aura-back/internal/db"
-	"github.com/cloud-tech-develop/aura-back/modules/cart"
-	"github.com/cloud-tech-develop/aura-back/modules/enterprise"
-	"github.com/cloud-tech-develop/aura-back/modules/inventory"
-	"github.com/cloud-tech-develop/aura-back/modules/invoices"
-	"github.com/cloud-tech-develop/aura-back/modules/payments"
-	"github.com/cloud-tech-develop/aura-back/modules/products"
-	"github.com/cloud-tech-develop/aura-back/modules/reports"
-	"github.com/cloud-tech-develop/aura-back/modules/sales"
-	"github.com/cloud-tech-develop/aura-back/modules/sync"
-	"github.com/cloud-tech-develop/aura-back/modules/third-parties"
-	"github.com/cloud-tech-develop/aura-back/modules/users"
+	"github.com/cloud-tech-develop/aura-back/modules/admin/enterprise"
+	"github.com/cloud-tech-develop/aura-back/modules/admin/third-parties"
+	"github.com/cloud-tech-develop/aura-back/modules/admin/users"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
+	catalogProducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/joho/godotenv"
 	"os/exec"
@@ -83,41 +78,26 @@ func main() {
 	usersLogger := users.NewLoggerHandler("logs")
 	_ = eventBus.Subscribe(users.EventCreated, usersLogger)
 	_ = eventBus.Subscribe(users.EventUpdated, usersLogger)
-	// _ = eventBus.Subscribe(users.EventDeleted, usersLogger) // If implemented
 
-	// Products module
-	productsHandler := products.NewHandler(database)
+	// Catalog module
+	categorySvc := categories.NewService(database.Wrap(database.DB))
+	categoryHandler := categories.NewHandler(categorySvc)
 
-	// Cart module
-	cartHandler := cart.NewHandler(database)
+	brandSvc := brands.NewService(database.Wrap(database.DB))
+	brandHandler := brands.NewHandler(brandSvc)
 
-	// Sales module
-	salesHandler := sales.NewHandler(database)
-
-	// Payments module
-	paymentsHandler := payments.NewHandler(database)
-
-	// Invoices module
-	invoicesHandler := invoices.NewHandler(database)
-
-	// Reports module
-	reportsHandler := reports.NewHandler(database)
+	productSvc := catalogProducts.NewService(database)
+	productHandler := catalogProducts.NewHandler(productSvc)
 
 	// Third Parties module
 	thirdPartiesHandler := thirdparties.NewHandler(database)
 
-	// Inventory module
-	inventoryHandler := inventory.NewHandler(database)
-
-	// Sync module
-	syncHandler := sync.NewHandler(database)
-
 	// ── HTTP Server ──────────────────────────────────────────────────────────
 	srv := server.NewServer(database.DB, tenantMgr)
-	srv.RegisterModules(enterpriseHandler, usersHandler, productsHandler, cartHandler, salesHandler, paymentsHandler, invoicesHandler, reportsHandler, thirdPartiesHandler, inventoryHandler, syncHandler)
+	srv.RegisterModules(enterpriseHandler, usersHandler, categoryHandler, brandHandler, productHandler, thirdPartiesHandler)
 
 	log.Println("servidor en :" + port)
-	
+
 	// Generate offline binary in background
 	go buildOfflineBinary()
 
@@ -128,13 +108,13 @@ func main() {
 
 func buildOfflineBinary() {
 	log.Println("Generating offline binary...")
-	
+
 	// Create static directory if it doesn't exist
 	_ = os.MkdirAll("static/bin", 0755)
 
 	cmd := exec.Command("go", "build", "-o", "static/bin/aura-pos-offline.exe", "cmd/api/main.go")
 	cmd.Env = append(os.Environ(), "GOOS=windows", "GOARCH=amd64", "CGO_ENABLED=0")
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Error building offline binary: %v\nOutput: %s", err, string(output))

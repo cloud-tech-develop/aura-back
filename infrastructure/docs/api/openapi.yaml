@@ -1,3339 +1,23 @@
 openapi: 3.0.0
 info:
   title: Aura Back API
-  description: API documentation for Aura Back application
+  description: API documentation for Aura Back multi-tenant POS application
   version: 1.0.0
   contact:
     name: API Support
     url: https://github.com/anomalyco/opencode/issues
+
 servers:
-  - url: http://localhost:8080
+  - url: http://localhost:8081
     description: Local development server
-paths:
-  /login:
-    post:
-      summary: Authenticate user
-      tags:
-        - Authentication
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-                - password
-                - slug
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                slug:
-                  type: string
-                  description: Tenant slug
-      responses:
-        "200":
-          description: Successful authentication
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  token:
-                    type: string
-        "400":
-          description: Bad Request
-        "401":
-          description: Unauthorized
-  /me:
-    get:
-      summary: Get current user information
-      tags:
-        - Authentication
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: User information retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  user_id:
-                    type: integer
-                    format: int64
-                  enterprise_id:
-                    type: integer
-                    format: int64
-                  slug:
-                    type: string
-                  email:
-                    type: string
-                  roles:
-                    type: array
-                    items:
-                      type: string
-        "401":
-          description: Unauthorized
-  /enterprises:
-    post:
-      summary: Create enterprise
-      tags:
-        - Enterprises
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - password
-                - name
-                - slug
-                - email
-              properties:
-                password:
-                  type: string
-                  description: Minimum 8 characters
-                name:
-                  type: string
-                commercial_name:
-                  type: string
-                slug:
-                  type: string
-                sub_domain:
-                  type: string
-                email:
-                  type: string
-                  format: email
-                document:
-                  type: string
-                dv:
-                  type: string
-                phone:
-                  type: string
-                municipality_id:
-                  type: string
-                municipality:
-                  type: string
-      responses:
-        "201":
-          description: Enterprise created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Enterprise"
-        "400":
-          description: Bad Request
-        "409":
-          description: Conflict (Enterprise already exists)
-    get:
-      summary: List enterprises
-      tags:
-        - Enterprises
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 1
-          description: Page number
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 10
-          description: Items per page
-        - in: query
-          name: status
-          schema:
-            type: string
-          description: Filter by status
-      responses:
-        "200":
-          description: List of enterprises
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Enterprise"
-                  pagination:
-                    type: object
-                    properties:
-                      page:
-                        type: integer
-                      limit:
-                        type: integer
-                      total:
-                        type: integer
-        "401":
-          description: Unauthorized
-  /enterprises/{slug}:
-    get:
-      summary: Get enterprise by slug
-      tags:
-        - Enterprises
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: slug
-          required: true
-          schema:
-            type: string
-          description: Enterprise slug
-      responses:
-        "200":
-          description: Enterprise found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Enterprise"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Enterprise not found
-    put:
-      summary: Update enterprise
-      tags:
-        - Enterprises
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: slug
-          required: true
-          schema:
-            type: string
-          description: Enterprise slug
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                commercial_name:
-                  type: string
-                sub_domain:
-                  type: string
-                phone:
-                  type: string
-                municipality_id:
-                  type: string
-                municipality:
-                  type: string
-      responses:
-        "200":
-          description: Enterprise updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Enterprise"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Enterprise not found
-  /enterprises/{slug}/status:
-    patch:
-      summary: Update enterprise status
-      tags:
-        - Enterprises
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: slug
-          required: true
-          schema:
-            type: string
-          description: Enterprise slug
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - status
-              properties:
-                status:
-                  type: string
-                  enum: [ACTIVE, INACTIVE, SUSPENDED, DEBT]
-      responses:
-        "200":
-          description: Status updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                    format: int64
-                  slug:
-                    type: string
-                  status:
-                    type: string
-                  updatedAt:
-                    type: string
-                    format: date-time
-        "401":
-          description: Unauthorized
-        "404":
-          description: Enterprise not found
-  /users:
-    post:
-      summary: Create user
-      tags:
-        - Users
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-                - name
-                - password
-              properties:
-                email:
-                  type: string
-                  format: email
-                name:
-                  type: string
-                password:
-                  type: string
-                  description: Minimum 8 characters
-                roles:
-                  type: array
-                  items:
-                    type: integer
-                    format: int64
-                first_name:
-                  type: string
-                last_name:
-                  type: string
-                document_number:
-                  type: string
-                document_type:
-                  type: string
-                  enum: [CC, CE, NIT, PASSPORT]
-                personal_email:
-                  type: string
-                  format: email
-                tax_responsibility:
-                  type: string
-                is_employee:
-                  type: boolean
-      responses:
-        "201":
-          description: User created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
-        "400":
-          description: Bad Request
-        "409":
-          description: Conflict (Email already exists)
-    get:
-      summary: List users for enterprise
-      tags:
-        - Users
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 1
-          description: Page number
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 10
-          description: Items per page
-        - in: query
-          name: status
-          schema:
-            type: string
-          description: Filter by status (active/inactive)
-      responses:
-        "200":
-          description: List of users
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/User"
-                  pagination:
-                    type: object
-                    properties:
-                      page:
-                        type: integer
-                      limit:
-                        type: integer
-                      total:
-                        type: integer
-        "401":
-          description: Unauthorized
-  /users/{id}:
-    get:
-      summary: Get user by ID
-      tags:
-        - Users
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: User ID
-      responses:
-        "200":
-          description: User found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
-        "401":
-          description: Unauthorized
-        "404":
-          description: User not found
-    put:
-      summary: Update user
-      tags:
-        - Users
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: User ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                  format: email
-                name:
-                  type: string
-                first_name:
-                  type: string
-                last_name:
-                  type: string
-                document_number:
-                  type: string
-                document_type:
-                  type: string
-                personal_email:
-                  type: string
-                  format: email
-                tax_responsibility:
-                  type: string
-                is_employee:
-                  type: boolean
-      responses:
-        "200":
-          description: User updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
-        "401":
-          description: Unauthorized
-        "404":
-          description: User not found
-        "409":
-          description: Conflict (Email already exists)
-    patch:
-      summary: Update user status
-      tags:
-        - Users
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: User ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - active
-              properties:
-                active:
-                  type: boolean
-      responses:
-        "200":
-          description: Status updated successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                    format: int64
-                  active:
-                    type: boolean
-        "401":
-          description: Unauthorized
-        "404":
-          description: User not found
-  /users/{id}/roles:
-    patch:
-      summary: Assign roles to user
-      tags:
-        - Users
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: User ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - role_ids
-              properties:
-                role_ids:
-                  type: array
-                  items:
-                    type: integer
-                    format: int64
-      responses:
-        "200":
-          description: Roles assigned successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                    format: int64
-                  role_ids:
-                    type: array
-                    items:
-                      type: integer
-                      format: int64
-        "401":
-          description: Unauthorized
-        "404":
-          description: User not found
-  /roles:
-    get:
-      summary: List roles available for current user
-      description: Returns roles filtered by the current user's role level. Only roles with level >= user's level are returned.
-      tags:
-        - Users
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: List of roles
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Role"
-        "401":
-          description: Unauthorized
-  /products:
-    post:
-      summary: Create product
-      tags:
-        - Products
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - sku
-                - name
-                - category_id
-                - cost_price
-                - sale_price
-              properties:
-                sku:
-                  type: string
-                  description: Unique SKU per enterprise
-                name:
-                  type: string
-                description:
-                  type: string
-                category_id:
-                  type: integer
-                  format: int64
-                brand_id:
-                  type: integer
-                  format: int64
-                cost_price:
-                  type: number
-                  format: double
-                sale_price:
-                  type: number
-                  format: double
-                tax_rate:
-                  type: number
-                  format: double
-                  default: 19.00
-                min_stock:
-                  type: integer
-                image_url:
-                  type: string
-                status:
-                  type: string
-                  enum: [ACTIVE, INACTIVE, DISCONTINUED]
-      responses:
-        "201":
-          description: Product created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Product"
-        "400":
-          description: Bad Request
-        "409":
-          description: Conflict (SKU already exists)
-    get:
-      summary: List products
-      tags:
-        - Products
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 1
-          description: Page number
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 10
-          description: Items per page
-        - in: query
-          name: search
-          schema:
-            type: string
-          description: Search by name or SKU
-        - in: query
-          name: category_id
-          schema:
-            type: integer
-          description: Filter by category
-        - in: query
-          name: brand_id
-          schema:
-            type: integer
-          description: Filter by brand
-      responses:
-        "200":
-          description: List of products
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Product"
-                  pagination:
-                    type: object
-                    properties:
-                      page:
-                        type: integer
-                      limit:
-                        type: integer
-                      total:
-                        type: integer
-        "401":
-          description: Unauthorized
-  /products/{id}:
-    get:
-      summary: Get product by ID
-      tags:
-        - Products
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: Product ID
-      responses:
-        "200":
-          description: Product found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Product"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Product not found
-    put:
-      summary: Update product
-      tags:
-        - Products
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: Product ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                category_id:
-                  type: integer
-                  format: int64
-                brand_id:
-                  type: integer
-                  format: int64
-                cost_price:
-                  type: number
-                  format: double
-                sale_price:
-                  type: number
-                  format: double
-                min_stock:
-                  type: integer
-                image_url:
-                  type: string
-                status:
-                  type: string
-                  enum: [ACTIVE, INACTIVE, DISCONTINUED]
-      responses:
-        "200":
-          description: Product updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Product"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Product not found
-        "409":
-          description: Conflict (SKU already exists)
-    delete:
-      summary: Delete product (soft delete)
-      tags:
-        - Products
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: Product ID
-      responses:
-        "204":
-          description: Product deleted successfully
-        "401":
-          description: Unauthorized
-        "404":
-          description: Product not found
-  /categories:
-    post:
-      summary: Create category
-      tags:
-        - Categories
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - name
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                parent_id:
-                  type: integer
-                  format: int64
-      responses:
-        "201":
-          description: Category created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Category"
-        "400":
-          description: Bad Request
-        "409":
-          description: Conflict (Category name already exists)
-    get:
-      summary: List categories
-      tags:
-        - Categories
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: List of categories
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Category"
-        "401":
-          description: Unauthorized
-  /categories/{id}:
-    get:
-      summary: Get category by ID
-      tags:
-        - Categories
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: Category ID
-      responses:
-        "200":
-          description: Category found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Category"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Category not found
-    put:
-      summary: Update category
-      tags:
-        - Categories
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: Category ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                parent_id:
-                  type: integer
-                  format: int64
-      responses:
-        "200":
-          description: Category updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Category"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Category not found
-  /brands:
-    post:
-      summary: Create brand
-      tags:
-        - Brands
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - name
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-      responses:
-        "201":
-          description: Brand created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Brand"
-        "400":
-          description: Bad Request
-        "409":
-          description: Conflict (Brand name already exists)
-    get:
-      summary: List brands
-      tags:
-        - Brands
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: List of brands
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Brand"
-        "401":
-          description: Unauthorized
-  /brands/{id}:
-    get:
-      summary: Get brand by ID
-      tags:
-        - Brands
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: Brand ID
-      responses:
-        "200":
-          description: Brand found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Brand"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Brand not found
-    put:
-      summary: Update brand
-      tags:
-        - Brands
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: Brand ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-      responses:
-        "200":
-          description: Brand updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Brand"
-        "401":
-          description: Unauthorized
-        "404":
-          description: Brand not found
-  /invoices/generate:
-    post:
-      summary: Generate Invoice From Sale
-      tags:
-        - Invoices
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /invoices:
-    post:
-      summary: Create Invoice
-      tags:
-        - Invoices
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Invoices
-      tags:
-        - Invoices
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /invoices/{id}:
-    get:
-      summary: Get Invoice by ID
-      tags:
-        - Invoices
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /invoices/number/{invoiceNumber}:
-    get:
-      summary: Get Invoice by Number
-      tags:
-        - Invoices
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: invoiceNumber
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /invoices/{id}/issue:
-    post:
-      summary: Issue Invoice
-      tags:
-        - Invoices
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /invoices/{id}/cancel:
-    post:
-      summary: Cancel Invoice
-      tags:
-        - Invoices
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /invoices/{id}/logs:
-    get:
-      summary: Get Invoice Logs
-      tags:
-        - Invoices
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /invoice-prefixes:
-    post:
-      summary: Create Invoice Prefix
-      tags:
-        - Invoices
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Invoice Prefixes
-      tags:
-        - Invoices
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /sales-orders:
-    post:
-      summary: Create Sales Order
-      tags:
-        - Sales
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Sales Orders
-      tags:
-        - Sales
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /sales-orders/{id}:
-    get:
-      summary: Get Sales Order by ID
-      tags:
-        - Sales
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /sales-orders/{id}/status:
-    put:
-      summary: Update Sales Order Status
-      tags:
-        - Sales
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /sales-orders/{id}/cancel:
-    post:
-      summary: Cancel Sales Order
-      tags:
-        - Sales
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /sales-orders/{id}/complete:
-    post:
-      summary: Complete Sales Order
-      tags:
-        - Sales
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /carts:
-    post:
-      summary: Create Cart
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Carts
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /carts/{id}:
-    get:
-      summary: Get Cart
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    delete:
-      summary: Delete Cart
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /carts/code/{code}:
-    get:
-      summary: Get Cart By Code
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: code
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /carts/{id}/items:
-    post:
-      summary: Add Item to Cart
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /carts/{id}/items/{itemId}:
-    put:
-      summary: Update Cart Item
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - in: path
-          name: itemId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    delete:
-      summary: Delete Cart Item
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - in: path
-          name: itemId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /carts/{id}/items/{itemId}/discount:
-    post:
-      summary: Apply Item Discount
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - in: path
-          name: itemId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /carts/{id}/convert:
-    post:
-      summary: Convert to Sale
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /carts/{id}/quotation:
-    post:
-      summary: Convert to Quotation
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /carts/{id}/customer:
-    put:
-      summary: Set Customer
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /carts/{id}/discount:
-    post:
-      summary: Apply Discount
-      tags:
-        - Cart
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /inventory:
-    get:
-      summary: List Inventory
-      tags:
-        - Inventory
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /inventory/low-stock:
-    get:
-      summary: Get Low Stock
-      tags:
-        - Inventory
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /inventory/{productId}/{branchId}:
-    get:
-      summary: Get Inventory details
-      tags:
-        - Inventory
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: productId
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - in: path
-          name: branchId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /inventory/product/{productId}:
-    get:
-      summary: Get Inventory By Product
-      tags:
-        - Inventory
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: productId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /inventory/kardex/{productId}/{branchId}:
-    get:
-      summary: Get Product Kardex
-      tags:
-        - Inventory
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: productId
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - in: path
-          name: branchId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /inventory/movements:
-    post:
-      summary: Update Stock
-      tags:
-        - Inventory
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /movements:
-    get:
-      summary: List Movements
-      tags:
-        - Inventory
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /movements/{id}:
-    get:
-      summary: Get Movement
-      tags:
-        - Inventory
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /movement-reasons:
-    get:
-      summary: List Reasons
-      tags:
-        - Inventory
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash/drawer/{branchID}:
-    get:
-      summary: Get Drawer By Branch
-      tags:
-        - Cash
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: branchID
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash/drawer:
-    post:
-      summary: Configure Drawer
-      tags:
-        - Cash
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash/shift/open:
-    post:
-      summary: Open Shift
-      tags:
-        - Cash
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash/shift/{shiftID}/close:
-    post:
-      summary: Close Shift
-      tags:
-        - Cash
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: shiftID
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash/shift/active:
-    get:
-      summary: Get Active Shift
-      tags:
-        - Cash
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash/shift/{shiftID}:
-    get:
-      summary: Get Shift Summary
-      tags:
-        - Cash
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: shiftID
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash/shifts:
-    get:
-      summary: List Shifts
-      tags:
-        - Cash
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash/movement:
-    post:
-      summary: Record Movement
-      tags:
-        - Cash
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash/shift/{shiftID}/reconcile:
-    post:
-      summary: Reconcile Shift
-      tags:
-        - Cash
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: shiftID
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payments:
-    post:
-      summary: Process Payment
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Payments
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payments/batch:
-    post:
-      summary: Process Multiple Payments
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payments/{id}:
-    get:
-      summary: Get Payment
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payments/reference/{referenceType}/{referenceId}:
-    get:
-      summary: Get Payments By Order
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: referenceType
-          required: true
-          schema:
-            type: string
-        - in: path
-          name: referenceId
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payments/{id}/cancel:
-    post:
-      summary: Cancel Payment
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash-drawers:
-    post:
-      summary: Open Cash Drawer
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Cash Drawers
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash-drawers/open:
-    get:
-      summary: Get Open Drawer
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash-drawers/{id}:
-    get:
-      summary: Get Cash Drawer
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash-drawers/{id}/close:
-    post:
-      summary: Close Cash Drawer
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash-drawers/{id}/cash-in:
-    post:
-      summary: Add Cash In
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /cash-drawers/{id}/cash-out:
-    post:
-      summary: Add Cash Out
-      tags:
-        - Payments
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /purchases/orders:
-    post:
-      summary: Create Purchase Order
-      tags:
-        - Purchases
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Purchase Orders
-      tags:
-        - Purchases
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /purchases/orders/{id}:
-    get:
-      summary: Get Purchase Order
-      tags:
-        - Purchases
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /purchases/receive:
-    post:
-      summary: Receive Goods
-      tags:
-        - Purchases
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /purchases:
-    get:
-      summary: List Purchases
-      tags:
-        - Purchases
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /purchases/{id}:
-    get:
-      summary: Get Purchase
-      tags:
-        - Purchases
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /purchases/{id}/cancel:
-    post:
-      summary: Cancel Purchase
-      tags:
-        - Purchases
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /purchases/payments:
-    post:
-      summary: Record Payment
-      tags:
-        - Purchases
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /purchases/suppliers/{supplierID}/summary:
-    get:
-      summary: Get Supplier Summary
-      tags:
-        - Purchases
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: supplierID
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /commissions/rules:
-    post:
-      summary: Create Rule
-      tags:
-        - Commissions
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Rules
-      tags:
-        - Commissions
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /commissions/rules/{id}:
-    put:
-      summary: Update Rule
-      tags:
-        - Commissions
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    delete:
-      summary: Delete Rule
-      tags:
-        - Commissions
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /commissions/calculate:
-    post:
-      summary: Calculate Commissions
-      tags:
-        - Commissions
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /commissions:
-    get:
-      summary: List Commissions
-      tags:
-        - Commissions
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /commissions/{id}:
-    get:
-      summary: Get Commission
-      tags:
-        - Commissions
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /commissions/settle:
-    post:
-      summary: Settle Commissions
-      tags:
-        - Commissions
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /commissions/report/summary:
-    get:
-      summary: Get Commission Report
-      tags:
-        - Commissions
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /commissions/report/totals:
-    get:
-      summary: Get Commission Totals
-      tags:
-        - Commissions
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/employees:
-    post:
-      summary: Create Employee
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Employees
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/employees/{id}:
-    get:
-      summary: Get Employee
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    put:
-      summary: Update Employee
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/employees/{id}/terminate:
-    post:
-      summary: Terminate Employee
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/employees/{id}/salary:
-    post:
-      summary: Set Salary
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods:
-    post:
-      summary: Create Period
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Periods
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{id}:
-    get:
-      summary: Get Period
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{periodId}/calculate:
-    post:
-      summary: Calculate Payroll
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: periodId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{periodId}/approve:
-    post:
-      summary: Approve Payroll
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: periodId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{periodId}/close:
-    post:
-      summary: Close Period
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: periodId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{periodId}/reopen:
-    post:
-      summary: Reopen Period
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: periodId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{periodId}/reject:
-    post:
-      summary: Reject Payroll
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: periodId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{periodId}/payrolls:
-    get:
-      summary: List Payrolls
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: periodId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{periodId}/preview:
-    get:
-      summary: Preview Payroll
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: periodId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{periodId}/summary:
-    get:
-      summary: Get Payroll Summary
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: periodId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/payslips/{payrollId}:
-    get:
-      summary: Get Payslip
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: payrollId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/overtime:
-    post:
-      summary: Register Overtime
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/bonuses:
-    post:
-      summary: Register Bonus
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/loans:
-    post:
-      summary: Create Loan
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/payments:
-    post:
-      summary: Process Payment
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Payments
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{periodId}/import-commissions:
-    post:
-      summary: Import Commissions
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: periodId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{periodId}/reports/tax:
-    get:
-      summary: Get Tax Report
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: periodId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/periods/{periodId}/reports/deductions:
-    get:
-      summary: Get Deduction Report
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: periodId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/employees/{employeeId}/earnings:
-    get:
-      summary: Get Employee Earnings
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: employeeId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/deduction-types:
-    get:
-      summary: List Deduction Types
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/addition-types:
-    get:
-      summary: List Addition Types
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/leave-types:
-    post:
-      summary: Create Leave Type
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Leave Types
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/leaves:
-    post:
-      summary: Create Leave Request
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/leaves/{leaveId}/approve:
-    post:
-      summary: Approve Leave
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: leaveId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /payroll/employees/{employeeId}/leave-balance:
-    get:
-      summary: Get Leave Balance
-      tags:
-        - Payroll
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: employeeId
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/sales-summary:
-    get:
-      summary: Get Sales Summary
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/product-sales:
-    get:
-      summary: Get Product Sales
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/payment-methods:
-    get:
-      summary: Get Payment Method Breakdown
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/daily-sales:
-    get:
-      summary: Get Daily Sales
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/top-customers:
-    get:
-      summary: Get Top Customers
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/sales:
-    get:
-      summary: Get Sales By Period
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/sales/products:
-    get:
-      summary: Get Sales By Product
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/sales/employees:
-    get:
-      summary: Get Sales By Employee
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/inventory:
-    get:
-      summary: Get Inventory Status
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/inventory/movements:
-    get:
-      summary: Get Movement History
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/{reportType}/export/pdf:
-    post:
-      summary: Export To PDF
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: reportType
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /reports/{reportType}/export/excel:
-    post:
-      summary: Export To Excel
-      tags:
-        - Reports
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: reportType
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /shrinkage:
-    post:
-      summary: Register Shrinkage
-      tags:
-        - Shrinkage
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Shrinkages
-      tags:
-        - Shrinkage
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /shrinkage/{id}:
-    get:
-      summary: Get Shrinkage
-      tags:
-        - Shrinkage
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /shrinkage/{id}/authorize:
-    post:
-      summary: Authorize Shrinkage
-      tags:
-        - Shrinkage
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /shrinkage/{id}/cancel:
-    post:
-      summary: Cancel Shrinkage
-      tags:
-        - Shrinkage
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /shrinkage/reasons:
-    post:
-      summary: Create Reason
-      tags:
-        - Shrinkage
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Reasons
-      tags:
-        - Shrinkage
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /shrinkage/report:
-    get:
-      summary: Get Shrinkage Report
-      tags:
-        - Shrinkage
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /third-parties:
-    post:
-      summary: Create Third Party
-      tags:
-        - Third Parties
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Third Parties
-      tags:
-        - Third Parties
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /third-parties/{id}:
-    get:
-      summary: Get Third Party
-      tags:
-        - Third Parties
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    put:
-      summary: Update Third Party
-      tags:
-        - Third Parties
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    delete:
-      summary: Delete Third Party
-      tags:
-        - Third Parties
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /third-parties/document/{documentNumber}:
-    get:
-      summary: Get Third Party By Document
-      tags:
-        - Third Parties
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: documentNumber
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /transfers:
-    post:
-      summary: Create Transfer
-      tags:
-        - Transfers
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-    get:
-      summary: List Transfers
-      tags:
-        - Transfers
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /transfers/{id}:
-    get:
-      summary: Get Transfer
-      tags:
-        - Transfers
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /transfers/{id}/approve:
-    post:
-      summary: Approve Transfer
-      tags:
-        - Transfers
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /transfers/{id}/ship:
-    post:
-      summary: Ship Transfer
-      tags:
-        - Transfers
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /transfers/{id}/receive:
-    post:
-      summary: Receive Transfer
-      tags:
-        - Transfers
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
-  /transfers/{id}/cancel:
-    post:
-      summary: Cancel Transfer
-      tags:
-        - Transfers
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Successful response
-        "401":
-          description: Unauthorized
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
   schemas:
     Enterprise:
       type: object
@@ -3364,65 +48,22 @@ components:
           type: string
         status:
           type: string
+          enum: [ACTIVE, INACTIVE, SUSPENDED]
         created_at:
           type: string
           format: date-time
-        updated_at:
-          type: string
-          format: date-time
+
     User:
       type: object
       properties:
         id:
           type: integer
           format: int64
-        enterprise_id:
-          type: integer
-          format: int64
-        name:
-          type: string
         email:
           type: string
           format: email
-        active:
-          type: boolean
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        deleted_at:
-          type: string
-          format: date-time
-        roles:
-          type: array
-          items:
-            $ref: "#/components/schemas/Role"
-        third_party:
-          $ref: "#/components/schemas/ThirdParty"
-    Role:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
         name:
           type: string
-        description:
-          type: string
-        level:
-          type: integer
-          description: Role hierarchy level (0=highest, e.g. SUPERADMIN)
-    ThirdParty:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        user_id:
-          type: integer
-          format: int64
         first_name:
           type: string
         last_name:
@@ -3431,19 +72,49 @@ components:
           type: string
         document_type:
           type: string
-        personal_email:
-          type: string
-          format: email
-        tax_responsibility:
-          type: string
-        is_employee:
+          enum: [CC, CE, NIT, PASSPORT]
+        active:
           type: boolean
+        enterprise_id:
+          type: integer
+          format: int64
         created_at:
           type: string
           format: date-time
-        deleted_at:
+
+    ThirdParty:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        first_name:
           type: string
-          format: date-time
+        last_name:
+          type: string
+        commercial_name:
+          type: string
+        document_number:
+          type: string
+        document_type:
+          type: string
+        personal_email:
+          type: string
+          format: email
+        phone:
+          type: string
+        address:
+          type: string
+        is_client:
+          type: boolean
+        is_provider:
+          type: boolean
+        is_employee:
+          type: boolean
+        enterprise_id:
+          type: integer
+          format: int64
+
     Product:
       type: object
       properties:
@@ -3464,13 +135,13 @@ components:
           format: int64
         cost_price:
           type: number
-          format: double
+          format: decimal
         sale_price:
           type: number
-          format: double
+          format: decimal
         tax_rate:
           type: number
-          format: double
+          format: decimal
         min_stock:
           type: integer
         current_stock:
@@ -3479,18 +150,11 @@ components:
           type: string
         status:
           type: string
+          enum: [ACTIVE, INACTIVE, DISCONTINUED]
         enterprise_id:
           type: integer
           format: int64
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        deleted_at:
-          type: string
-          format: date-time
+
     Category:
       type: object
       properties:
@@ -3507,12 +171,7 @@ components:
         enterprise_id:
           type: integer
           format: int64
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
+
     Brand:
       type: object
       properties:
@@ -3526,9 +185,1120 @@ components:
         enterprise_id:
           type: integer
           format: int64
-        created_at:
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
           type: string
-          format: date-time
-        updated_at:
+          format: email
+        password:
           type: string
-          format: date-time
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+paths:
+  /login:
+    post:
+      summary: Authenticate user and get JWT token
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Successful authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Bad Request
+        "401":
+          description: Invalid credentials
+
+  /me:
+    get:
+      summary: Get current authenticated user info
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: integer
+                    format: int64
+                  enterprise_id:
+                    type: integer
+                    format: int64
+                  slug:
+                    type: string
+                  email:
+                    type: string
+                  roles:
+                    type: array
+                    items:
+                      type: string
+        "401":
+          description: Unauthorized
+
+  # ============================================
+  # ENTERPRISE MODULE (Public)
+  # ============================================
+  /enterprises:
+    post:
+      summary: Create new enterprise (public registration)
+      tags:
+        - Enterprise
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - slug
+                - email
+                - password
+                - document
+              properties:
+                name:
+                  type: string
+                commercial_name:
+                  type: string
+                slug:
+                  type: string
+                sub_domain:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                document:
+                  type: string
+                dv:
+                  type: string
+                phone:
+                  type: string
+                municipality_id:
+                  type: string
+                municipality:
+                  type: string
+      responses:
+        "201":
+          description: Enterprise created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enterprise"
+        "400":
+          description: Bad Request
+        "409":
+          description: Conflict (slug or email already exists)
+
+    get:
+      summary: List enterprises
+      tags:
+        - Enterprise
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of enterprises
+        "401":
+          description: Unauthorized
+
+  /enterprises/{slug}:
+    get:
+      summary: Get enterprise by slug
+      tags:
+        - Enterprise
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Enterprise details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enterprise"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Enterprise not found
+
+    put:
+      summary: Update enterprise
+      tags:
+        - Enterprise
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                commercial_name:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+                municipality:
+                  type: string
+      responses:
+        "200":
+          description: Enterprise updated
+        "401":
+          description: Unauthorized
+
+  /enterprises/{slug}/status:
+    patch:
+      summary: Update enterprise status
+      tags:
+        - Enterprise
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [ACTIVE, INACTIVE, SUSPENDED]
+      responses:
+        "200":
+          description: Status updated
+        "401":
+          description: Unauthorized
+
+  # ============================================
+  # ADMIN MODULE - USERS
+  # ============================================
+  /admin/users:
+    post:
+      summary: Create new user
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - name
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+                password:
+                  type: string
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                document_number:
+                  type: string
+                document_type:
+                  type: string
+                  enum: [CC, CE, NIT, PASSPORT]
+                roles:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Bad Request
+        "409":
+          description: Conflict (email exists)
+
+    get:
+      summary: List users for enterprise
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of users
+        "401":
+          description: Unauthorized
+
+  /admin/users/{id}:
+    get:
+      summary: Get user by ID
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+        "404":
+          description: User not found
+
+    put:
+      summary: Update user
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                document_number:
+                  type: string
+      responses:
+        "200":
+          description: User updated
+        "401":
+          description: Unauthorized
+
+  /admin/users/{id}/status:
+    patch:
+      summary: Update user active status
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - active
+              properties:
+                active:
+                  type: boolean
+      responses:
+        "200":
+          description: Status updated
+        "401":
+          description: Unauthorized
+
+  /admin/users/{id}/roles:
+    patch:
+      summary: Assign roles to user
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role_ids
+              properties:
+                role_ids:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+      responses:
+        "200":
+          description: Roles assigned
+        "401":
+          description: Unauthorized
+
+  /admin/roles:
+    get:
+      summary: List available roles for enterprise
+      tags:
+        - Admin - Users
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of roles
+        "401":
+          description: Unauthorized
+
+  # ============================================
+  # ADMIN MODULE - THIRD PARTIES
+  # ============================================
+  /admin/third-parties:
+    post:
+      summary: Create third party
+      tags:
+        - Admin - Third Parties
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - document_number
+                - document_type
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                commercial_name:
+                  type: string
+                document_number:
+                  type: string
+                document_type:
+                  type: string
+                personal_email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                address:
+                  type: string
+                is_client:
+                  type: boolean
+                is_provider:
+                  type: boolean
+                is_employee:
+                  type: boolean
+      responses:
+        "201":
+          description: Third party created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThirdParty"
+        "400":
+          description: Bad Request
+        "409":
+          description: Conflict
+
+    get:
+      summary: List third parties
+      tags:
+        - Admin - Third Parties
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [client, provider, employee]
+      responses:
+        "200":
+          description: List of third parties
+        "401":
+          description: Unauthorized
+
+  /admin/third-parties/{id}:
+    get:
+      summary: Get third party by ID
+      tags:
+        - Admin - Third Parties
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Third party details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThirdParty"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+    put:
+      summary: Update third party
+      tags:
+        - Admin - Third Parties
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                commercial_name:
+                  type: string
+                phone:
+                  type: string
+                address:
+                  type: string
+      responses:
+        "200":
+          description: Third party updated
+        "401":
+          description: Unauthorized
+
+    delete:
+      summary: Delete third party
+      tags:
+        - Admin - Third Parties
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Third party deleted
+        "401":
+          description: Unauthorized
+
+  /admin/third-parties/document/{documentNumber}:
+    get:
+      summary: Get third party by document number
+      tags:
+        - Admin - Third Parties
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: documentNumber
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Third party details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThirdParty"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  # ============================================
+  # CATALOG MODULE - PRODUCTS
+  # ============================================
+  /catalog/products:
+    post:
+      summary: Create product
+      tags:
+        - Catalog - Products
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sku
+                - name
+                - cost_price
+                - sale_price
+              properties:
+                sku:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                category_id:
+                  type: integer
+                  format: int64
+                brand_id:
+                  type: integer
+                  format: int64
+                cost_price:
+                  type: number
+                  format: decimal
+                sale_price:
+                  type: number
+                  format: decimal
+                tax_rate:
+                  type: number
+                  format: decimal
+                min_stock:
+                  type: integer
+                image_url:
+                  type: string
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: Bad Request
+        "409":
+          description: Conflict (SKU exists)
+
+    get:
+      summary: List products
+      tags:
+        - Catalog - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: category_id
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: brand_id
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: List of products
+        "401":
+          description: Unauthorized
+
+  /catalog/products/{id}:
+    get:
+      summary: Get product by ID
+      tags:
+        - Catalog - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+    put:
+      summary: Update product
+      tags:
+        - Catalog - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                cost_price:
+                  type: number
+                  format: decimal
+                sale_price:
+                  type: number
+                  format: decimal
+                status:
+                  type: string
+                  enum: [ACTIVE, INACTIVE, DISCONTINUED]
+      responses:
+        "200":
+          description: Product updated
+        "401":
+          description: Unauthorized
+
+    delete:
+      summary: Delete product
+      tags:
+        - Catalog - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Product deleted
+        "401":
+          description: Unauthorized
+
+  /catalog/products/page:
+    post:
+      summary: Paginated products list
+      tags:
+        - Catalog - Products
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first:
+                  type: integer
+                  default: 1
+                rows:
+                  type: integer
+                  default: 10
+                search:
+                  type: string
+      responses:
+        "200":
+          description: Paginated products
+        "401":
+          description: Unauthorized
+
+  # ============================================
+  # CATALOG MODULE - CATEGORIES
+  # ============================================
+  /catalog/categories:
+    post:
+      summary: Create category
+      tags:
+        - Catalog - Categories
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                parent_id:
+                  type: integer
+                  format: int64
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          description: Bad Request
+
+    get:
+      summary: List categories
+      tags:
+        - Catalog - Categories
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of categories
+        "401":
+          description: Unauthorized
+
+  /catalog/categories/{id}:
+    get:
+      summary: Get category by ID
+      tags:
+        - Catalog - Categories
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Category details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+    put:
+      summary: Update category
+      tags:
+        - Catalog - Categories
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "200":
+          description: Category updated
+        "401":
+          description: Unauthorized
+
+    delete:
+      summary: Delete category
+      tags:
+        - Catalog - Categories
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Category deleted
+        "401":
+          description: Unauthorized
+
+  # ============================================
+  # CATALOG MODULE - BRANDS
+  # ============================================
+  /catalog/brands:
+    post:
+      summary: Create brand
+      tags:
+        - Catalog - Brands
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "201":
+          description: Brand created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brand"
+        "400":
+          description: Bad Request
+
+    get:
+      summary: List brands
+      tags:
+        - Catalog - Brands
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of brands
+        "401":
+          description: Unauthorized
+
+  /catalog/brands/{id}:
+    get:
+      summary: Get brand by ID
+      tags:
+        - Catalog - Brands
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Brand details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Brand"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+    put:
+      summary: Update brand
+      tags:
+        - Catalog - Brands
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "200":
+          description: Brand updated
+        "401":
+          description: Unauthorized
+
+    delete:
+      summary: Delete brand
+      tags:
+        - Catalog - Brands
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Brand deleted
+        "401":
+          description: Unauthorized

@@ -3,17 +3,12 @@ package server
 import (
 	"database/sql"
 
-	"github.com/cloud-tech-develop/aura-back/modules/cart"
-	"github.com/cloud-tech-develop/aura-back/modules/enterprise"
-	"github.com/cloud-tech-develop/aura-back/modules/inventory"
-	"github.com/cloud-tech-develop/aura-back/modules/invoices"
-	"github.com/cloud-tech-develop/aura-back/modules/payments"
-	"github.com/cloud-tech-develop/aura-back/modules/products"
-	"github.com/cloud-tech-develop/aura-back/modules/reports"
-	"github.com/cloud-tech-develop/aura-back/modules/sales"
-	"github.com/cloud-tech-develop/aura-back/modules/sync"
-	"github.com/cloud-tech-develop/aura-back/modules/third-parties"
-	"github.com/cloud-tech-develop/aura-back/modules/users"
+	"github.com/cloud-tech-develop/aura-back/modules/admin/enterprise"
+	thirdparties "github.com/cloud-tech-develop/aura-back/modules/admin/third-parties"
+	"github.com/cloud-tech-develop/aura-back/modules/admin/users"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
+	catalogproducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/gin-gonic/gin"
@@ -26,9 +21,23 @@ type Server struct {
 	tenantMgr *tenant.Manager
 }
 
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	}
+}
+
 // NewServer creates and configures the Gin router with global middleware.
 func NewServer(db *sql.DB, tenantMgr *tenant.Manager) *Server {
 	r := gin.Default()
+	r.Use(corsMiddleware())
 
 	return &Server{
 		router:    r,
@@ -46,15 +55,10 @@ func NewServer(db *sql.DB, tenantMgr *tenant.Manager) *Server {
 func (s *Server) RegisterModules(
 	enterpriseH *enterprise.Handler,
 	userH *users.Handler,
-	productsH *products.Handler,
-	cartH *cart.Handler,
-	salesH *sales.Handler,
-	paymentsH *payments.Handler,
-	invoicesH *invoices.Handler,
-	reportsH *reports.Handler,
+	categoryH *categories.Handler,
+	brandH *brands.Handler,
+	productH *catalogproducts.Handler,
 	thirdPartiesH *thirdparties.Handler,
-	inventoryH *inventory.Handler,
-	syncH *sync.Handler,
 ) {
 	// ── Health Check ──────────────────────────────────────────────────────────
 	s.router.GET("/", func(c *gin.Context) {
@@ -83,15 +87,10 @@ func (s *Server) RegisterModules(
 	// ── Feature Modules ───────────────────────────────────────────────────────
 	enterprise.Register(public, protected, enterpriseH)
 	users.Register(public, protected, userH)
-	products.Register(public, protected, productsH)
-	cart.Register(public, protected, cartH)
-	sales.Register(public, protected, salesH)
-	payments.Register(public, protected, paymentsH)
-	invoices.Register(public, protected, invoicesH)
-	reports.Register(public, protected, reportsH)
+	categories.Register(public, protected, categoryH)
+	brands.Register(public, protected, brandH)
+	catalogproducts.Register(public, protected, productH)
 	thirdparties.Register(public, protected, thirdPartiesH)
-	inventory.Register(public, protected, inventoryH)
-	sync.Register(public, protected, syncH)
 }
 
 // Run starts the HTTP server on the given address.
