@@ -54,7 +54,8 @@ aura-back/
 
 ## Module Pattern
 
-Each feature module in `modules/` follows this structure:
+Modules can be simple standalone directories or grouped as sub-modules within a parent directory.
+Each feature module (e.g., `modules/<name>/` or `modules/<group>/<name>/`) follows this structure:
 - `domain.go` - Entity, Repository interface, Service interface, events
 - `service.go` - Business logic (unexported struct, constructor returns interface)
 - `repository.go` - PostgreSQL implementation with `querier` interface for DB/Tx support
@@ -181,6 +182,7 @@ db, mock, err := sqlmock.New()
 
 ## Adding a New Module
 
+### Adding a Simple Module
 1. Create `modules/<name>/` with domain.go, service.go, repository.go, handler.go, routes.go
 2. Define entity, repository interface, service interface in domain.go
 3. Implement service (unexported struct, `NewService` returns interface)
@@ -189,6 +191,12 @@ db, mock, err := sqlmock.New()
 6. Add routes in `Register(public, protected gin.IRouter, h *Handler)`
 7. Create migration SQL files in `tenant/migrations/tenant/`
 8. Register handler in `cmd/api/main.go` and `cmd/server/server.go`
+
+### Adding a Sub-Module (Grouped)
+1. Create the sub-directory `modules/<group>/<name>/`
+2. Follow the same file pattern (`domain.go`, `service.go`, etc.) with `package <name>`
+3. Register the handler and service **independently** alongside other sub-modules in `cmd/api/main.go`
+4. Add the `<name>.Register(...)` call in `RegisterModules` inside `cmd/server/server.go`
 
 ## Security
 

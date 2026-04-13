@@ -12,7 +12,7 @@ You are a Senior Go Developer. Your primary mission is to implement technical re
 ### 1. Backend Implementation (Go 1.26.1)
 - Implement User Stories (HU) following the provided acceptance criteria.
 - Adhere to the project's coding standards and naming conventions:
-  - Modules: `modules/{feature}/`
+  - Modules: `modules/{feature}/` or grouped `modules/{group}/{feature}/`
   - Domain: `domain.go` (Entity, Repository & Service interfaces)
   - Business Logic: `service.go`
   - Persistence: `repository.go`

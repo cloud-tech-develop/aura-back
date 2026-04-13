@@ -36,7 +36,10 @@ aura-back/
 ├── modules/                     # Módulos de funcionalidad (autocontenidos)
 │   ├── enterprise/              # Gestión de empresas
 │   ├── users/                   # Gestión de usuarios y roles
-│   ├── products/                # Catálogo de productos
+│   ├── catalog/                 # Módulo de catálogo (agrupado)
+│   │   ├── products/            # Sub-módulo: productos
+│   │   ├── brands/              # Sub-módulo: marcas
+│   │   └── categories/          # Sub-módulo: categorías
 │   ├── sales/                   # Órdenes de venta
 │   ├── cart/                    # Carrito de compras
 │   ├── payments/                # Pagos
@@ -165,7 +168,26 @@ Cada módulo sigue esta estructura consistente:
 | `handler.go`    | HTTP handlers de Gin con tipos de request/response                              |
 | `routes.go`     | Función `Register(public, protected, handler)`                                  |
 
-### Agregar un nuevo módulo
+### Módulos agrupados (Group Modules)
+
+Algunos módulos contienen entidades relacionadas organizadas como **sub-módulos independientes** dentro de una carpeta padre. Cada sub-módulo mantiene su propio `domain.go`, `service.go`, `repository.go`, `handler.go` y `routes.go`, y se registra de forma independiente en `cmd/server/server.go`.
+
+**Ejemplo — módulo `catalog`:**
+```
+modules/catalog/
+├── products/   → package products
+├── brands/     → package brands
+└── categories/ → package categories
+```
+
+En `cmd/server/server.go` cada sub-módulo se registra de forma independiente:
+```go
+categories.Register(public, protected, categoryH)
+brands.Register(public, protected, brandH)
+catalogproducts.Register(public, protected, productH)
+```
+
+### Agregar un nuevo módulo simple
 
 1. Crear directorio `modules/<nombre>/` con los archivos base
 2. Definir entidad, interfaces de repositorio y servicio en `domain.go`
@@ -174,6 +196,13 @@ Cada módulo sigue esta estructura consistente:
 5. Definir rutas en `routes.go`
 6. Crear migraciones SQL en `tenant/migrations/tenant/`
 7. Registrar handler en `cmd/api/main.go` y `cmd/server/server.go`
+
+### Agregar un sub-módulo dentro de un módulo agrupado
+
+1. Crear el sub-directorio `modules/<grupo>/<nombre>/`
+2. Seguir el mismo patrón de archivos (`domain.go`, `service.go`, etc.) con `package <nombre>`
+3. Registrar el handler y el servicio **independientemente** en `cmd/api/main.go`
+4. Añadir la llamada `<nombre>.Register(...)` en `RegisterModules` dentro de `cmd/server/server.go`
 
 ## Migraciones
 
