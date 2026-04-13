@@ -15,6 +15,16 @@ type LoggerHandler struct {
 	LogDir string
 }
 
+// Log prints a message to the standard logger
+func (h *LoggerHandler) Log(v ...interface{}) {
+	log.Print(v...)
+}
+
+// Logf formats according to a format specifier and prints to the standard logger
+func (h *LoggerHandler) Logf(format string, v ...interface{}) {
+	log.Printf(format, v...)
+}
+
 func NewLoggerHandler(logDir string) *LoggerHandler {
 	if logDir == "" {
 		logDir = "logs"

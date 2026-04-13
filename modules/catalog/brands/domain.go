@@ -3,6 +3,8 @@ package brands
 import (
 	"context"
 	"time"
+
+	"github.com/cloud-tech-develop/aura-back/shared/domain"
 )
 
 // Brand entity
@@ -21,18 +23,20 @@ type Brand struct {
 
 // Repository interface
 type Repository interface {
-	Create(ctx context.Context, b *Brand) error
-	GetByID(ctx context.Context, id int64) (*Brand, error)
-	List(ctx context.Context, enterpriseID int64) ([]Brand, error)
-	Update(ctx context.Context, b *Brand) error
-	Delete(ctx context.Context, id int64) error
+	Create(ctx context.Context, tenantSlug string, b *Brand) error
+	GetByID(ctx context.Context, tenantSlug string, id int64) (*Brand, error)
+	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Brand, error)
+	Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) (domain.PageResult, error)
+	Update(ctx context.Context, tenantSlug string, b *Brand) error
+	Delete(ctx context.Context, tenantSlug string, id int64) error
 }
 
 // Service interface
 type Service interface {
-	Create(ctx context.Context, b *Brand) error
-	GetByID(ctx context.Context, id int64) (*Brand, error)
-	List(ctx context.Context, enterpriseID int64) ([]Brand, error)
-	Update(ctx context.Context, id int64, b *Brand) error
-	Delete(ctx context.Context, id int64) error
+	Create(ctx context.Context, tenantSlug string, b *Brand) error
+	GetByID(ctx context.Context, tenantSlug string, id int64) (*Brand, error)
+	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Brand, error)
+	Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) (domain.PageResult, error)
+	Update(ctx context.Context, tenantSlug string, id int64, b *Brand) error
+	Delete(ctx context.Context, tenantSlug string, id int64) error
 }

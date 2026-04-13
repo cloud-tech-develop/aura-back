@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
+	"github.com/cloud-tech-develop/aura-back/shared/domain"
 )
 
 type querier = db.Querier
@@ -18,11 +19,11 @@ func NewRepository(db querier) Repository {
 	return &repository{db: db}
 }
 
-func (r *repository) Create(ctx context.Context, b *Brand) error {
-	query := `
-		INSERT INTO brand (name, description, enterprise_id)
+func (r *repository) Create(ctx context.Context, tenantSlug string, b *Brand) error {
+	query := fmt.Sprintf(`
+		INSERT INTO "%s".brand (name, description, enterprise_id)
 		VALUES ($1, $2, $3)
-		RETURNING id, created_at`
+		RETURNING id, created_at`, tenantSlug)
 
 	err := r.db.QueryRowContext(ctx, query, b.Name, b.Description, b.EnterpriseID).
 		Scan(&b.ID, &b.CreatedAt)
@@ -32,11 +33,11 @@ func (r *repository) Create(ctx context.Context, b *Brand) error {
 	return nil
 }
 
-func (r *repository) GetByID(ctx context.Context, id int64) (*Brand, error) {
+func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (*Brand, error) {
 	b := &Brand{}
-	query := `
+	query := fmt.Sprintf(`
 		SELECT id, name, description, enterprise_id, created_at, updated_at, deleted_at
-		FROM brand WHERE id = $1 AND deleted_at IS NULL`
+		FROM "%s".brand WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&b.ID, &b.Name, &b.Description, &b.EnterpriseID,
@@ -51,11 +52,11 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*Brand, error) {
 	return b, nil
 }
 
-func (r *repository) List(ctx context.Context, enterpriseID int64) ([]Brand, error) {
-	query := `
+func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Brand, error) {
+	query := fmt.Sprintf(`
 		SELECT id, name, description, enterprise_id, created_at, updated_at, deleted_at
-		FROM brand WHERE enterprise_id = $1 AND deleted_at IS NULL
-		ORDER BY name`
+		FROM "%s".brand WHERE enterprise_id = $1 AND deleted_at IS NULL
+		ORDER BY name`, tenantSlug)
 
 	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
 	if err != nil {
@@ -75,10 +76,10 @@ func (r *repository) List(ctx context.Context, enterpriseID int64) ([]Brand, err
 	return list, nil
 }
 
-func (r *repository) Update(ctx context.Context, b *Brand) error {
-	query := `
-		UPDATE brand SET name = $1, description = $2, updated_at = NOW()
-		WHERE id = $3 AND deleted_at IS NULL`
+func (r *repository) Update(ctx context.Context, tenantSlug string, b *Brand) error {
+	query := fmt.Sprintf(`
+		UPDATE "%s".brand SET name = $1, description = $2, updated_at = NOW()
+		WHERE id = $3 AND deleted_at IS NULL`, tenantSlug)
 
 	_, err := r.db.ExecContext(ctx, query, b.Name, b.Description, b.ID)
 	if err != nil {
@@ -87,11 +88,87 @@ func (r *repository) Update(ctx context.Context, b *Brand) error {
 	return nil
 }
 
-func (r *repository) Delete(ctx context.Context, id int64) error {
-	query := `UPDATE brand SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
+func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) error {
+	query := fmt.Sprintf(`UPDATE "%s".brand SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
 	_, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete brand: %w", err)
 	}
 	return nil
+}
+
+func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) (domain.PageResult, error) {
+	// Build base WHERE clause
+	baseWhere := `enterprise_id = $1 AND deleted_at IS NULL`
+	args := []interface{}{enterpriseID}
+	argPos := 2
+
+	// COUNT query
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".brand WHERE `+baseWhere, tenantSlug)
+	if search != "" {
+		countQuery += fmt.Sprintf(" AND name ILIKE $%d", argPos)
+		searchTerm := "%" + search + "%"
+		args = append(args, searchTerm)
+		argPos++
+	}
+
+	var total int64
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return domain.PageResult{}, fmt.Errorf("failed to count brands: %w", err)
+	}
+
+	// SELECT query with pagination
+	selectQuery := fmt.Sprintf(`
+		SELECT id, name, description, enterprise_id, created_at, updated_at, deleted_at
+		FROM "%s".brand WHERE `+baseWhere, tenantSlug)
+
+	args = []interface{}{enterpriseID}
+	argPos = 2
+
+	if search != "" {
+		selectQuery += fmt.Sprintf(" AND name ILIKE $%d", argPos)
+		searchTerm := "%" + search + "%"
+		args = append(args, searchTerm)
+		argPos++
+	}
+
+	selectQuery += " ORDER BY name LIMIT $" + fmt.Sprintf("%d", argPos)
+	args = append(args, rows)
+	argPos++
+
+	offset := (first - 1) * rows
+	selectQuery += " OFFSET $" + fmt.Sprintf("%d", argPos)
+	args = append(args, offset)
+
+	resultRows, err := r.db.QueryContext(ctx, selectQuery, args...)
+	if err != nil {
+		return domain.PageResult{}, fmt.Errorf("failed to page brands: %w", err)
+	}
+	defer resultRows.Close()
+
+	var list []Brand
+	for resultRows.Next() {
+		var b Brand
+		if err := resultRows.Scan(&b.ID, &b.Name, &b.Description, &b.EnterpriseID,
+			&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt); err != nil {
+			return domain.PageResult{}, err
+		}
+		list = append(list, b)
+	}
+
+	// Calculate pagination
+	page := first
+	limit := rows
+	totalPages := (total + limit - 1) / limit
+	if total == 0 {
+		totalPages = 0
+	}
+
+	return domain.PageResult{
+		Items:      list,
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}, nil
 }

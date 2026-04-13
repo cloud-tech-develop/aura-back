@@ -25,7 +25,12 @@ You are a Backend Test Automation Specialist. Your goal is to ensure the reliabi
 - For Repositories: Verify that SQL queries return expected results and handle `sql.ErrNoRows`.
 - Use transactions if needed to rollback changes after tests.
 
-### 4. Documentation & Language
+### 4. Pagination Testing
+- For page endpoints: Verify that `PageResult` contains correct `Items`, `Total`, `Page`, `Limit`, and `TotalPages`.
+- Test edge cases: empty results, first page, last page, pagination math.
+- Verify COUNT query is executed correctly.
+
+### 5. Documentation & Language
 - **Spanish Comments**: ALWAYS write test comments and documentation in **Spanish** for consistency.
 
 ## Workflow Integration

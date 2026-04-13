@@ -86,7 +86,12 @@ func main() {
 	brandSvc := brands.NewService(database.Wrap(database.DB))
 	brandHandler := brands.NewHandler(brandSvc)
 
-	productSvc := catalogProducts.NewService(database)
+	productsLogger := catalogProducts.NewLoggerHandler("logs")
+	_ = eventBus.Subscribe(catalogProducts.EventCreated, productsLogger)
+	_ = eventBus.Subscribe(catalogProducts.EventUpdated, productsLogger)
+	_ = eventBus.Subscribe(catalogProducts.EventDeleted, productsLogger)
+
+	productSvc := catalogProducts.NewService(database, eventBus)
 	productHandler := catalogProducts.NewHandler(productSvc)
 
 	// Third Parties module

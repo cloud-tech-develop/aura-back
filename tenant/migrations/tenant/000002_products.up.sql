@@ -2,8 +2,9 @@
 CREATE TABLE category (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    description TEXT,
-    parent_id BIGINT REFERENCES category(id),
+    parent_id BIGINT,
+    default_tax_rate DECIMAL(5,2) DEFAULT 0.00,
+    active BOOLEAN DEFAULT TRUE,
     enterprise_id BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ,

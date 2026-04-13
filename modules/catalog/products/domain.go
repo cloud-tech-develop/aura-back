@@ -3,6 +3,9 @@ package products
 import (
 	"context"
 	"time"
+
+	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/events"
 )
 
 // Product entity
@@ -43,7 +46,7 @@ type Repository interface {
 	Create(ctx context.Context, tenantSlug string, p *Product) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Product, error)
 	GetBySKU(ctx context.Context, tenantSlug string, sku string, enterpriseID int64) (*Product, error)
-	Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) ([]Product, error)
+	Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) (domain.PageResult, error)
 	List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Product, error)
 	Update(ctx context.Context, tenantSlug string, p *Product) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
@@ -53,8 +56,41 @@ type Repository interface {
 type Service interface {
 	Create(ctx context.Context, tenantSlug string, p *Product) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Product, error)
-	Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) ([]Product, error)
+	Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) (domain.PageResult, error)
 	List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Product, error)
 	Update(ctx context.Context, tenantSlug string, id int64, p *Product) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
+}
+
+// ─── Domain Events ────────────────────────────────────────────────────────
+const (
+	EventCreated = "product.created"
+	EventUpdated = "product.updated"
+	EventDeleted = "product.deleted"
+)
+
+type CreatedEvent struct{ events.BaseEvent }
+type UpdatedEvent struct{ events.BaseEvent }
+type DeletedEvent struct{ events.BaseEvent }
+
+func (e *Product) ToEventPayload() map[string]interface{} {
+	return map[string]interface{}{
+		"id":          e.ID,
+		"sku":         e.SKU,
+		"name":        e.Name,
+		"description": e.Description,
+		"status":      e.Status,
+		"created_at":  e.CreatedAt,
+		"updated_at":  e.UpdatedAt,
+	}
+}
+
+func NewCreatedEvent(e *Product) CreatedEvent {
+	return CreatedEvent{events.NewBaseEvent(EventCreated, e.ToEventPayload())}
+}
+func NewUpdatedEvent(e *Product) UpdatedEvent {
+	return UpdatedEvent{events.NewBaseEvent(EventUpdated, e.ToEventPayload())}
+}
+func NewDeletedEvent(e *Product) DeletedEvent {
+	return DeletedEvent{events.NewBaseEvent(EventDeleted, e.ToEventPayload())}
 }

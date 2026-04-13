@@ -163,8 +163,11 @@ components:
           format: int64
         name:
           type: string
-        description:
-          type: string
+        default_tax_rate:
+          type: number
+          format: decimal
+        active:
+          type: boolean
         parent_id:
           type: integer
           format: int64
@@ -209,6 +212,100 @@ components:
       properties:
         error:
           type: string
+
+    # Pagination schemas
+    PageParams:
+      type: object
+      properties:
+        first:
+          type: integer
+          default: 1
+          description: Page number (starting from 1)
+        rows:
+          type: integer
+          default: 10
+          description: Number of items per page
+        search:
+          type: string
+          description: Search term
+
+    ProductPageResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        total:
+          type: integer
+          format: int64
+          description: Total number of items matching the filters
+        page:
+          type: integer
+          format: int64
+          description: Current page number
+        limit:
+          type: integer
+          format: int64
+          description: Items per page
+        totalPages:
+          type: integer
+          format: int64
+          description: Total number of pages
+
+    CategoryPageResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int64
+        limit:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int64
+
+    BrandPageResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Brand"
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int64
+        limit:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int64
+
+    # Response envelope for all endpoints
+    ResponseEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          description: Response data
+        message:
+          type: string
+          description: Response message
+        success:
+          type: boolean
+          description: Success indicator
 
 paths:
   /login:
@@ -1044,19 +1141,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                first:
-                  type: integer
-                  default: 1
-                rows:
-                  type: integer
-                  default: 10
-                search:
-                  type: string
+              $ref: "#/components/schemas/PageParams"
       responses:
         "200":
           description: Paginated products
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductPageResult"
         "401":
           description: Unauthorized
 
@@ -1183,6 +1275,29 @@ paths:
         "401":
           description: Unauthorized
 
+  /catalog/categories/page:
+    post:
+      summary: Paginated categories list
+      tags:
+        - Catalog - Categories
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageParams"
+      responses:
+        "200":
+          description: Paginated categories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryPageResult"
+        "401":
+          description: Unauthorized
+
   # ============================================
   # CATALOG MODULE - BRANDS
   # ============================================
@@ -1300,5 +1415,28 @@ paths:
       responses:
         "204":
           description: Brand deleted
+        "401":
+          description: Unauthorized
+
+  /catalog/brands/page:
+    post:
+      summary: Paginated brands list
+      tags:
+        - Catalog - Brands
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageParams"
+      responses:
+        "200":
+          description: Paginated brands
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandPageResult"
         "401":
           description: Unauthorized

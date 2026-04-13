@@ -210,3 +210,54 @@ db, mock, err := sqlmock.New()
 ## Dependencies
 
 Key packages: `gin-gonic/gin`, `lib/pq`, `golang-migrate/v4`, `golang-jwt/jwt/v5`, `stretchr/testify`, `DATA-DOG/go-sqlmock`, `joho/godotenv`
+
+## Pagination Pattern
+
+All page endpoints must use `shared/domain.PageResult` for consistent response format.
+
+### Structures (in shared/domain/pagination.go)
+
+```go
+// PageParams holds pagination request parameters
+type PageParams struct {
+    First  int64  `json:"first"` // offset (starting from 1)
+    Rows   int64  `json:"rows"`  // limit
+    Search string `json:"search"`
+}
+
+// PageResult holds a paginated result with items and pagination metadata
+type PageResult struct {
+    Items      interface{} `json:"items"`
+    Total      int64       `json:"total"`
+    Page       int64       `json:"page"`
+    Limit      int64       `json:"limit"`
+    TotalPages int64       `json:"totalPages"`
+}
+```
+
+### Response Format
+
+All page endpoints must return:
+
+```json
+{
+  "data": {
+    "items": [...],
+    "total": 15,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 2
+  },
+  "message": "Operacion exitosa",
+  "success": true
+}
+```
+
+### Implementation Requirements
+
+1. **Repository**: Execute a COUNT query first to get total elements, then the SELECT with LIMIT/OFFSET
+2. **Filters**: Always filter by `deleted_at IS NULL` and:
+   - For categories/products: `active = true` or `status = 'ACTIVE'`
+   - For brands: no additional filter (just active by default)
+3. **Module interfaces**: Use `domain.PageResult` as return type in Repository and Service interfaces
+4. **Validation**: In service, validate that `first >= 1` and `rows >= 1`, defaulting to 1 and 10 respectively

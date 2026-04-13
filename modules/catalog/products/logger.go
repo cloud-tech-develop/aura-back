@@ -3,13 +3,8 @@ package products
 import (
 	"fmt"
 
+	"github.com/cloud-tech-develop/aura-back/shared/events"
 	"github.com/cloud-tech-develop/aura-back/shared/logging"
-)
-
-const (
-	EventProductCreated = "catalog.product.created"
-	EventProductUpdated = "catalog.product.updated"
-	EventProductDeleted = "catalog.product.deleted"
 )
 
 type LoggerHandler struct {
@@ -22,11 +17,15 @@ func NewLoggerHandler(logDir string) *LoggerHandler {
 	}
 }
 
-func (l *LoggerHandler) Handle(event interface{}) {
-	switch e := event.(type) {
+func (l *LoggerHandler) Handle(event events.Event) error {
+	payload := event.GetPayload()
+
+	switch e := payload.(type) {
 	case Product:
-		fmt.Printf("[Catalog/Products Logger] Product event: %+v\n", e)
+		fmt.Printf("[Catalog/Products Logger] Product event: %s - %+v\n", event.GetName(), e)
 	default:
-		fmt.Printf("[Catalog/Products Logger] Unknown event: %+v\n", e)
+		fmt.Printf("[Catalog/Products Logger] Unknown event: %s - %+v\n", event.GetName(), e)
 	}
+
+	return nil
 }

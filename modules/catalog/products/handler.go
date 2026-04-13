@@ -92,13 +92,13 @@ func (h *Handler) Page(c *gin.Context) {
 		return
 	}
 
-	products, err := h.svc.Page(c.Request.Context(), tenantSlug, enterpriseID, req.First, req.Rows, req.Search)
+	result, err := h.svc.Page(c.Request.Context(), tenantSlug, enterpriseID, req.First, req.Rows, req.Search)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	response.OK(c, products)
+	response.OK(c, result)
 }
 
 func (h *Handler) List(c *gin.Context) {

@@ -26,6 +26,12 @@ You are a Senior Go Developer. Your primary mission is to implement technical re
     - Use `search_path` per-tenant for schema isolation.
     - Tenant slug must match `^[a-z0-9_]+$`.
     - Extract tenant from context (middleware-set), not headers directly in handlers.
+- **Pagination**:
+    - All page endpoints must use `shared/domain.PageResult` for consistent response format.
+    - Response structure inside `data` must be: `{"items": [...], "total": N, "page": N, "limit": N, "totalPages": N}`.
+    - Use `domain.PageParams` for request parameters (`First`, `Rows`, `Search`).
+    - Filter by `deleted_at IS NULL` and `active = true` (or `status = 'ACTIVE'` for products).
+    - Always execute a COUNT query to get total elements before the SELECT query.
 - **Concurrency & Context**:
     - Always pass `context.Context` as the first parameter.
     - Never store contexts in structs.

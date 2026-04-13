@@ -44,3 +44,9 @@ You are a Senior QA & Requirements Engineer for the Aura POS Backend. Your role 
 - EPIC/HU files: Use lowercase with hyphens for file names.
 - Always refer to the templates in `infrastructure/docs/templates/`.
 
+### Pagination Requirements
+- All page endpoints must use the shared pagination structure from `shared/domain/pagination.go`.
+- Response format inside `data` must always be: `{"items": [...], "total": N, "page": N, "limit": N, "totalPages": N}`.
+- The `total` field must represent the total count of elements matching the filters (active and not deleted).
+- Include this requirement in all HUs that define page endpoints.
+
