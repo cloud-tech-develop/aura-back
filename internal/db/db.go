@@ -21,6 +21,7 @@ func New(driver, dsn string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("abrir db (%s): %w", driver, err)
 	}
+
 	if err := conn.Ping(); err != nil {
 		return nil, fmt.Errorf("conectar db (%s): %w", driver, err)
 	}

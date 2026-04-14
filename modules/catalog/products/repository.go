@@ -130,11 +130,30 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	return list, nil
 }
 
-func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) (domain.PageResult, error) {
+func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	// Build base WHERE clause - only active products
 	baseWhere := `enterprise_id = $1 AND deleted_at IS NULL AND status = 'ACTIVE'`
 	args := []interface{}{enterpriseID}
 	argPos := 2
+
+	// Apply params: category_id, brand_id, status
+	if params != nil {
+		if categoryID, ok := params["category_id"]; ok && categoryID != nil {
+			baseWhere += fmt.Sprintf(" AND category_id = $%d", argPos)
+			args = append(args, categoryID)
+			argPos++
+		}
+		if brandID, ok := params["brand_id"]; ok && brandID != nil {
+			baseWhere += fmt.Sprintf(" AND brand_id = $%d", argPos)
+			args = append(args, brandID)
+			argPos++
+		}
+		if status, ok := params["status"]; ok && status != nil {
+			baseWhere += fmt.Sprintf(" AND status = $%d", argPos)
+			args = append(args, status)
+			argPos++
+		}
+	}
 
 	// COUNT query
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".product WHERE `+baseWhere, tenantSlug)
@@ -150,6 +169,24 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 		return domain.PageResult{}, fmt.Errorf("failed to count products: %w", err)
 	}
 
+	// Validate sort column
+	validSorts := map[string]string{
+		"id":         "id",
+		"name":       "name",
+		"sku":        "sku",
+		"cost_price": "cost_price",
+		"sale_price": "sale_price",
+		"created_at": "created_at",
+	}
+	if sortCol, ok := validSorts[sort]; ok {
+		sort = sortCol
+	} else {
+		sort = "id"
+	}
+	if order != "asc" && order != "desc" {
+		order = "asc"
+	}
+
 	// SELECT query with pagination
 	selectQuery := fmt.Sprintf(`
 		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id, created_at, updated_at, deleted_at
@@ -158,6 +195,24 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	args = []interface{}{enterpriseID}
 	argPos = 2
 
+	if params != nil {
+		if categoryID, ok := params["category_id"]; ok && categoryID != nil {
+			baseWhere += fmt.Sprintf(" AND category_id = $%d", argPos)
+			args = append(args, categoryID)
+			argPos++
+		}
+		if brandID, ok := params["brand_id"]; ok && brandID != nil {
+			baseWhere += fmt.Sprintf(" AND brand_id = $%d", argPos)
+			args = append(args, brandID)
+			argPos++
+		}
+		if status, ok := params["status"]; ok && status != nil {
+			baseWhere += fmt.Sprintf(" AND status = $%d", argPos)
+			args = append(args, status)
+			argPos++
+		}
+	}
+
 	if search != "" {
 		selectQuery += fmt.Sprintf(" AND (name ILIKE $%d OR sku ILIKE $%d)", argPos, argPos)
 		searchTerm := "%" + search + "%"
@@ -165,12 +220,12 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 		argPos += 2
 	}
 
-	selectQuery += " ORDER BY name LIMIT $" + fmt.Sprintf("%d", argPos)
-	args = append(args, rows)
+	selectQuery += fmt.Sprintf(" ORDER BY %s %s LIMIT $%d", sort, order, argPos)
+	args = append(args, limit)
 	argPos++
 
-	offset := (first - 1) * rows
-	selectQuery += " OFFSET $" + fmt.Sprintf("%d", argPos)
+	offset := (page - 1) * limit
+	selectQuery += fmt.Sprintf(" OFFSET $%d", argPos)
 	args = append(args, offset)
 
 	resultRows, err := r.db.QueryContext(ctx, selectQuery, args...)
@@ -193,8 +248,6 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	}
 
 	// Calculate pagination
-	page := first
-	limit := rows
 	totalPages := (total + limit - 1) / limit
 	if total == 0 {
 		totalPages = 0

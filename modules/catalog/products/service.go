@@ -89,14 +89,14 @@ func (s *service) GetByID(ctx context.Context, tenantSlug string, id int64) (*Pr
 	return product, nil
 }
 
-func (s *service) Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) (domain.PageResult, error) {
-	if first < 1 {
-		first = 1
+func (s *service) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
+	if page < 1 {
+		page = 1
 	}
-	if rows < 1 {
-		rows = 10
+	if limit < 1 {
+		limit = 10
 	}
-	return s.repo.Page(ctx, tenantSlug, enterpriseID, first, rows, search)
+	return s.repo.Page(ctx, tenantSlug, enterpriseID, page, limit, search, sort, order, params)
 }
 
 func (s *service) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Product, error) {

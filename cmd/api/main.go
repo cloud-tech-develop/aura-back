@@ -58,6 +58,16 @@ func main() {
 		log.Fatal("MigratePublic:", err)
 	}
 
+	// ── Migrate existing tenants in background ─────────────────────────────
+	go func() {
+		log.Println("Migrating existing tenants...")
+		if err := tenantMgr.MigrateAll(context.Background()); err != nil {
+			log.Printf("MigrateAll: %v", err)
+			return
+		}
+		log.Println("All tenants migrated successfully")
+	}()
+
 	// ── Modules ──────────────────────────────────────────────────────────────
 	// Enterprise module
 	enterpriseMigrator := &enterpriseMigratorAdapter{manager: tenantMgr}

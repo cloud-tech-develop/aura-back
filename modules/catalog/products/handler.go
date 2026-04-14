@@ -77,13 +77,33 @@ func (h *Handler) Page(c *gin.Context) {
 	}
 
 	var req struct {
-		First  int64  `json:"first"`
-		Rows   int64  `json:"rows"`
-		Search string `json:"search"`
+		Page   int64          `json:"page"`
+		Limit  int64          `json:"limit"`
+		Search string         `json:"search"`
+		Sort   string         `json:"sort"`
+		Order  string         `json:"order"`
+		Params map[string]any `json:"params"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
+	}
+
+	// Apply defaults
+	if req.Limit <= 0 {
+		req.Limit = 10
+	}
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.Sort == "" {
+		req.Sort = "id"
+	}
+	if req.Order == "" {
+		req.Order = "asc"
+	}
+	if req.Params == nil {
+		req.Params = make(map[string]any)
 	}
 
 	enterpriseID := c.GetInt64("enterprise_id")
@@ -92,7 +112,7 @@ func (h *Handler) Page(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.Page(c.Request.Context(), tenantSlug, enterpriseID, req.First, req.Rows, req.Search)
+	result, err := h.svc.Page(c.Request.Context(), tenantSlug, enterpriseID, req.Page, req.Limit, req.Search, req.Sort, req.Order, req.Params)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return

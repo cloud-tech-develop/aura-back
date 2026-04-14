@@ -97,7 +97,7 @@ func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) er
 	return nil
 }
 
-func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) (domain.PageResult, error) {
+func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	// Build base WHERE clause
 	baseWhere := `enterprise_id = $1 AND deleted_at IS NULL`
 	args := []interface{}{enterpriseID}
@@ -117,6 +117,21 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 		return domain.PageResult{}, fmt.Errorf("failed to count brands: %w", err)
 	}
 
+	// Validate sort column
+	validSorts := map[string]string{
+		"id":         "id",
+		"name":       "name",
+		"created_at": "created_at",
+	}
+	if sortCol, ok := validSorts[sort]; ok {
+		sort = sortCol
+	} else {
+		sort = "id"
+	}
+	if order != "asc" && order != "desc" {
+		order = "asc"
+	}
+
 	// SELECT query with pagination
 	selectQuery := fmt.Sprintf(`
 		SELECT id, name, description, enterprise_id, created_at, updated_at, deleted_at
@@ -132,12 +147,12 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 		argPos++
 	}
 
-	selectQuery += " ORDER BY name LIMIT $" + fmt.Sprintf("%d", argPos)
-	args = append(args, rows)
+	selectQuery += fmt.Sprintf(" ORDER BY %s %s LIMIT $%d", sort, order, argPos)
+	args = append(args, limit)
 	argPos++
 
-	offset := (first - 1) * rows
-	selectQuery += " OFFSET $" + fmt.Sprintf("%d", argPos)
+	offset := (page - 1) * limit
+	selectQuery += fmt.Sprintf(" OFFSET $%d", argPos)
 	args = append(args, offset)
 
 	resultRows, err := r.db.QueryContext(ctx, selectQuery, args...)
@@ -157,8 +172,6 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	}
 
 	// Calculate pagination
-	page := first
-	limit := rows
 	totalPages := (total + limit - 1) / limit
 	if total == 0 {
 		totalPages = 0

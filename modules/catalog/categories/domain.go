@@ -11,6 +11,7 @@ import (
 type Category struct {
 	ID             int64      `json:"id"`
 	Name           string     `json:"name"`
+	Description    *string    `json:"description,omitempty"`
 	DefaultTaxRate float64    `json:"default_tax_rate"`
 	Active         bool       `json:"active"`
 	ParentID       *int64     `json:"parent_id,omitempty"`
@@ -23,12 +24,18 @@ type Category struct {
 	DeletedAt      *time.Time `json:"deleted_at,omitempty"`
 }
 
+// CategoryListItem entity for List endpoint (only id and name)
+type CategoryListItem struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
 // Repository interface
 type Repository interface {
 	Create(ctx context.Context, tenantSlug string, c *Category) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Category, error)
-	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Category, error)
-	Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) (domain.PageResult, error)
+	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]CategoryListItem, error)
+	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
 	Update(ctx context.Context, tenantSlug string, c *Category) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
 }
@@ -37,8 +44,8 @@ type Repository interface {
 type Service interface {
 	Create(ctx context.Context, tenantSlug string, c *Category) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Category, error)
-	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Category, error)
-	Page(ctx context.Context, tenantSlug string, enterpriseID int64, first int64, rows int64, search string) (domain.PageResult, error)
+	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]CategoryListItem, error)
+	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
 	Update(ctx context.Context, tenantSlug string, id int64, c *Category) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
 }
