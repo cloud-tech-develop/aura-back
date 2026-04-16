@@ -54,6 +54,7 @@ El módulo de catálogo permite la gestión completa de productos, categorías y
 - ✅ CRUD completo de productos
 - ✅ CRUD completo de categorías
 - ✅ CRUD completo de marcas
+- ✅ CRUD completo de unidades
 - ✅ Validación de SKU único por empresa
 - ✅ Validación de precios (precio venta >= precio costo)
 - ✅ Control de estado (ACTIVE, INACTIVE)
@@ -89,6 +90,12 @@ El módulo de catálogo permite la gestión completa de productos, categorías y
 | HU-CATALOG-013 | Obtener marca por ID | ✅ Completado |
 | HU-CATALOG-014 | Actualizar marca | ✅ Completado |
 | HU-CATALOG-015 | Eliminar marca | ✅ Completado |
+| HU-CATALOG-016 | Crear Unidad | ✅ Completado |
+| HU-CATALOG-017 | Listar Unidades | ✅ Completado |
+| HU-CATALOG-018 | Obtener Unidad por ID | ✅ Completado |
+| HU-CATALOG-019 | Actualizar Unidad | ✅ Completado |
+| HU-CATALOG-020 | Eliminar Unidad | ✅ Completado |
+| HU-CATALOG-021 | Listar Unidades Paginadas | ✅ Completado |
 
 ---
 
@@ -127,7 +134,7 @@ El módulo de catálogo permite la gestión completa de productos, categorías y
 
 - **Framework**: Go + Gin
 - **Módulo**: `modules/catalog/`
-- **Sub-módulos**: `products/`, `categories/`, `brands/`
+- **Sub-módulos**: `products/`, `categories/`, `brands/`, `units/`
 
 ### Base de datos
 
@@ -158,6 +165,14 @@ El módulo de catálogo permite la gestión completa de productos, categorías y
   ├── GET /brands/:id            → Obtener marca
   ├── PUT /brands/:id            → Actualizar marca
   └── DELETE /brands/:id          → Eliminar marca
+
+/units
+  ├── POST /units                 → Crear unidad
+  ├── GET /units                 → Listar unidades
+  ├── GET /units/:id            → Obtener unidad
+  ├── PUT /units/:id           → Actualizar unidad
+  ├── DELETE /units/:id         → Eliminar unidad
+  └── POST /units/page          → Listar paginado
 ```
 
 ---
@@ -195,7 +210,7 @@ El módulo de catálogo permite la gestión completa de productos, categorías y
 
 ## Resumen
 
-- **Total de HU**: 15
-- **Completadas**: 15
+- **Total de HU**: 21
+- **Completadas**: 21
 - **Pendientes**: 0
-- **Sub-módulos implementados**: 3 (products, categories, brands)
+- **Sub-módulos implementados**: 4 (products, categories, brands, units)

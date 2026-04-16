@@ -24,6 +24,16 @@
 - **Endpoint**: `/brands/:id`
 - **Método HTTP**: PUT
 
+### Request Body
+```json
+{
+  "name": "Samsung Actualizada",
+  "description": "Nueva descripción",
+  "active": false
+}
+```
+- `active` (opcional): boolean, permite activar/desactivar la marca
+
 ---
 
 ## 📎 Dependencias

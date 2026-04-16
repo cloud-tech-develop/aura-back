@@ -14,6 +14,7 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
 	catalogProducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/joho/godotenv"
 	"os/exec"
@@ -96,6 +97,9 @@ func main() {
 	brandSvc := brands.NewService(database.Wrap(database.DB))
 	brandHandler := brands.NewHandler(brandSvc)
 
+	unitSvc := units.NewService(database.Wrap(database.DB))
+	unitHandler := units.NewHandler(unitSvc)
+
 	productsLogger := catalogProducts.NewLoggerHandler("logs")
 	_ = eventBus.Subscribe(catalogProducts.EventCreated, productsLogger)
 	_ = eventBus.Subscribe(catalogProducts.EventUpdated, productsLogger)
@@ -109,7 +113,7 @@ func main() {
 
 	// ── HTTP Server ──────────────────────────────────────────────────────────
 	srv := server.NewServer(database.DB, tenantMgr)
-	srv.RegisterModules(enterpriseHandler, usersHandler, categoryHandler, brandHandler, productHandler, thirdPartiesHandler)
+	srv.RegisterModules(enterpriseHandler, usersHandler, categoryHandler, brandHandler, productHandler, thirdPartiesHandler, unitHandler)
 
 	log.Println("servidor en :" + port)
 

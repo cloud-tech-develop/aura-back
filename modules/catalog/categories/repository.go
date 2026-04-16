@@ -53,12 +53,15 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 }
 
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]CategoryListItem, error) {
+	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
+	ctx = context.WithoutCancel(ctx)
+
 	query := fmt.Sprintf(`
 		SELECT id, name
-		FROM "%s".category WHERE enterprise_id = $1 AND deleted_at IS NULL
-		ORDER BY name`, tenantSlug)
+		FROM "%s".category WHERE enterprise_id = %d AND deleted_at IS NULL AND active = true
+		ORDER BY name`, tenantSlug, enterpriseID)
 
-	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
+	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list categories: %w", err)
 	}
@@ -76,8 +79,11 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 }
 
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
+	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
+	ctx = context.WithoutCancel(ctx)
+
 	// Build base WHERE clause
-	baseWhere := `enterprise_id = $1 AND deleted_at IS NULL AND active = true`
+	baseWhere := `enterprise_id = $1 AND deleted_at IS NULL`
 	args := []interface{}{enterpriseID}
 	argPos := 2
 

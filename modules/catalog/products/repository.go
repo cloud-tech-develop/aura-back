@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
@@ -75,41 +76,30 @@ func (r *repository) GetBySKU(ctx context.Context, tenantSlug string, sku string
 }
 
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Product, error) {
-	query := fmt.Sprintf(`
-		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id, created_at, updated_at, deleted_at
-		FROM "%s".product WHERE enterprise_id = $1 AND deleted_at IS NULL`, tenantSlug)
+	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
+	ctx = context.WithoutCancel(ctx)
 
-	args := []interface{}{enterpriseID}
-	argPos := 2
+	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL`, enterpriseID)
 
 	if filters.Search != "" {
-		query += fmt.Sprintf(" AND (name ILIKE $%d OR sku ILIKE $%d)", argPos, argPos)
-		searchTerm := "%" + filters.Search + "%"
-		args = append(args, searchTerm, searchTerm)
-		argPos += 2
+		safeSearch := strings.ReplaceAll(filters.Search, "'", "''")
+		baseWhere += fmt.Sprintf(" AND (name ILIKE '%%%s%%' OR sku ILIKE '%%%s%%')", safeSearch, safeSearch)
 	}
 
 	if filters.CategoryID != nil {
-		query += fmt.Sprintf(" AND category_id = $%d", argPos)
-		args = append(args, *filters.CategoryID)
-		argPos++
+		baseWhere += fmt.Sprintf(" AND category_id = %d", *filters.CategoryID)
 	}
 
 	if filters.BrandID != nil {
-		query += fmt.Sprintf(" AND brand_id = $%d", argPos)
-		args = append(args, *filters.BrandID)
-		argPos++
+		baseWhere += fmt.Sprintf(" AND brand_id = %d", *filters.BrandID)
 	}
 
-	query += " ORDER BY name LIMIT $" + fmt.Sprintf("%d", argPos)
-	args = append(args, filters.Limit)
-	argPos++
-
 	offset := (filters.Page - 1) * filters.Limit
-	query += " OFFSET $" + fmt.Sprintf("%d", argPos)
-	args = append(args, offset)
+	query := fmt.Sprintf(`
+		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id, created_at, updated_at, deleted_at
+		FROM "%s".product WHERE `+baseWhere+` ORDER BY name LIMIT %d OFFSET %d`, tenantSlug, filters.Limit, offset)
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list products: %w", err)
 	}
@@ -131,41 +121,53 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 }
 
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
-	// Build base WHERE clause - only active products
-	baseWhere := `enterprise_id = $1 AND deleted_at IS NULL AND status = 'ACTIVE'`
-	args := []interface{}{enterpriseID}
-	argPos := 2
+	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
+	ctx = context.WithoutCancel(ctx)
+
+	// Build base WHERE clause inlining variables to avoid PgBouncer statement pooling errors
+	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL `, enterpriseID)
 
 	// Apply params: category_id, brand_id, status
 	if params != nil {
 		if categoryID, ok := params["category_id"]; ok && categoryID != nil {
-			baseWhere += fmt.Sprintf(" AND category_id = $%d", argPos)
-			args = append(args, categoryID)
-			argPos++
+			var catID int64
+			switch v := categoryID.(type) {
+			case float64:
+				catID = int64(v)
+			case int64:
+				catID = v
+			}
+			baseWhere += fmt.Sprintf(" AND category_id = %d", catID)
 		}
 		if brandID, ok := params["brand_id"]; ok && brandID != nil {
-			baseWhere += fmt.Sprintf(" AND brand_id = $%d", argPos)
-			args = append(args, brandID)
-			argPos++
+			var bID int64
+			switch v := brandID.(type) {
+			case float64:
+				bID = int64(v)
+			case int64:
+				bID = v
+			}
+			baseWhere += fmt.Sprintf(" AND brand_id = %d", bID)
 		}
 		if status, ok := params["status"]; ok && status != nil {
-			baseWhere += fmt.Sprintf(" AND status = $%d", argPos)
-			args = append(args, status)
-			argPos++
+			if statusStr, isStr := status.(string); isStr {
+				safeStatus := strings.ReplaceAll(statusStr, "'", "''")
+				baseWhere += fmt.Sprintf(" AND status = '%s'", safeStatus)
+			}
 		}
+	}
+
+	searchCond := ""
+	if search != "" {
+		safeSearch := strings.ReplaceAll(search, "'", "''")
+		searchCond = fmt.Sprintf(" AND (name ILIKE '%%%s%%' OR sku ILIKE '%%%s%%')", safeSearch, safeSearch)
 	}
 
 	// COUNT query
-	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".product WHERE `+baseWhere, tenantSlug)
-	if search != "" {
-		countQuery += fmt.Sprintf(" AND (name ILIKE $%d OR sku ILIKE $%d)", argPos, argPos)
-		searchTerm := "%" + search + "%"
-		args = append(args, searchTerm, searchTerm)
-		argPos += 2
-	}
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".product WHERE `+baseWhere+searchCond, tenantSlug)
 
 	var total int64
-	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+	if err := r.db.QueryRowContext(ctx, countQuery).Scan(&total); err != nil {
 		return domain.PageResult{}, fmt.Errorf("failed to count products: %w", err)
 	}
 
@@ -187,48 +189,13 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 		order = "asc"
 	}
 
-	// SELECT query with pagination
+	offset := (page - 1) * limit
 	selectQuery := fmt.Sprintf(`
 		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id, created_at, updated_at, deleted_at
-		FROM "%s".product WHERE `+baseWhere, tenantSlug)
+		FROM "%s".product WHERE `+baseWhere+searchCond+` ORDER BY %s %s LIMIT %d OFFSET %d`,
+		tenantSlug, sort, order, limit, offset)
 
-	args = []interface{}{enterpriseID}
-	argPos = 2
-
-	if params != nil {
-		if categoryID, ok := params["category_id"]; ok && categoryID != nil {
-			baseWhere += fmt.Sprintf(" AND category_id = $%d", argPos)
-			args = append(args, categoryID)
-			argPos++
-		}
-		if brandID, ok := params["brand_id"]; ok && brandID != nil {
-			baseWhere += fmt.Sprintf(" AND brand_id = $%d", argPos)
-			args = append(args, brandID)
-			argPos++
-		}
-		if status, ok := params["status"]; ok && status != nil {
-			baseWhere += fmt.Sprintf(" AND status = $%d", argPos)
-			args = append(args, status)
-			argPos++
-		}
-	}
-
-	if search != "" {
-		selectQuery += fmt.Sprintf(" AND (name ILIKE $%d OR sku ILIKE $%d)", argPos, argPos)
-		searchTerm := "%" + search + "%"
-		args = append(args, searchTerm, searchTerm)
-		argPos += 2
-	}
-
-	selectQuery += fmt.Sprintf(" ORDER BY %s %s LIMIT $%d", sort, order, argPos)
-	args = append(args, limit)
-	argPos++
-
-	offset := (page - 1) * limit
-	selectQuery += fmt.Sprintf(" OFFSET $%d", argPos)
-	args = append(args, offset)
-
-	resultRows, err := r.db.QueryContext(ctx, selectQuery, args...)
+	resultRows, err := r.db.QueryContext(ctx, selectQuery)
 	if err != nil {
 		return domain.PageResult{}, fmt.Errorf("failed to page products: %w", err)
 	}

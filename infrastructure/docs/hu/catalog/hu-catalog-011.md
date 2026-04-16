@@ -29,8 +29,8 @@ El sistema debe permitir crear marcas verificando nombre único por empresa.
 
 ### Escenario 1: Crear marca exitosamente
 - Dado que no existe una marca con ese nombre
-- Cuando envío POST a `/brands`
--Entonces crea la marca con estado ACTIVE
+- Cuando envío POST a `/brands` con el campo `active` (opcional, por defecto true)
+-Entonces crea la marca con el estado activo especificado
 
 ---
 
@@ -44,6 +44,16 @@ El sistema debe permitir crear marcas verificando nombre único por empresa.
 
 - **Endpoint**: `/brands`
 - **Método HTTP**: POST
+
+### Request Body
+```json
+{
+  "name": "Samsung",
+  "description": "Marca de electrónica",
+  "active": true
+}
+```
+- `active` (opcional): boolean, por defecto true
 
 ---
 

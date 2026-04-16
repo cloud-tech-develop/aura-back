@@ -33,15 +33,22 @@ func (h *Handler) Create(c *gin.Context) {
 	var req struct {
 		Name        string `json:"name" binding:"required"`
 		Description string `json:"description"`
+		Active      *bool  `json:"active"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
+	active := true
+	if req.Active != nil {
+		active = *req.Active
+	}
+
 	brand := &Brand{
 		Name:         req.Name,
 		Description:  req.Description,
+		Active:       active,
 		EnterpriseID: enterpriseID,
 	}
 
@@ -169,6 +176,7 @@ func (h *Handler) Update(c *gin.Context) {
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		Active      *bool  `json:"active"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -178,6 +186,10 @@ func (h *Handler) Update(c *gin.Context) {
 	brand := &Brand{
 		Name:        req.Name,
 		Description: req.Description,
+	}
+
+	if req.Active != nil {
+		brand.Active = *req.Active
 	}
 
 	if err := h.svc.Update(c.Request.Context(), tenantSlug, id, brand); err != nil {

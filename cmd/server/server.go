@@ -9,6 +9,7 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
 	catalogproducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/gin-gonic/gin"
@@ -59,6 +60,7 @@ func (s *Server) RegisterModules(
 	brandH *brands.Handler,
 	productH *catalogproducts.Handler,
 	thirdPartiesH *thirdparties.Handler,
+	unitH *units.Handler,
 ) {
 	// ── Health Check ──────────────────────────────────────────────────────────
 	s.router.GET("/", func(c *gin.Context) {
@@ -91,6 +93,7 @@ func (s *Server) RegisterModules(
 	brands.Register(public, protected, brandH)
 	catalogproducts.Register(public, protected, productH)
 	thirdparties.Register(public, protected, thirdPartiesH)
+	units.Register(public, protected, unitH)
 }
 
 // Run starts the HTTP server on the given address.

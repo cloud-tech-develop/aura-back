@@ -12,6 +12,7 @@ type Brand struct {
 	ID           int64      `json:"id"`
 	Name         string     `json:"name"`
 	Description  string     `json:"description"`
+	Active       bool       `json:"active"`
 	EnterpriseID int64      `json:"enterprise_id"`
 	GlobalID     string     `json:"global_id"`
 	SyncStatus   string     `json:"sync_status"`
