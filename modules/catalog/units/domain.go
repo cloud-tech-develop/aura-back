@@ -14,6 +14,9 @@ type Unit struct {
 	Active        bool    `json:"active"`
 	AllowDecimals bool    `json:"allow_decimals"`
 	EnterpriseID  int64   `json:"enterprise_id"`
+	GlobalID      string  `json:"global_id"`
+	SyncStatus    string  `json:"sync_status"`
+	LastSyncedAt  *string `json:"last_synced_at,omitempty"`
 	CreatedAt     string  `json:"created_at"`
 	UpdatedAt     *string `json:"updated_at,omitempty"`
 	DeletedAt     *string `json:"deleted_at,omitempty"`
