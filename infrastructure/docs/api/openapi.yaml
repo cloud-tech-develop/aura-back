@@ -163,6 +163,8 @@ components:
           format: int64
         name:
           type: string
+        description:
+          type: string
         default_tax_rate:
           type: number
           format: decimal
@@ -174,6 +176,31 @@ components:
         enterprise_id:
           type: integer
           format: int64
+        global_id:
+          type: string
+        sync_status:
+          type: string
+        last_synced_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+
+    CategoryListResult:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListId"
+      description: List of categories with only id and name (active categories only)
 
     Brand:
       type: object
@@ -191,6 +218,31 @@ components:
         enterprise_id:
           type: integer
           format: int64
+        global_id:
+          type: string
+        sync_status:
+          type: string
+        last_synced_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+
+    BrandListResult:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListId"
+      description: List of brands with only id and name (active brands only)
 
     Unit:
       type: object
@@ -209,6 +261,28 @@ components:
         enterprise_id:
           type: integer
           format: int64
+        global_id:
+          type: string
+        sync_status:
+          type: string
+        last_synced_at:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+        deleted_at:
+          type: string
+
+    UnitListResult:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListId"
+      description: List of units with only id and name
 
     LoginRequest:
       type: object
@@ -238,17 +312,37 @@ components:
     PageParams:
       type: object
       properties:
-        first:
+        page:
           type: integer
           default: 1
           description: Page number (starting from 1)
-        rows:
+        limit:
           type: integer
           default: 10
           description: Number of items per page
         search:
           type: string
           description: Search term
+        sort:
+          type: string
+          default: "id"
+          description: Sort field
+        order:
+          type: string
+          default: "asc"
+          description: Sort order (asc or desc)
+        params:
+          type: object
+          description: Additional filter parameters
+
+    ListId:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
 
     ProductPageResult:
       type: object
@@ -1223,6 +1317,11 @@ paths:
                 parent_id:
                   type: integer
                   format: int64
+                default_tax_rate:
+                  type: number
+                  format: decimal
+                active:
+                  type: boolean
       responses:
         "201":
           description: Category created
@@ -1234,14 +1333,19 @@ paths:
           description: Bad Request
 
     get:
-      summary: List categories
+      summary: List active categories
+      description: Returns only active categories with id and name for dropdown/list selection
       tags:
         - Catalog - Categories
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: List of categories
+          description: List of active categories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryListResult"
         "401":
           description: Unauthorized
 
@@ -1380,14 +1484,19 @@ paths:
           description: Bad Request
 
     get:
-      summary: List brands
+      summary: List active brands
+      description: Returns only active brands with id and name for dropdown/list selection
       tags:
         - Catalog - Brands
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: List of brands
+          description: List of active brands
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandListResult"
         "401":
           description: Unauthorized
 
@@ -1532,6 +1641,7 @@ paths:
 
     get:
       summary: List units
+      description: Returns all units with id and name for dropdown/list selection
       tags:
         - Catalog - Units
       security:
@@ -1542,9 +1652,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Unit"
+                $ref: "#/components/schemas/UnitListResult"
         "401":
           description: Unauthorized
 
