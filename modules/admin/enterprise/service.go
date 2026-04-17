@@ -69,7 +69,7 @@ func (s *service) Create(ctx context.Context, e *Enterprise, passwordHash string
 		if plan != nil && plan.MaxEnterprises != nil {
 			currentCount, err := s.repo.CountEnterprisesByTenant(ctx, e.TenantID)
 			if err != nil {
-				return fmt.Errorf("contando empresas: %w", err) 
+				return fmt.Errorf("contando empresas: %w", err)
 			}
 			if currentCount >= int64(*plan.MaxEnterprises) {
 				return ErrPlanLimitReached

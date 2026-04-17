@@ -30,7 +30,7 @@ func (s *service) GetByID(ctx context.Context, tenantSlug string, id int64) (*Un
 	return s.repo.GetByID(ctx, tenantSlug, id)
 }
 
-func (s *service) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Unit, error) {
+func (s *service) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]domain.ListId, error) {
 	return s.repo.List(ctx, tenantSlug, enterpriseID)
 }
 

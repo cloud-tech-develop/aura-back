@@ -52,7 +52,7 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 	return c, nil
 }
 
-func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]CategoryListItem, error) {
+func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]domain.ListId, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
 
@@ -67,10 +67,10 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	}
 	defer rows.Close()
 
-	var list []CategoryListItem
+	var list []domain.ListId
 	for rows.Next() {
-		var c CategoryListItem
-		if err := rows.Scan(&c.ID, &c.Name); err != nil {
+		var c domain.ListId
+		if err := rows.Scan(&c.Id, &c.Name); err != nil {
 			return nil, err
 		}
 		list = append(list, c)

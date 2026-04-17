@@ -27,22 +27,22 @@ func (h *Handler) CreateThirdParty(c *gin.Context) {
 	}
 
 	var req struct {
-		UserID            *int64  `json:"user_id"`
-		FirstName         string  `json:"first_name" binding:"required"`
-		LastName          string  `json:"last_name" binding:"required"`
-		DocumentNumber    string  `json:"document_number" binding:"required"`
-		DocumentType      string  `json:"document_type" binding:"required"`
-		PersonalEmail     string  `json:"personal_email"`
-		CommercialName   string  `json:"commercial_name"`
-		Address           string  `json:"address"`
-		Phone             string  `json:"phone"`
-		AdditionalEmail   string  `json:"additional_email"`
-		TaxResponsibility string  `json:"tax_responsibility" binding:"required"`
-		IsClient          bool    `json:"is_client"`
-		IsProvider        bool    `json:"is_provider"`
-		IsEmployee        bool    `json:"is_employee"`
-		MunicipalityID    string  `json:"municipality_id"`
-		Municipality      string  `json:"municipality"`
+		UserID            *int64 `json:"user_id"`
+		FirstName         string `json:"first_name" binding:"required"`
+		LastName          string `json:"last_name" binding:"required"`
+		DocumentNumber    string `json:"document_number" binding:"required"`
+		DocumentType      string `json:"document_type" binding:"required"`
+		PersonalEmail     string `json:"personal_email"`
+		CommercialName    string `json:"commercial_name"`
+		Address           string `json:"address"`
+		Phone             string `json:"phone"`
+		AdditionalEmail   string `json:"additional_email"`
+		TaxResponsibility string `json:"tax_responsibility" binding:"required"`
+		IsClient          bool   `json:"is_client"`
+		IsProvider        bool   `json:"is_provider"`
+		IsEmployee        bool   `json:"is_employee"`
+		MunicipalityID    string `json:"municipality_id"`
+		Municipality      string `json:"municipality"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -56,14 +56,14 @@ func (h *Handler) CreateThirdParty(c *gin.Context) {
 		DocumentNumber:    req.DocumentNumber,
 		DocumentType:      req.DocumentType,
 		PersonalEmail:     req.PersonalEmail,
-		CommercialName:   req.CommercialName,
+		CommercialName:    req.CommercialName,
 		Address:           req.Address,
 		Phone:             req.Phone,
 		AdditionalEmail:   req.AdditionalEmail,
 		TaxResponsibility: req.TaxResponsibility,
 		IsClient:          req.IsClient,
 		IsProvider:        req.IsProvider,
-		IsEmployee:       req.IsEmployee,
+		IsEmployee:        req.IsEmployee,
 		MunicipalityID:    req.MunicipalityID,
 		Municipality:      req.Municipality,
 	}
@@ -154,21 +154,21 @@ func (h *Handler) UpdateThirdParty(c *gin.Context) {
 	}
 
 	var req struct {
-		UserID            *int64  `json:"user_id"`
-		FirstName         string  `json:"first_name"`
-		LastName          string  `json:"last_name"`
-		DocumentType      string  `json:"document_type"`
-		PersonalEmail     string  `json:"personal_email"`
-		CommercialName   string  `json:"commercial_name"`
-		Address           string  `json:"address"`
-		Phone             string  `json:"phone"`
-		AdditionalEmail   string  `json:"additional_email"`
-		TaxResponsibility string  `json:"tax_responsibility"`
-		IsClient          *bool   `json:"is_client"`
-		IsProvider        *bool   `json:"is_provider"`
-		IsEmployee        *bool   `json:"is_employee"`
-		MunicipalityID    string  `json:"municipality_id"`
-		Municipality      string  `json:"municipality"`
+		UserID            *int64 `json:"user_id"`
+		FirstName         string `json:"first_name"`
+		LastName          string `json:"last_name"`
+		DocumentType      string `json:"document_type"`
+		PersonalEmail     string `json:"personal_email"`
+		CommercialName    string `json:"commercial_name"`
+		Address           string `json:"address"`
+		Phone             string `json:"phone"`
+		AdditionalEmail   string `json:"additional_email"`
+		TaxResponsibility string `json:"tax_responsibility"`
+		IsClient          *bool  `json:"is_client"`
+		IsProvider        *bool  `json:"is_provider"`
+		IsEmployee        *bool  `json:"is_employee"`
+		MunicipalityID    string `json:"municipality_id"`
+		Municipality      string `json:"municipality"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -181,7 +181,7 @@ func (h *Handler) UpdateThirdParty(c *gin.Context) {
 		LastName:          req.LastName,
 		DocumentType:      req.DocumentType,
 		PersonalEmail:     req.PersonalEmail,
-		CommercialName:   req.CommercialName,
+		CommercialName:    req.CommercialName,
 		Address:           req.Address,
 		Phone:             req.Phone,
 		AdditionalEmail:   req.AdditionalEmail,

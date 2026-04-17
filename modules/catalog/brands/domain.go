@@ -26,7 +26,7 @@ type Brand struct {
 type Repository interface {
 	Create(ctx context.Context, tenantSlug string, b *Brand) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Brand, error)
-	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Brand, error)
+	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]domain.ListId, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
 	Update(ctx context.Context, tenantSlug string, b *Brand) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
@@ -36,7 +36,7 @@ type Repository interface {
 type Service interface {
 	Create(ctx context.Context, tenantSlug string, b *Brand) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Brand, error)
-	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Brand, error)
+	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]domain.ListId, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
 	Update(ctx context.Context, tenantSlug string, id int64, b *Brand) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error

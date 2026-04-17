@@ -30,9 +30,9 @@ func (m *MockRepository) GetByID(ctx context.Context, tenantSlug string, id int6
 	return args.Get(0).(*Unit), args.Error(1)
 }
 
-func (m *MockRepository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Unit, error) {
+func (m *MockRepository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]domain.ListId, error) {
 	args := m.Called(ctx, tenantSlug, enterpriseID)
-	return args.Get(0).([]Unit), args.Error(1)
+	return args.Get(0).([]domain.ListId), args.Error(1)
 }
 
 func (m *MockRepository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
@@ -158,11 +158,10 @@ func TestService_GetByID_NotFound(t *testing.T) {
 }
 
 func TestService_List_Empty(t *testing.T) {
-	// Test: Lista vacía cuando no hay unidades
 	mockRepo := new(MockRepository)
 	svc := &service{repo: mockRepo}
 
-	mockRepo.On("List", mock.Anything, "test_tenant", int64(1)).Return([]Unit{}, nil).Once()
+	mockRepo.On("List", mock.Anything, "test_tenant", int64(1)).Return([]domain.ListId{}, nil).Once()
 
 	units, err := svc.List(context.Background(), "test_tenant", 1)
 
@@ -172,13 +171,12 @@ func TestService_List_Empty(t *testing.T) {
 }
 
 func TestService_List_WithData(t *testing.T) {
-	// Test: Lista con datos
 	mockRepo := new(MockRepository)
 	svc := &service{repo: mockRepo}
 
-	units := []Unit{
-		{ID: 1, Name: "Kilogramo", Abbreviation: "kg", Active: true, EnterpriseID: 1},
-		{ID: 2, Name: "Litro", Abbreviation: "L", Active: true, EnterpriseID: 1},
+	units := []domain.ListId{
+		{Id: 1, Name: "Kilogramo"},
+		{Id: 2, Name: "Litro"},
 	}
 
 	mockRepo.On("List", mock.Anything, "test_tenant", int64(1)).Return(units, nil).Once()

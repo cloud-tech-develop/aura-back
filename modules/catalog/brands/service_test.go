@@ -31,9 +31,9 @@ func (m *MockRepository) GetByID(ctx context.Context, tenantSlug string, id int6
 	return args.Get(0).(*Brand), args.Error(1)
 }
 
-func (m *MockRepository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Brand, error) {
+func (m *MockRepository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]domain.ListId, error) {
 	args := m.Called(ctx, tenantSlug, enterpriseID)
-	return args.Get(0).([]Brand), args.Error(1)
+	return args.Get(0).([]domain.ListId), args.Error(1)
 }
 
 func (m *MockRepository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
@@ -183,11 +183,10 @@ func TestService_GetByID_NotFound(t *testing.T) {
 }
 
 func TestService_List_Empty(t *testing.T) {
-	// Test: Lista vacía cuando no hay marcas
 	mockRepo := new(MockRepository)
 	svc := &service{repo: mockRepo}
 
-	mockRepo.On("List", mock.Anything, "test_tenant", int64(1)).Return([]Brand{}, nil).Once()
+	mockRepo.On("List", mock.Anything, "test_tenant", int64(1)).Return([]domain.ListId{}, nil).Once()
 
 	brands, err := svc.List(context.Background(), "test_tenant", 1)
 
@@ -196,35 +195,13 @@ func TestService_List_Empty(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-func TestService_List_WithData(t *testing.T) {
-	// Test: Lista con datos
-	mockRepo := new(MockRepository)
-	svc := &service{repo: mockRepo}
-
-	brands := []Brand{
-		{ID: 1, Name: "Marca A", Description: "Desc A", Active: true, EnterpriseID: 1},
-		{ID: 2, Name: "Marca B", Description: "Desc B", Active: true, EnterpriseID: 1},
-	}
-
-	mockRepo.On("List", mock.Anything, "test_tenant", int64(1)).Return(brands, nil).Once()
-
-	result, err := svc.List(context.Background(), "test_tenant", 1)
-
-	assert.NoError(t, err)
-	assert.Len(t, result, 2)
-	assert.Equal(t, "Marca A", result[0].Name)
-	assert.Equal(t, "Marca B", result[1].Name)
-	mockRepo.AssertExpectations(t)
-}
-
 func TestService_List_OnlyActive(t *testing.T) {
 	// Test: Verifica que List solo retorna marcas activas
 	mockRepo := new(MockRepository)
 	svc := &service{repo: mockRepo}
 
-	// Repository debe filtrar por active = true
-	brands := []Brand{
-		{ID: 1, Name: "Marca Activa", Description: "Desc", Active: true, EnterpriseID: 1},
+	brands := []domain.ListId{
+		{Id: 1, Name: "Marca Activa"},
 	}
 
 	mockRepo.On("List", mock.Anything, "test_tenant", int64(1)).Return(brands, nil).Once()
@@ -234,7 +211,7 @@ func TestService_List_OnlyActive(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, result, 1)
 	for _, b := range result {
-		assert.True(t, b.Active, "Todas las marcas devueltas deben estar activas")
+		assert.Equal(t, "Marca Activa", b.Name)
 	}
 	mockRepo.AssertExpectations(t)
 }

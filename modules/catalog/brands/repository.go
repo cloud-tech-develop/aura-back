@@ -52,13 +52,12 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 	return b, nil
 }
 
-func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Brand, error) {
+func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]domain.ListId, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
 
 	query := fmt.Sprintf(`
-		SELECT id, name, description, active, enterprise_id, created_at, updated_at, deleted_at
-		FROM "%s".brand WHERE enterprise_id = $1 AND deleted_at IS NULL AND active = true
+		SELECT id, name FROM "%s".brand WHERE enterprise_id = $1 AND deleted_at IS NULL AND active = true
 		ORDER BY name`, tenantSlug)
 
 	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
@@ -67,11 +66,10 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	}
 	defer rows.Close()
 
-	var list []Brand
+	var list []domain.ListId
 	for rows.Next() {
-		var b Brand
-		if err := rows.Scan(&b.ID, &b.Name, &b.Description, &b.Active, &b.EnterpriseID,
-			&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt); err != nil {
+		var b domain.ListId
+		if err := rows.Scan(&b.Id, &b.Name); err != nil {
 			return nil, err
 		}
 		list = append(list, b)

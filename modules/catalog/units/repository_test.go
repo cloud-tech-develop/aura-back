@@ -120,19 +120,17 @@ func TestRepository_GetByID_NotFound(t *testing.T) {
 }
 
 func TestRepository_List_Success(t *testing.T) {
-	// Test: Listado exitoso
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close()
 
 	repo := &repository{db: db}
 
-	rows := sqlmock.NewRows([]string{
-		"id", "name", "abbreviation", "active", "allow_decimals", "enterprise_id", "created_at", "updated_at", "deleted_at",
-	}).AddRow(1, "Kilogramo", "kg", true, true, 1, "2024-01-01T00:00:00Z", nil, nil).
-		AddRow(2, "Litro", "L", true, false, 1, "2024-01-01T00:00:00Z", nil, nil)
+	rows := sqlmock.NewRows([]string{"id", "name"}).
+		AddRow(1, "Kilogramo").
+		AddRow(2, "Litro")
 
-	mock.ExpectQuery(`SELECT .* FROM "test_tenant".unit WHERE enterprise_id`).
+	mock.ExpectQuery(`SELECT id, name FROM "test_tenant".unit WHERE enterprise_id`).
 		WithArgs(int64(1)).
 		WillReturnRows(rows)
 
@@ -145,18 +143,15 @@ func TestRepository_List_Success(t *testing.T) {
 }
 
 func TestRepository_List_Empty(t *testing.T) {
-	// Test: Lista vacía
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close()
 
 	repo := &repository{db: db}
 
-	rows := sqlmock.NewRows([]string{
-		"id", "name", "abbreviation", "active", "allow_decimals", "enterprise_id", "created_at", "updated_at", "deleted_at",
-	})
+	rows := sqlmock.NewRows([]string{"id", "name"})
 
-	mock.ExpectQuery(`SELECT .* FROM "test_tenant".unit WHERE enterprise_id`).
+	mock.ExpectQuery(`SELECT id, name FROM "test_tenant".unit WHERE enterprise_id`).
 		WithArgs(int64(1)).
 		WillReturnRows(rows)
 

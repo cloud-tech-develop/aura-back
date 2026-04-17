@@ -42,17 +42,17 @@ const (
 
 // Tax responsibilities
 const (
-	TaxRespResponsible   = "RESPONSIBLE"
+	TaxRespResponsible    = "RESPONSIBLE"
 	TaxRespNotResponsible = "NOT-RESPONSIBLE"
 )
 
 // ThirdPartyFilters filters for listing third parties
 type ThirdPartyFilters struct {
-	Type      string // "client", "provider", "employee"
-	Search    string
-	Status    string // "active", "inactive", "all"
-	Page      int
-	Limit     int
+	Type   string // "client", "provider", "employee"
+	Search string
+	Status string // "active", "inactive", "all"
+	Page   int
+	Limit  int
 }
 
 // Repository interface for third party operations

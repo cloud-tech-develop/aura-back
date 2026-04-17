@@ -156,21 +156,17 @@ func TestRepository_GetByID_NotFound(t *testing.T) {
 }
 
 func TestRepository_List_FilterActive(t *testing.T) {
-	// Test: Verifica que solo liste marcas activas (active = true)
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close()
 
 	repo := &repository{db: db}
 
-	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	// El repositorio filtra por active = true
-	rows := sqlmock.NewRows([]string{
-		"id", "name", "description", "active", "enterprise_id", "created_at", "updated_at", "deleted_at",
-	}).AddRow(1, "Marca Activa 1", "Desc 1", true, 1, createdAt, nil, nil).
-		AddRow(2, "Marca Activa 2", "Desc 2", true, 1, createdAt, nil, nil)
+	rows := sqlmock.NewRows([]string{"id", "name"}).
+		AddRow(1, "Marca Activa 1").
+		AddRow(2, "Marca Activa 2")
 
-	mock.ExpectQuery(`SELECT .* FROM "test_tenant".brand WHERE enterprise_id`).
+	mock.ExpectQuery(`SELECT id, name FROM "test_tenant".brand WHERE enterprise_id`).
 		WithArgs(int64(1)).
 		WillReturnRows(rows)
 
@@ -178,26 +174,21 @@ func TestRepository_List_FilterActive(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Len(t, brands, 2)
-	for _, b := range brands {
-		assert.True(t, b.Active, "Solo debe listar marcas activas")
-	}
+	assert.Equal(t, "Marca Activa 1", brands[0].Name)
 }
 
 func TestRepository_List_Success(t *testing.T) {
-	// Test: Listado exitoso
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close()
 
 	repo := &repository{db: db}
 
-	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	rows := sqlmock.NewRows([]string{
-		"id", "name", "description", "active", "enterprise_id", "created_at", "updated_at", "deleted_at",
-	}).AddRow(1, "Marca A", "Desc A", true, 1, createdAt, nil, nil).
-		AddRow(2, "Marca B", "Desc B", true, 1, createdAt, nil, nil)
+	rows := sqlmock.NewRows([]string{"id", "name"}).
+		AddRow(1, "Marca A").
+		AddRow(2, "Marca B")
 
-	mock.ExpectQuery(`SELECT .* FROM "test_tenant".brand WHERE enterprise_id`).
+	mock.ExpectQuery(`SELECT id, name FROM "test_tenant".brand WHERE enterprise_id`).
 		WithArgs(int64(1)).
 		WillReturnRows(rows)
 
@@ -210,18 +201,15 @@ func TestRepository_List_Success(t *testing.T) {
 }
 
 func TestRepository_List_Empty(t *testing.T) {
-	// Test: Lista vacía
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer db.Close()
 
 	repo := &repository{db: db}
 
-	rows := sqlmock.NewRows([]string{
-		"id", "name", "description", "active", "enterprise_id", "created_at", "updated_at", "deleted_at",
-	})
+	rows := sqlmock.NewRows([]string{"id", "name"})
 
-	mock.ExpectQuery(`SELECT .* FROM "test_tenant".brand WHERE enterprise_id`).
+	mock.ExpectQuery(`SELECT id, name FROM "test_tenant".brand WHERE enterprise_id`).
 		WithArgs(int64(1)).
 		WillReturnRows(rows)
 
