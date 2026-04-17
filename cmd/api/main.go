@@ -13,6 +13,7 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/admin/users"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	catalogProducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
 	"github.com/cloud-tech-develop/aura-back/tenant"
@@ -28,10 +29,10 @@ func main() {
 	dsn := os.Getenv("DATABASE_URL")
 	driver := os.Getenv("DATABASE_DRIVER")
 	if driver == "" {
-		driver = "postgres" // Default
+		driver = "postgres"
 	}
 	if driver == "sqlite" && dsn == "" {
-		dsn = "aura_pos.db" // Default local db
+		dsn = "aura_pos.db"
 	}
 
 	port := os.Getenv("PORT")
@@ -39,27 +40,27 @@ func main() {
 		port = "8081"
 	}
 
-	// ── Database ────────────────────────────────────────────────────────────
+	// Database
 	database, err := db.New(driver, dsn)
 	if err != nil {
 		log.Fatal("DB:", err)
 	}
 	defer database.Close()
 
-	// ── Event Bus ───────────────────────────────────────────────────────────
+	// Event Bus
 	eventBus := memory.NewMemoryEventBus(100, 5)
 	if err := eventBus.Start(); err != nil {
 		log.Fatalf("Failed to start event bus: %v", err)
 	}
 	defer eventBus.Stop()
 
-	// ── Tenant Manager & Public Migrations ──────────────────────────────────
+	// Tenant Manager & Public Migrations
 	tenantMgr := tenant.NewManager(database.DB)
 	if err := tenantMgr.MigratePublic(); err != nil {
 		log.Fatal("MigratePublic:", err)
 	}
 
-	// ── Migrate existing tenants in background ─────────────────────────────
+	// Migrate existing tenants in background
 	go func() {
 		log.Println("Migrating existing tenants...")
 		if err := tenantMgr.MigrateAll(context.Background()); err != nil {
@@ -69,7 +70,7 @@ func main() {
 		log.Println("All tenants migrated successfully")
 	}()
 
-	// ── Modules ──────────────────────────────────────────────────────────────
+	// Modules
 	// Enterprise module
 	enterpriseMigrator := &enterpriseMigratorAdapter{manager: tenantMgr}
 	enterpriseSvc := enterprise.NewService(database.DB, eventBus, enterpriseMigrator)
@@ -90,7 +91,7 @@ func main() {
 	_ = eventBus.Subscribe(users.EventCreated, usersLogger)
 	_ = eventBus.Subscribe(users.EventUpdated, usersLogger)
 
-	// Catalog module
+	// Catalog modules
 	categorySvc := categories.NewService(database.Wrap(database.DB))
 	categoryHandler := categories.NewHandler(categorySvc)
 
@@ -108,12 +109,16 @@ func main() {
 	productSvc := catalogProducts.NewService(database, eventBus)
 	productHandler := catalogProducts.NewHandler(productSvc)
 
+	// Presentations module
+	presSvc := presentations.NewService(database, eventBus)
+	presHandler := presentations.NewHandler(presSvc)
+
 	// Third Parties module
 	thirdPartiesHandler := thirdparties.NewHandler(database)
 
-	// ── HTTP Server ──────────────────────────────────────────────────────────
+	// HTTP Server
 	srv := server.NewServer(database.DB, tenantMgr)
-	srv.RegisterModules(enterpriseHandler, usersHandler, categoryHandler, brandHandler, productHandler, thirdPartiesHandler, unitHandler)
+	srv.RegisterModules(enterpriseHandler, usersHandler, categoryHandler, brandHandler, productHandler, presHandler, thirdPartiesHandler, unitHandler)
 
 	log.Println("servidor en :" + port)
 

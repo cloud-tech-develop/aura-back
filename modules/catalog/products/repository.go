@@ -10,41 +10,77 @@ import (
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
 )
 
+// querier defines the database query interface
+// Supports both direct DB and transaction queries
 type querier = db.Querier
 
+// repository implements the Repository interface
+// Handles all database operations for products
 type repository struct {
 	db *db.DB
 }
 
+// NewRepository creates a new product repository instance
+// db: database connection instance
 func NewRepository(db *db.DB) Repository {
 	return &repository{db: db}
 }
 
+// Create inserts a new product into the database
 func (r *repository) Create(ctx context.Context, tenantSlug string, p *Product) error {
 	query := fmt.Sprintf(`
-		INSERT INTO "%s".product (sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		INSERT INTO "%s".product (
+			sku, barcode, name, description, category_id, brand_id, unit_id,
+			product_type, active, visible_in_pos,
+			cost_price, sale_price, price_2, price_3,
+			iva_percentage, consumption_tax_percentage,
+			current_stock, min_stock, max_stock,
+			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
+			image_url, enterprise_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
 		RETURNING id, created_at`, tenantSlug)
 
-	err := r.db.QueryRowContext(ctx, query, p.SKU, p.Name, p.Description, p.CategoryID, p.BrandID,
-		p.CostPrice, p.SalePrice, p.TaxRate, p.MinStock, p.CurrentStock, p.ImageURL, p.Status, p.EnterpriseID).
-		Scan(&p.ID, &p.CreatedAt)
+	err := r.db.QueryRowContext(ctx, query,
+		p.SKU, p.Barcode, p.Name, p.Description,
+		p.CategoryID, p.BrandID, p.UnitID,
+		p.ProductType, p.Active, p.VisibleInPOS,
+		p.CostPrice, p.SalePrice, p.Price2, p.Price3,
+		p.IVAPercentage, p.ConsumptionTax,
+		p.CurrentStock, p.MinStock, p.MaxStock,
+		p.ManagesInventory, p.ManagesBatches, p.ManagesSerial, p.AllowNegativeStock,
+		p.ImageURL, p.EnterpriseID,
+	).Scan(&p.ID, &p.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create product: %w", err)
 	}
 	return nil
 }
 
+// GetByID retrieves a product by its ID
 func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (*Product, error) {
 	p := &Product{}
 	query := fmt.Sprintf(`
-		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id, created_at, updated_at, deleted_at
+		SELECT 
+			id, sku, barcode, name, description, category_id, brand_id, unit_id,
+			product_type, active, visible_in_pos,
+			cost_price, sale_price, price_2, price_3,
+			iva_percentage, consumption_tax_percentage,
+			current_stock, min_stock, max_stock,
+			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
+			image_url, enterprise_id,
+			created_at, updated_at, deleted_at
 		FROM "%s".product WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&p.ID, &p.SKU, &p.Name, &p.Description, &p.CategoryID, &p.BrandID,
-		&p.CostPrice, &p.SalePrice, &p.TaxRate, &p.MinStock, &p.CurrentStock,
-		&p.ImageURL, &p.Status, &p.EnterpriseID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+		&p.ID, &p.SKU, &p.Barcode, &p.Name, &p.Description,
+		&p.CategoryID, &p.BrandID, &p.UnitID,
+		&p.ProductType, &p.Active, &p.VisibleInPOS,
+		&p.CostPrice, &p.SalePrice, &p.Price2, &p.Price3,
+		&p.IVAPercentage, &p.ConsumptionTax,
+		&p.CurrentStock, &p.MinStock, &p.MaxStock,
+		&p.ManagesInventory, &p.ManagesBatches, &p.ManagesSerial, &p.AllowNegativeStock,
+		&p.ImageURL, &p.EnterpriseID,
+		&p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -55,16 +91,31 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 	return p, nil
 }
 
+// GetBySKU retrieves a product by its SKU code
 func (r *repository) GetBySKU(ctx context.Context, tenantSlug string, sku string, enterpriseID int64) (*Product, error) {
 	p := &Product{}
 	query := fmt.Sprintf(`
-		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id, created_at, updated_at, deleted_at
+		SELECT 
+			id, sku, barcode, name, description, category_id, brand_id, unit_id,
+			product_type, active, visible_in_pos,
+			cost_price, sale_price, price_2, price_3,
+			iva_percentage, consumption_tax_percentage,
+			current_stock, min_stock, max_stock,
+			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
+			image_url, enterprise_id,
+			created_at, updated_at, deleted_at
 		FROM "%s".product WHERE sku = $1 AND enterprise_id = $2 AND deleted_at IS NULL`, tenantSlug)
 
 	err := r.db.QueryRowContext(ctx, query, sku, enterpriseID).Scan(
-		&p.ID, &p.SKU, &p.Name, &p.Description, &p.CategoryID, &p.BrandID,
-		&p.CostPrice, &p.SalePrice, &p.TaxRate, &p.MinStock, &p.CurrentStock,
-		&p.ImageURL, &p.Status, &p.EnterpriseID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+		&p.ID, &p.SKU, &p.Barcode, &p.Name, &p.Description,
+		&p.CategoryID, &p.BrandID, &p.UnitID,
+		&p.ProductType, &p.Active, &p.VisibleInPOS,
+		&p.CostPrice, &p.SalePrice, &p.Price2, &p.Price3,
+		&p.IVAPercentage, &p.ConsumptionTax,
+		&p.CurrentStock, &p.MinStock, &p.MaxStock,
+		&p.ManagesInventory, &p.ManagesBatches, &p.ManagesSerial, &p.AllowNegativeStock,
+		&p.ImageURL, &p.EnterpriseID,
+		&p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -75,28 +126,75 @@ func (r *repository) GetBySKU(ctx context.Context, tenantSlug string, sku string
 	return p, nil
 }
 
+// GetByBarcode retrieves a product by its barcode
+func (r *repository) GetByBarcode(ctx context.Context, tenantSlug string, barcode string, enterpriseID int64) (*Product, error) {
+	p := &Product{}
+	query := fmt.Sprintf(`
+		SELECT 
+			id, sku, barcode, name, description, category_id, brand_id, unit_id,
+			product_type, active, visible_in_pos,
+			cost_price, sale_price, price_2, price_3,
+			iva_percentage, consumption_tax_percentage,
+			current_stock, min_stock, max_stock,
+			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
+			image_url, enterprise_id,
+			created_at, updated_at, deleted_at
+		FROM "%s".product WHERE barcode = $1 AND enterprise_id = $2 AND deleted_at IS NULL`, tenantSlug)
+
+	err := r.db.QueryRowContext(ctx, query, barcode, enterpriseID).Scan(
+		&p.ID, &p.SKU, &p.Barcode, &p.Name, &p.Description,
+		&p.CategoryID, &p.BrandID, &p.UnitID,
+		&p.ProductType, &p.Active, &p.VisibleInPOS,
+		&p.CostPrice, &p.SalePrice, &p.Price2, &p.Price3,
+		&p.IVAPercentage, &p.ConsumptionTax,
+		&p.CurrentStock, &p.MinStock, &p.MaxStock,
+		&p.ManagesInventory, &p.ManagesBatches, &p.ManagesSerial, &p.AllowNegativeStock,
+		&p.ImageURL, &p.EnterpriseID,
+		&p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, sql.ErrNoRows
+		}
+		return nil, fmt.Errorf("failed to get product by barcode: %w", err)
+	}
+	return p, nil
+}
+
+// List retrieves a list of products with filters
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Product, error) {
-	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
+	// Prevents lib/pq connection state corruption when client cancels request
 	ctx = context.WithoutCancel(ctx)
 
 	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL`, enterpriseID)
 
+	// Apply search filter
 	if filters.Search != "" {
 		safeSearch := strings.ReplaceAll(filters.Search, "'", "''")
-		baseWhere += fmt.Sprintf(" AND (name ILIKE '%%%s%%' OR sku ILIKE '%%%s%%')", safeSearch, safeSearch)
+		baseWhere += fmt.Sprintf(" AND (name ILIKE '%%%s%%' OR sku ILIKE '%%%s%%' OR barcode ILIKE '%%%s%%')", safeSearch, safeSearch, safeSearch)
 	}
 
+	// Apply category filter
 	if filters.CategoryID != nil {
 		baseWhere += fmt.Sprintf(" AND category_id = %d", *filters.CategoryID)
 	}
 
+	// Apply brand filter
 	if filters.BrandID != nil {
 		baseWhere += fmt.Sprintf(" AND brand_id = %d", *filters.BrandID)
 	}
 
 	offset := (filters.Page - 1) * filters.Limit
 	query := fmt.Sprintf(`
-		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id, created_at, updated_at, deleted_at
+		SELECT 
+			id, sku, barcode, name, description, category_id, brand_id, unit_id,
+			product_type, active, visible_in_pos,
+			cost_price, sale_price, price_2, price_3,
+			iva_percentage, consumption_tax_percentage,
+			current_stock, min_stock, max_stock,
+			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
+			image_url, enterprise_id,
+			created_at, updated_at, deleted_at
 		FROM "%s".product WHERE `+baseWhere+` ORDER BY name LIMIT %d OFFSET %d`, tenantSlug, filters.Limit, offset)
 
 	rows, err := r.db.QueryContext(ctx, query)
@@ -109,9 +207,15 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	for rows.Next() {
 		var p Product
 		if err := rows.Scan(
-			&p.ID, &p.SKU, &p.Name, &p.Description, &p.CategoryID, &p.BrandID,
-			&p.CostPrice, &p.SalePrice, &p.TaxRate, &p.MinStock, &p.CurrentStock,
-			&p.ImageURL, &p.Status, &p.EnterpriseID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+			&p.ID, &p.SKU, &p.Barcode, &p.Name, &p.Description,
+			&p.CategoryID, &p.BrandID, &p.UnitID,
+			&p.ProductType, &p.Active, &p.VisibleInPOS,
+			&p.CostPrice, &p.SalePrice, &p.Price2, &p.Price3,
+			&p.IVAPercentage, &p.ConsumptionTax,
+			&p.CurrentStock, &p.MinStock, &p.MaxStock,
+			&p.ManagesInventory, &p.ManagesBatches, &p.ManagesSerial, &p.AllowNegativeStock,
+			&p.ImageURL, &p.EnterpriseID,
+			&p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -120,14 +224,15 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	return list, nil
 }
 
+// Page retrieves a paginated list of products with optional filters
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
-	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
+	// Prevents lib/pq connection state corruption when client cancels request
 	ctx = context.WithoutCancel(ctx)
 
-	// Build base WHERE clause inlining variables to avoid PgBouncer statement pooling errors
-	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL `, enterpriseID)
+	// Build base WHERE clause
+	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL`, enterpriseID)
 
-	// Apply params: category_id, brand_id, status
+	// Apply filters from params
 	if params != nil {
 		if categoryID, ok := params["category_id"]; ok && categoryID != nil {
 			var catID int64
@@ -149,18 +254,23 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 			}
 			baseWhere += fmt.Sprintf(" AND brand_id = %d", bID)
 		}
-		if status, ok := params["status"]; ok && status != nil {
-			if statusStr, isStr := status.(string); isStr {
-				safeStatus := strings.ReplaceAll(statusStr, "'", "''")
-				baseWhere += fmt.Sprintf(" AND status = '%s'", safeStatus)
+		if active, ok := params["active"]; ok && active != nil {
+			if activeBool, isBool := active.(bool); isBool {
+				baseWhere += fmt.Sprintf(" AND active = %v", activeBool)
+			}
+		}
+		if visibleInPOS, ok := params["visible_in_pos"]; ok && visibleInPOS != nil {
+			if visibleBool, isBool := visibleInPOS.(bool); isBool {
+				baseWhere += fmt.Sprintf(" AND visible_in_pos = %v", visibleBool)
 			}
 		}
 	}
 
+	// Apply search filter
 	searchCond := ""
 	if search != "" {
 		safeSearch := strings.ReplaceAll(search, "'", "''")
-		searchCond = fmt.Sprintf(" AND (name ILIKE '%%%s%%' OR sku ILIKE '%%%s%%')", safeSearch, safeSearch)
+		searchCond = fmt.Sprintf(" AND (name ILIKE '%%%s%%' OR sku ILIKE '%%%s%%' OR barcode ILIKE '%%%s%%')", safeSearch, safeSearch, safeSearch)
 	}
 
 	// COUNT query
@@ -173,12 +283,14 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 
 	// Validate sort column
 	validSorts := map[string]string{
-		"id":         "id",
-		"name":       "name",
-		"sku":        "sku",
-		"cost_price": "cost_price",
-		"sale_price": "sale_price",
-		"created_at": "created_at",
+		"id":            "id",
+		"name":          "name",
+		"sku":           "sku",
+		"barcode":       "barcode",
+		"cost_price":    "cost_price",
+		"sale_price":    "sale_price",
+		"current_stock": "current_stock",
+		"created_at":    "created_at",
 	}
 	if sortCol, ok := validSorts[sort]; ok {
 		sort = sortCol
@@ -191,7 +303,15 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 
 	offset := (page - 1) * limit
 	selectQuery := fmt.Sprintf(`
-		SELECT id, sku, name, description, category_id, brand_id, cost_price, sale_price, tax_rate, min_stock, current_stock, image_url, status, enterprise_id, created_at, updated_at, deleted_at
+		SELECT 
+			id, sku, barcode, name, description, category_id, brand_id, unit_id,
+			product_type, active, visible_in_pos,
+			cost_price, sale_price, price_2, price_3,
+			iva_percentage, consumption_tax_percentage,
+			current_stock, min_stock, max_stock,
+			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
+			image_url, enterprise_id,
+			created_at, updated_at, deleted_at
 		FROM "%s".product WHERE `+baseWhere+searchCond+` ORDER BY %s %s LIMIT %d OFFSET %d`,
 		tenantSlug, sort, order, limit, offset)
 
@@ -205,9 +325,15 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	for resultRows.Next() {
 		var p Product
 		if err := resultRows.Scan(
-			&p.ID, &p.SKU, &p.Name, &p.Description, &p.CategoryID, &p.BrandID,
-			&p.CostPrice, &p.SalePrice, &p.TaxRate, &p.MinStock, &p.CurrentStock,
-			&p.ImageURL, &p.Status, &p.EnterpriseID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+			&p.ID, &p.SKU, &p.Barcode, &p.Name, &p.Description,
+			&p.CategoryID, &p.BrandID, &p.UnitID,
+			&p.ProductType, &p.Active, &p.VisibleInPOS,
+			&p.CostPrice, &p.SalePrice, &p.Price2, &p.Price3,
+			&p.IVAPercentage, &p.ConsumptionTax,
+			&p.CurrentStock, &p.MinStock, &p.MaxStock,
+			&p.ManagesInventory, &p.ManagesBatches, &p.ManagesSerial, &p.AllowNegativeStock,
+			&p.ImageURL, &p.EnterpriseID,
+			&p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
 		); err != nil {
 			return domain.PageResult{}, err
 		}
@@ -229,20 +355,37 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	}, nil
 }
 
+// Update updates an existing product in the database
 func (r *repository) Update(ctx context.Context, tenantSlug string, p *Product) error {
 	query := fmt.Sprintf(`
-		UPDATE "%s".product SET sku = $1, name = $2, description = $3, category_id = $4, brand_id = $5,
-		cost_price = $6, sale_price = $7, tax_rate = $8, min_stock = $9, current_stock = $10, image_url = $11, status = $12, updated_at = NOW()
-		WHERE id = $13 AND deleted_at IS NULL`, tenantSlug)
+		UPDATE "%s".product SET 
+			sku = $1, barcode = $2, name = $3, description = $4, 
+			category_id = $5, brand_id = $6, unit_id = $7,
+			product_type = $8, active = $9, visible_in_pos = $10,
+			cost_price = $11, sale_price = $12, price_2 = $13, price_3 = $14,
+			iva_percentage = $15, consumption_tax_percentage = $16,
+			current_stock = $17, min_stock = $18, max_stock = $19,
+			manages_inventory = $20, manages_batches = $21, manages_serial = $22, allow_negative_stock = $23,
+			image_url = $24, updated_at = NOW()
+		WHERE id = $25 AND deleted_at IS NULL`, tenantSlug)
 
-	_, err := r.db.ExecContext(ctx, query, p.SKU, p.Name, p.Description, p.CategoryID, p.BrandID,
-		p.CostPrice, p.SalePrice, p.TaxRate, p.MinStock, p.CurrentStock, p.ImageURL, p.Status, p.ID)
+	_, err := r.db.ExecContext(ctx, query,
+		p.SKU, p.Barcode, p.Name, p.Description,
+		p.CategoryID, p.BrandID, p.UnitID,
+		p.ProductType, p.Active, p.VisibleInPOS,
+		p.CostPrice, p.SalePrice, p.Price2, p.Price3,
+		p.IVAPercentage, p.ConsumptionTax,
+		p.CurrentStock, p.MinStock, p.MaxStock,
+		p.ManagesInventory, p.ManagesBatches, p.ManagesSerial, p.AllowNegativeStock,
+		p.ImageURL, p.ID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to update product: %w", err)
 	}
 	return nil
 }
 
+// Delete performs a soft delete of a product
 func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) error {
 	query := fmt.Sprintf(`UPDATE "%s".product SET deleted_at = NOW() WHERE id = $1`, tenantSlug)
 	_, err := r.db.ExecContext(ctx, query, id)

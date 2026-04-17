@@ -30,9 +30,9 @@ func (m *MockRepository) GetByID(ctx context.Context, tenantSlug string, id int6
 	return args.Get(0).(*Unit), args.Error(1)
 }
 
-func (m *MockRepository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]domain.ListId, error) {
+func (m *MockRepository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]UnitList, error) {
 	args := m.Called(ctx, tenantSlug, enterpriseID)
-	return args.Get(0).([]domain.ListId), args.Error(1)
+	return args.Get(0).([]UnitList), args.Error(1)
 }
 
 func (m *MockRepository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
@@ -161,7 +161,7 @@ func TestService_List_Empty(t *testing.T) {
 	mockRepo := new(MockRepository)
 	svc := &service{repo: mockRepo}
 
-	mockRepo.On("List", mock.Anything, "test_tenant", int64(1)).Return([]domain.ListId{}, nil).Once()
+	mockRepo.On("List", mock.Anything, "test_tenant", int64(1)).Return([]UnitList{}, nil).Once()
 
 	units, err := svc.List(context.Background(), "test_tenant", 1)
 
@@ -174,7 +174,7 @@ func TestService_List_WithData(t *testing.T) {
 	mockRepo := new(MockRepository)
 	svc := &service{repo: mockRepo}
 
-	units := []domain.ListId{
+	units := []UnitList{
 		{Id: 1, Name: "Kilogramo"},
 		{Id: 2, Name: "Litro"},
 	}

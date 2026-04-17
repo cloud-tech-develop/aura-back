@@ -8,6 +8,7 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/admin/users"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	catalogproducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
@@ -48,50 +49,48 @@ func NewServer(db *sql.DB, tenantMgr *tenant.Manager) *Server {
 }
 
 // RegisterModules mounts all module routes onto the router.
-// All modules receive:
-//   - a public group (no auth)
-//   - a protected group (behind AuthMiddleware)
-//
-// To add a new module, call its Register() here.
 func (s *Server) RegisterModules(
 	enterpriseH *enterprise.Handler,
 	userH *users.Handler,
 	categoryH *categories.Handler,
 	brandH *brands.Handler,
 	productH *catalogproducts.Handler,
+	presentationH *presentations.Handler,
 	thirdPartiesH *thirdparties.Handler,
 	unitH *units.Handler,
 ) {
-	// ── Health Check ──────────────────────────────────────────────────────────
+	// Health Check
 	s.router.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "hello world", "status": "ok"})
 	})
 
-	// ── Auth ─────────────────────────────────────────────────────────────────
+	// Auth
 	s.router.POST("/login", tenant.Login(s.db))
 
-	// ── Static Files ──────────────────────────────────────────────────────────
+	// Static Files
 	s.router.Static("/static", "./static")
 	s.router.GET("/download/offline-pos", func(c *gin.Context) {
 		c.FileAttachment("./static/bin/aura-pos-offline.exe", "aura-pos-offline.exe")
 	})
 
-	// ── Public routes (no middleware) ─────────────────────────────────────────
+	// Public routes (no middleware)
 	public := s.router.Group("/")
 
-	// ── Protected routes (JWT required) ───────────────────────────────────────
+	// Protected routes (JWT required)
 	protected := s.router.Group("/")
 	protected.Use(tenant.AuthMiddleware())
 
-	// ── Well-known protected routes ───────────────────────────────────────────
+	// Well-known protected routes
 	protected.GET("/me", s.meHandler)
 
-	// ── Feature Modules ───────────────────────────────────────────────────────
+	// Feature Modules
 	enterprise.Register(public, protected, enterpriseH)
 	users.Register(public, protected, userH)
 	categories.Register(public, protected, categoryH)
 	brands.Register(public, protected, brandH)
 	catalogproducts.Register(public, protected, productH)
+	catalogproducts.RegisterProductPresentations(public, protected, productH, presentationH)
+	presentations.Register(public, protected, presentationH)
 	thirdparties.Register(public, protected, thirdPartiesH)
 	units.Register(public, protected, unitH)
 }

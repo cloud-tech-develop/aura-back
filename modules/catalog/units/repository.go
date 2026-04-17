@@ -48,12 +48,12 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 	return u, nil
 }
 
-func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]domain.ListId, error) {
+func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]UnitList, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
 
 	query := fmt.Sprintf(`
-		SELECT id, name 
+		SELECT id, name, abbreviation
 		FROM "%s".unit WHERE enterprise_id = $1 AND deleted_at IS NULL
 		ORDER BY name`, tenantSlug)
 
@@ -63,10 +63,10 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	}
 	defer rows.Close()
 
-	var list []domain.ListId
+	var list []UnitList
 	for rows.Next() {
-		var u domain.ListId
-		if err := rows.Scan(&u.Id, &u.Name); err != nil {
+		var u UnitList
+		if err := rows.Scan(&u.Id, &u.Name, &u.Abbreviation); err != nil {
 			return nil, err
 		}
 		list = append(list, u)
