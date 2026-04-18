@@ -5,11 +5,13 @@ import (
 	"log"
 	"os"
 
+	"os/exec"
+
 	"github.com/cloud-tech-develop/aura-back/cmd/server"
 	"github.com/cloud-tech-develop/aura-back/infrastructure/messaging/memory"
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/modules/admin/enterprise"
-	"github.com/cloud-tech-develop/aura-back/modules/admin/third-parties"
+	thirdparties "github.com/cloud-tech-develop/aura-back/modules/admin/third-parties"
 	"github.com/cloud-tech-develop/aura-back/modules/admin/users"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
@@ -18,12 +20,11 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/joho/godotenv"
-	"os/exec"
 )
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
+		log.Println("Error loading .env file")
 	}
 
 	dsn := os.Getenv("DATABASE_URL")
