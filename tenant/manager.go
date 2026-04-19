@@ -7,12 +7,10 @@ import (
 	"fmt"
 	"io/fs"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
 //go:embed migrations
@@ -161,12 +159,22 @@ func (m *Manager) CreateEnterprise(ctx context.Context, e *Enterprise, passwordH
 		return err
 	}
 
-	// 6. Create Initial Third Party in tenant schema
-	tpQuery := fmt.Sprintf(`
-		INSERT INTO %q.third_parties (user_id, first_name, last_name, document_number, document_type, personal_email, tax_responsibility, is_employee) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, e.Slug)
+	// 6. Create Initial Third Party in tenant schema using a dedicated connection
+	conn, err := m.db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("obtener conexión: %w", err)
+	}
+	defer conn.Close()
 
-	_, err = m.db.ExecContext(ctx, tpQuery,
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("SET search_path TO %q", e.Slug)); err != nil {
+		return fmt.Errorf("set search_path: %w", err)
+	}
+
+	tpQuery := `
+		INSERT INTO third_parties (user_id, first_name, last_name, document_number, document_type, personal_email, tax_responsibility, is_employee) 
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+
+	_, err = conn.ExecContext(ctx, tpQuery,
 		userID, "Admin", e.Name, e.DV, "NIT", e.Email, "RESPONSIBLE", true,
 	)
 	if err != nil {
@@ -255,64 +263,84 @@ func (m *Manager) MigrateAll(ctx context.Context) error {
 	return nil
 }
 
-// RunMigrations usa golang-migrate apuntando al esquema indicado y subdirectorio de migraciones
 func (m *Manager) RunMigrations(schema, subPath string) error {
-	// Obtener una conexión dedicada para garantizar que el search_path sea correcto
 	conn, err := m.db.Conn(context.Background())
 	if err != nil {
 		return fmt.Errorf("obtener conexión: %w", err)
 	}
 	defer conn.Close()
 
-	// Forzar el search_path explícitamente en la conexión
-	if _, err := conn.ExecContext(context.Background(),
-		fmt.Sprintf("SET search_path TO %q", schema),
-	); err != nil {
-		return fmt.Errorf("set search_path [%s]: %w", schema, err)
+	if _, err := conn.ExecContext(context.Background(), fmt.Sprintf("SET search_path TO %q", schema)); err != nil {
+		return fmt.Errorf("set search_path: %w", err)
 	}
 
-	driver, err := postgres.WithInstance(m.db, &postgres.Config{
-		SchemaName:      schema,
-		MigrationsTable: "schema_migrations",
-	})
-	if err != nil {
-		return fmt.Errorf("driver migrate: %w", err)
-	}
+	_, _ = conn.ExecContext(context.Background(),
+		`CREATE TABLE IF NOT EXISTS schema_migrations (
+			version BIGSERIAL PRIMARY KEY,
+			dirty boolean NOT NULL DEFAULT false,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+	)
 
-	// Apuntar al subdirectorio correcto dentro del embed
 	fullPath := fmt.Sprintf("migrations/%s", subPath)
 	subFS, err := fs.Sub(migrationsFS, fullPath)
 	if err != nil {
 		return fmt.Errorf("sub fs [%s]: %w", fullPath, err)
 	}
 
-	src, err := iofs.New(subFS, ".")
+	migrationFiles, err := fs.ReadDir(subFS, ".")
 	if err != nil {
-		return fmt.Errorf("fuente de migraciones [%s]: %w", fullPath, err)
+		return fmt.Errorf("leer directorio [%s]: %w", fullPath, err)
 	}
 
-	mg, err := migrate.NewWithInstance("iofs", src, "postgres", driver)
-	if err != nil {
-		return fmt.Errorf("inicializar migrate: %w", err)
+	var version int64
+	err = conn.QueryRowContext(context.Background(),
+		"SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+	).Scan(&version)
+	if err != nil && err != sql.ErrNoRows {
+		version = 0
 	}
 
-	if err := mg.Up(); err != nil {
-		if err == migrate.ErrNoChange {
-			fmt.Printf("✓ esquema [%s/%s] sin cambios\n", schema, subPath)
-			return nil
+	var filesToMigrate []string
+	for _, file := range migrationFiles {
+		if file.IsDir() {
+			continue
 		}
-		if strings.Contains(err.Error(), "Dirty database version") {
-			version, _, _ := mg.Version()
-			if forceErr := mg.Force(int(version) - 1); forceErr != nil {
-				return fmt.Errorf("forzar versión [%s/%s]: %w", schema, subPath, forceErr)
-			}
-			if err2 := mg.Up(); err2 != nil && err2 != migrate.ErrNoChange {
-				return fmt.Errorf("re-aplicar migraciones [%s/%s]: %w", schema, subPath, err2)
-			}
-			fmt.Printf("✓ esquema [%s/%s] migrado después de reset dirty\n", schema, subPath)
-			return nil
+		name := file.Name()
+		var fileVersion int64
+		fmt.Sscanf(name, "%d", &fileVersion)
+		if fileVersion <= version {
+			continue
 		}
-		return fmt.Errorf("aplicar migraciones [%s/%s]: %w", schema, subPath, err)
+		if !strings.HasSuffix(name, ".up.sql") {
+			continue
+		}
+		filesToMigrate = append(filesToMigrate, name)
+	}
+
+	sort.Strings(filesToMigrate)
+
+	for _, name := range filesToMigrate {
+		var fileVersion int64
+		fmt.Sscanf(name, "%d", &fileVersion)
+
+		content, err := migrationsFS.ReadFile(fullPath + "/" + name)
+		if err != nil {
+			return fmt.Errorf("leer archivo [%s]: %w", name, err)
+		}
+
+		if _, err := conn.ExecContext(context.Background(), string(content)); err != nil {
+			return fmt.Errorf("ejecutar migración [%s]: %w", name, err)
+		}
+
+		_, err = conn.ExecContext(context.Background(),
+			"INSERT INTO schema_migrations (version, dirty) VALUES ($1, false)",
+			fileVersion,
+		)
+		if err != nil {
+			return fmt.Errorf("registrar versión [%s]: %w", name, err)
+		}
+		fmt.Printf("✓ migración [%s/%s] aplicada\n", schema, name)
 	}
 
 	fmt.Printf("✓ esquema [%s/%s] migrado correctamente\n", schema, subPath)
