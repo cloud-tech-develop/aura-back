@@ -322,7 +322,7 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 		LEFT JOIN "%s".unit u ON p.unit_id = u.id
 		WHERE `+baseWhere+searchCond+` ORDER BY %s %s LIMIT %d OFFSET %d`,
 		tenantSlug, tenantSlug, tenantSlug, tenantSlug, sort, order, limit, offset)
-	fmt.Println(selectQuery)
+
 	resultRows, err := r.db.QueryContext(ctx, selectQuery)
 	if err != nil {
 		return domain.PageResult{}, fmt.Errorf("failed to page products: %w", err)

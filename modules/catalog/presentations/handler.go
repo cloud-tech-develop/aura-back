@@ -62,9 +62,10 @@ func (h *Handler) Create(c *gin.Context) {
 	response.Created(c, gin.H{"message": "Presentations created successfully", "count": len(req.Presentations)})
 }
 
-// Upsert handles PUT /products/:id/presentations
+// UpsertArray handles PUT /products/:id/presentations
 // Creates or updates presentations for a product based on ID presence
-func (h *Handler) Upsert(c *gin.Context) {
+// Accepts direct array of presentations
+func (h *Handler) UpsertArray(c *gin.Context) {
 	tenantSlug, ok := tenant.SlugFromContext(c)
 	if !ok {
 		response.BadRequest(c, "tenant not found")
@@ -84,25 +85,24 @@ func (h *Handler) Upsert(c *gin.Context) {
 		return
 	}
 
-	// Request structure for list of presentations
-	var req PresentationListRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	// Request structure for direct array of presentations
+	var presentations []PresentationRequest
+	if err := c.ShouldBindJSON(&presentations); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	// Validate product ID is provided and valid
-	if productID == 0 {
-		response.BadRequest(c, "product_id is required")
+	if len(presentations) == 0 {
+		response.BadRequest(c, "at least one presentation is required")
 		return
 	}
 
-	if err := h.svc.Upsert(c.Request.Context(), tenantSlug, enterpriseID, productID, req.Presentations); err != nil {
+	if err := h.svc.Upsert(c.Request.Context(), tenantSlug, enterpriseID, productID, presentations); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	response.OK(c, gin.H{"message": "Presentations upserted successfully", "count": len(req.Presentations)})
+	response.OK(c, gin.H{"message": "Presentations upserted successfully", "count": len(presentations)})
 }
 
 // Page handles POST /presentations/page
