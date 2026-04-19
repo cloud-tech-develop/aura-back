@@ -109,6 +109,19 @@ func (s *service) Upsert(ctx context.Context, tenantSlug string, enterpriseID in
 		return fmt.Errorf("at least one presentation is required")
 	}
 
+	// Get existing presentations for the product
+	existingPresentations, err := s.repo.GetByProductID(ctx, tenantSlug, productID)
+	if err != nil && err != sql.ErrNoRows {
+		logger.Logf("[Presentation Service] Error fetching existing presentations: %v", err)
+		return fmt.Errorf("error fetching existing presentations: %w", err)
+	}
+
+	// Build map of existing presentations by name (for new presentations, check if name exists)
+	existingByName := make(map[string]int64)
+	for _, p := range existingPresentations {
+		existingByName[p.Name] = p.ID
+	}
+
 	// Separate presentations to create and to update
 	var toCreate []*Presentation
 	var toUpdate []PresentationRequest
@@ -130,18 +143,26 @@ func (s *service) Upsert(ctx context.Context, tenantSlug string, enterpriseID in
 			// Has ID - will update
 			toUpdate = append(toUpdate, req)
 		} else {
-			// No ID - will create
-			toCreate = append(toCreate, &Presentation{
-				ProductID:       productID,
-				Name:            req.Name,
-				Factor:          req.Factor,
-				Barcode:         req.Barcode,
-				CostPrice:       req.CostPrice,
-				SalePrice:       req.SalePrice,
-				DefaultPurchase: req.DefaultPurchase,
-				DefaultSale:     req.DefaultSale,
-				EnterpriseID:    enterpriseID,
-			})
+			// No ID - check if presentation with same name exists
+			if existingID, exists := existingByName[req.Name]; exists {
+				// Presentation exists by name - treat as update
+				logger.Logf("[Presentation Service] Presentation with name '%s' exists with ID %d, updating", req.Name, existingID)
+				req.ID = &existingID
+				toUpdate = append(toUpdate, req)
+			} else {
+				// No existing presentation - create new
+				toCreate = append(toCreate, &Presentation{
+					ProductID:       productID,
+					Name:            req.Name,
+					Factor:          req.Factor,
+					Barcode:         req.Barcode,
+					CostPrice:       req.CostPrice,
+					SalePrice:       req.SalePrice,
+					DefaultPurchase: req.DefaultPurchase,
+					DefaultSale:     req.DefaultSale,
+					EnterpriseID:    enterpriseID,
+				})
+			}
 		}
 	}
 
