@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
@@ -104,7 +105,7 @@ func (r *repository) GetBySKU(ctx context.Context, tenantSlug string, sku string
 			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
 			image_url, enterprise_id,
 			created_at, updated_at, deleted_at
-		FROM "%s".product WHERE sku = $1 AND enterprise_id = $2 AND deleted_at IS NULL`, tenantSlug)
+		FROM "%s".product WHERE sku = $1 AND enterprise_id = $2 AND deleted_at IS NULL LIMIT 1`, tenantSlug)
 
 	err := r.db.QueryRowContext(ctx, query, sku, enterpriseID).Scan(
 		&p.ID, &p.SKU, &p.Barcode, &p.Name, &p.Description,
@@ -166,7 +167,7 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	// Prevents lib/pq connection state corruption when client cancels request
 	ctx = context.WithoutCancel(ctx)
 
-	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL`, enterpriseID)
+	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL AND active = true`, enterpriseID)
 
 	// Apply search filter
 	if filters.Search != "" {
@@ -387,8 +388,9 @@ func (r *repository) Update(ctx context.Context, tenantSlug string, p *Product) 
 
 // Delete performs a soft delete of a product
 func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) error {
-	query := fmt.Sprintf(`UPDATE "%s".product SET deleted_at = NOW() WHERE id = $1`, tenantSlug)
-	_, err := r.db.ExecContext(ctx, query, id)
+	skuDel := "DEL-" + time.Now().Format("20060102150405")
+	query := fmt.Sprintf(`UPDATE "%s".product SET deleted_at = NOW(), sku = $1 WHERE id = $2`, tenantSlug)
+	_, err := r.db.ExecContext(ctx, query, skuDel, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete product: %w", err)
 	}
