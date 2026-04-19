@@ -24,7 +24,7 @@ func NewService(db *db.DB, eventBus events.EventBus) Service {
 }
 
 // Create creates multiple presentations for a product
-func (s *service) Create(ctx context.Context, tenantSlug string, productID int64, presentations []PresentationRequest) error {
+func (s *service) Create(ctx context.Context, tenantSlug string, enterpriseID int64, productID int64, presentations []PresentationRequest) error {
 	logger := logging.NewLoggerHandler("logs")
 	logger.Log(fmt.Sprintf("[Presentation Service] Creating %d presentations for product ID: %d", len(presentations), productID))
 
@@ -32,6 +32,12 @@ func (s *service) Create(ctx context.Context, tenantSlug string, productID int64
 	if productID == 0 {
 		logger.Log("[Presentation Service] Validation failed: product_id is required")
 		return fmt.Errorf("product_id is required")
+	}
+
+	// Validate enterprise ID
+	if enterpriseID == 0 {
+		logger.Log("[Presentation Service] Validation failed: enterprise_id is required")
+		return fmt.Errorf("enterprise_id is required")
 	}
 
 	// Validate we have at least one presentation
@@ -64,11 +70,12 @@ func (s *service) Create(ctx context.Context, tenantSlug string, productID int64
 			SalePrice:       req.SalePrice,
 			DefaultPurchase: req.DefaultPurchase,
 			DefaultSale:     req.DefaultSale,
+			EnterpriseID:    enterpriseID,
 		}
 	}
 
 	// Create all presentations
-	err := s.repo.CreateMany(ctx, tenantSlug, entities)
+	err := s.repo.CreateMany(ctx, tenantSlug, enterpriseID, entities)
 	if err != nil {
 		logger.Logf("[Presentation Service] Repository create failed: %v", err)
 		return err

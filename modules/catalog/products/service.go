@@ -122,7 +122,7 @@ func (s *service) Create(ctx context.Context, tenantSlug string, p *Product) err
 	// Create presentations if provided
 	if len(p.Presentations) > 0 {
 		logger.Logf("[Product Service] Creating %d presentations for product ID: %d", len(p.Presentations), p.ID)
-		
+
 		// Convert Product.Presentations to presentations.PresentationRequest
 		presRequests := make([]presentations.PresentationRequest, len(p.Presentations))
 		for i, pres := range p.Presentations {
@@ -136,8 +136,8 @@ func (s *service) Create(ctx context.Context, tenantSlug string, p *Product) err
 				DefaultSale:     pres.DefaultSale,
 			}
 		}
-		
-		if err := s.presentationSvc.Create(ctx, tenantSlug, p.ID, presRequests); err != nil {
+
+		if err := s.presentationSvc.Create(ctx, tenantSlug, p.EnterpriseID, p.ID, presRequests); err != nil {
 			logger.Logf("[Product Service] Failed to create presentations: %v", err)
 			return fmt.Errorf("failed to create presentations: %w", err)
 		}
@@ -268,7 +268,7 @@ func (s *service) Update(ctx context.Context, tenantSlug string, id int64, p *Pr
 	// Update presentations if provided
 	if len(p.Presentations) > 0 {
 		logger.Logf("[Product Service] Updating %d presentations for product ID: %d", len(p.Presentations), id)
-		
+
 		// Convert Product.Presentations to presentations.PresentationRequest
 		presRequests := make([]presentations.PresentationRequest, len(p.Presentations))
 		for i, pres := range p.Presentations {
@@ -282,8 +282,8 @@ func (s *service) Update(ctx context.Context, tenantSlug string, id int64, p *Pr
 				DefaultSale:     pres.DefaultSale,
 			}
 		}
-		
-		if err := s.presentationSvc.Create(ctx, tenantSlug, id, presRequests); err != nil {
+
+		if err := s.presentationSvc.Create(ctx, tenantSlug, p.EnterpriseID, id, presRequests); err != nil {
 			logger.Logf("[Product Service] Failed to update presentations: %v", err)
 			return fmt.Errorf("failed to update presentations: %w", err)
 		}

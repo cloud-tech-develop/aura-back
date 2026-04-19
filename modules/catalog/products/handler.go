@@ -137,7 +137,6 @@ func (h *Handler) Create(c *gin.Context) {
 		AllowNegativeStock: req.AllowNegativeStock != nil && *req.AllowNegativeStock,
 		MinStock:           minStock,
 		EnterpriseID:       enterpriseID,
-		Status:             req.Status,
 		Presentations:      req.Presentations,
 	}
 
@@ -417,9 +416,6 @@ func (h *Handler) Update(c *gin.Context) {
 	if req.MinStock != nil {
 		product.MinStock = *req.MinStock
 	}
-
-	// Handle Status
-	product.Status = req.Status
 
 	// Handle Presentations
 	product.Presentations = req.Presentations

@@ -47,7 +47,6 @@ type Product struct {
 	ManagesSerial      bool                  `json:"manages_serial"`
 	AllowNegativeStock bool                  `json:"allow_negative_stock"`
 	ImageURL           string                `json:"image_url"`
-	Status             string                `json:"status"`
 	EnterpriseID       int64                 `json:"enterprise_id"`
 	CreatedAt          time.Time             `json:"created_at"`
 	UpdatedAt          *time.Time            `json:"updated_at"`

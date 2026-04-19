@@ -67,8 +67,8 @@ type PresentationListRequest struct {
 // Repository interface
 // Defines the data access layer for presentations
 type Repository interface {
-	Create(ctx context.Context, tenantSlug string, p *Presentation) error
-	CreateMany(ctx context.Context, tenantSlug string, presentations []*Presentation) error
+	Create(ctx context.Context, tenantSlug string, enterpriseID int64, p *Presentation) error
+	CreateMany(ctx context.Context, tenantSlug string, enterpriseID int64, presentations []*Presentation) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Presentation, error)
 	GetByProductID(ctx context.Context, tenantSlug string, productID int64) ([]Presentation, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
@@ -80,7 +80,7 @@ type Repository interface {
 // Service interface
 // Defines the business logic layer for presentations
 type Service interface {
-	Create(ctx context.Context, tenantSlug string, productID int64, presentations []PresentationRequest) error
+	Create(ctx context.Context, tenantSlug string, enterpriseID int64, productID int64, presentations []PresentationRequest) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Presentation, error)
 	GetByProductID(ctx context.Context, tenantSlug string, productID int64) ([]Presentation, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)

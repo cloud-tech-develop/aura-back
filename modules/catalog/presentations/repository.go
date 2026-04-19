@@ -26,7 +26,7 @@ func NewRepository(db *db.DB) Repository {
 }
 
 // Create inserts a new presentation into the database
-func (r *repository) Create(ctx context.Context, tenantSlug string, p *Presentation) error {
+func (r *repository) Create(ctx context.Context, tenantSlug string, enterpriseID int64, p *Presentation) error {
 	query := fmt.Sprintf(`
 		INSERT INTO "%s".presentation (
 			product_id, name, factor, barcode, cost_price, sale_price,
@@ -36,7 +36,7 @@ func (r *repository) Create(ctx context.Context, tenantSlug string, p *Presentat
 
 	err := r.db.QueryRowContext(ctx, query,
 		p.ProductID, p.Name, p.Factor, p.Barcode,
-		p.CostPrice, p.SalePrice, p.DefaultPurchase, p.DefaultSale, p.EnterpriseID,
+		p.CostPrice, p.SalePrice, p.DefaultPurchase, p.DefaultSale, enterpriseID,
 	).Scan(&p.ID, &p.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create presentation: %w", err)
@@ -45,9 +45,9 @@ func (r *repository) Create(ctx context.Context, tenantSlug string, p *Presentat
 }
 
 // CreateMany inserts multiple presentations into the database
-func (r *repository) CreateMany(ctx context.Context, tenantSlug string, presentations []*Presentation) error {
+func (r *repository) CreateMany(ctx context.Context, tenantSlug string, enterpriseID int64, presentations []*Presentation) error {
 	for _, p := range presentations {
-		if err := r.Create(ctx, tenantSlug, p); err != nil {
+		if err := r.Create(ctx, tenantSlug, enterpriseID, p); err != nil {
 			return err
 		}
 	}

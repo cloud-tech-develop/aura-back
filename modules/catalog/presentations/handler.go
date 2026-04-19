@@ -54,7 +54,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.Create(c.Request.Context(), tenantSlug, productID, req.Presentations); err != nil {
+	if err := h.svc.Create(c.Request.Context(), tenantSlug, enterpriseID, productID, req.Presentations); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
