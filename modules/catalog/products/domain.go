@@ -28,8 +28,11 @@ type Product struct {
 	Name               string                `json:"name" binding:"required"`
 	Description        string                `json:"description"`
 	CategoryID         *int64                `json:"category_id"`
+	CategoryName       string                `json:"category_name"`
 	BrandID            *int64                `json:"brand_id"`
+	BrandName          string                `json:"brand_name"`
 	UnitID             int64                 `json:"unit_measure_id" binding:"required"`
+	UnitName           string                `json:"unit_name"`
 	ProductType        string                `json:"product_type"`
 	Active             bool                  `json:"active"`
 	VisibleInPOS       bool                  `json:"visible_in_pos"`

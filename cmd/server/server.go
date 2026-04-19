@@ -90,7 +90,7 @@ func (s *Server) RegisterModules(
 	brands.Register(public, protected, brandH)
 	catalogproducts.Register(public, protected, productH)
 	catalogproducts.RegisterProductPresentations(public, protected, productH, presentationH)
-	presentations.Register(public, protected, presentationH)
+	presentations.Register(protected, presentationH)
 	thirdparties.Register(public, protected, thirdPartiesH)
 	units.Register(public, protected, unitH)
 }

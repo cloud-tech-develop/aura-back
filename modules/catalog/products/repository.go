@@ -231,7 +231,7 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	ctx = context.WithoutCancel(ctx)
 
 	// Build base WHERE clause
-	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL`, enterpriseID)
+	baseWhere := fmt.Sprintf(`p.enterprise_id = %d AND p.deleted_at IS NULL`, enterpriseID)
 
 	// Apply filters from params
 	if params != nil {
@@ -243,7 +243,7 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 			case int64:
 				catID = v
 			}
-			baseWhere += fmt.Sprintf(" AND category_id = %d", catID)
+			baseWhere += fmt.Sprintf(" AND p.category_id = %d", catID)
 		}
 		if brandID, ok := params["brand_id"]; ok && brandID != nil {
 			var bID int64
@@ -253,16 +253,16 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 			case int64:
 				bID = v
 			}
-			baseWhere += fmt.Sprintf(" AND brand_id = %d", bID)
+			baseWhere += fmt.Sprintf(" AND p.brand_id = %d", bID)
 		}
 		if active, ok := params["active"]; ok && active != nil {
 			if activeBool, isBool := active.(bool); isBool {
-				baseWhere += fmt.Sprintf(" AND active = %v", activeBool)
+				baseWhere += fmt.Sprintf(" AND p.active = %v", activeBool)
 			}
 		}
 		if visibleInPOS, ok := params["visible_in_pos"]; ok && visibleInPOS != nil {
 			if visibleBool, isBool := visibleInPOS.(bool); isBool {
-				baseWhere += fmt.Sprintf(" AND visible_in_pos = %v", visibleBool)
+				baseWhere += fmt.Sprintf(" AND p.visible_in_pos = %v", visibleBool)
 			}
 		}
 	}
@@ -271,11 +271,11 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	searchCond := ""
 	if search != "" {
 		safeSearch := strings.ReplaceAll(search, "'", "''")
-		searchCond = fmt.Sprintf(" AND (name ILIKE '%%%s%%' OR sku ILIKE '%%%s%%' OR barcode ILIKE '%%%s%%')", safeSearch, safeSearch, safeSearch)
+		searchCond = fmt.Sprintf(" AND (p.name ILIKE '%%%s%%' OR p.sku ILIKE '%%%s%%' OR p.barcode ILIKE '%%%s%%')", safeSearch, safeSearch, safeSearch)
 	}
 
 	// COUNT query
-	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".product WHERE `+baseWhere+searchCond, tenantSlug)
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".product AS p WHERE `+baseWhere+searchCond, tenantSlug)
 
 	var total int64
 	if err := r.db.QueryRowContext(ctx, countQuery).Scan(&total); err != nil {
@@ -305,17 +305,24 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	offset := (page - 1) * limit
 	selectQuery := fmt.Sprintf(`
 		SELECT 
-			id, sku, barcode, name, description, category_id, brand_id, unit_id,
-			product_type, active, visible_in_pos,
-			cost_price, sale_price, price_2, price_3,
-			iva_percentage, consumption_tax_value,
-			current_stock, min_stock, max_stock,
-			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
-			image_url, enterprise_id,
-			created_at, updated_at, deleted_at
-		FROM "%s".product WHERE `+baseWhere+searchCond+` ORDER BY %s %s LIMIT %d OFFSET %d`,
-		tenantSlug, sort, order, limit, offset)
-
+			p.id, p.sku, p.barcode, p.name, p.description, 
+			p.category_id, c.name as category_name, 
+			p.brand_id, b.name as brand_name, 
+			p.unit_id, u.name as unit_name,
+			p.product_type, p.active, p.visible_in_pos,
+			p.cost_price, p.sale_price, p.price_2, p.price_3,
+			p.iva_percentage, p.consumption_tax_value,
+			p.current_stock, p.min_stock, p.max_stock,
+			p.manages_inventory, p.manages_batches, p.manages_serial, p.allow_negative_stock,
+			p.image_url, p.enterprise_id,
+			p.created_at, p.updated_at, p.deleted_at
+		FROM "%s".product AS p
+		LEFT JOIN "%s".category c ON p.category_id = c.id
+		LEFT JOIN "%s".brand b ON p.brand_id = b.id
+		LEFT JOIN "%s".unit u ON p.unit_id = u.id
+		WHERE `+baseWhere+searchCond+` ORDER BY %s %s LIMIT %d OFFSET %d`,
+		tenantSlug, tenantSlug, tenantSlug, tenantSlug, sort, order, limit, offset)
+	fmt.Println(selectQuery)
 	resultRows, err := r.db.QueryContext(ctx, selectQuery)
 	if err != nil {
 		return domain.PageResult{}, fmt.Errorf("failed to page products: %w", err)
@@ -327,7 +334,9 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 		var p Product
 		if err := resultRows.Scan(
 			&p.ID, &p.SKU, &p.Barcode, &p.Name, &p.Description,
-			&p.CategoryID, &p.BrandID, &p.UnitID,
+			&p.CategoryID, &p.CategoryName,
+			&p.BrandID, &p.BrandName,
+			&p.UnitID, &p.UnitName,
 			&p.ProductType, &p.Active, &p.VisibleInPOS,
 			&p.CostPrice, &p.SalePrice, &p.Price2, &p.Price3,
 			&p.IVAPercentage, &p.ConsumptionTax,
