@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
@@ -272,8 +273,14 @@ func (r *repository) Update(ctx context.Context, tenantSlug string, p *Presentat
 
 // Delete performs a soft delete of a presentation
 func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) error {
-	query := fmt.Sprintf(`UPDATE "%s".presentation SET deleted_at = NOW() WHERE id = $1`, tenantSlug)
-	_, err := r.db.ExecContext(ctx, query, id)
+	ctx = context.WithoutCancel(ctx)
+	nameProduct, err := r.GetByID(ctx, tenantSlug, id)
+	if err != nil {
+		return fmt.Errorf("failed to get presentation: %w", err)
+	}
+	nameDelete := fmt.Sprintf("%s_deleted_%s", nameProduct.Name, time.Now().Format("20060102150405"))
+	query := fmt.Sprintf(`UPDATE "%s".presentation SET deleted_at = NOW(), name = $1 WHERE id = $2`, tenantSlug)
+	_, err = r.db.ExecContext(ctx, query, nameDelete, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete presentation: %w", err)
 	}
