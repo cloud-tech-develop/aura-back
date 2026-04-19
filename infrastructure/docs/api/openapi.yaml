@@ -432,6 +432,34 @@ components:
           type: integer
           format: int64
 
+    # Presentation schema
+    Presentation:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        product_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        factor:
+          type: number
+        barcode:
+          type: string
+        cost_price:
+          type: number
+        sale_price:
+          type: number
+        default_purchase:
+          type: boolean
+        default_sale:
+          type: boolean
+        enterprise_id:
+          type: integer
+          format: int64
+
     # Response envelope for all endpoints
     ResponseEnvelope:
       type: object
@@ -1328,6 +1356,94 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProductPageResult"
+        "401":
+          description: Unauthorized
+
+  /catalog/products/{id}/presentations:
+    get:
+      summary: Get presentations by product ID
+      tags:
+        - Catalog - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: List of presentations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Presentation"
+        "401":
+          description: Unauthorized
+
+    put:
+      summary: Create or update presentations for a product
+      tags:
+        - Catalog - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - presentations
+              properties:
+                presentations:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        format: int64
+                        description: "If provided, will update; otherwise will create"
+                      name:
+                        type: string
+                      factor:
+                        type: number
+                      barcode:
+                        type: string
+                      cost_price:
+                        type: number
+                      sale_price:
+                        type: number
+                      default_purchase:
+                        type: boolean
+                      default_sale:
+                        type: boolean
+      responses:
+        "200":
+          description: Presentations upserted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+        "400":
+          description: Bad request
         "401":
           description: Unauthorized
 

@@ -85,6 +85,111 @@ func (s *service) Create(ctx context.Context, tenantSlug string, enterpriseID in
 	return nil
 }
 
+// Upsert creates or updates presentations for a product
+// If PresentationRequest has ID, updates; otherwise creates new
+func (s *service) Upsert(ctx context.Context, tenantSlug string, enterpriseID int64, productID int64, presentations []PresentationRequest) error {
+	logger := logging.NewLoggerHandler("logs")
+	logger.Log(fmt.Sprintf("[Presentation Service] Upserting %d presentations for product ID: %d", len(presentations), productID))
+
+	// Validate product ID
+	if productID == 0 {
+		logger.Log("[Presentation Service] Validation failed: product_id is required")
+		return fmt.Errorf("product_id is required")
+	}
+
+	// Validate enterprise ID
+	if enterpriseID == 0 {
+		logger.Log("[Presentation Service] Validation failed: enterprise_id is required")
+		return fmt.Errorf("enterprise_id is required")
+	}
+
+	// Validate we have at least one presentation
+	if len(presentations) == 0 {
+		logger.Log("[Presentation Service] Validation failed: at least one presentation is required")
+		return fmt.Errorf("at least one presentation is required")
+	}
+
+	// Separate presentations to create and to update
+	var toCreate []*Presentation
+	var toUpdate []PresentationRequest
+
+	for i, req := range presentations {
+		logger.Logf("[Presentation Service] Validating presentation %d: name=%s, id=%v", i+1, req.Name, req.ID)
+
+		// Validate required fields
+		if req.Name == "" {
+			logger.Logf("[Presentation Service] Validation failed: name is required for presentation %d", i+1)
+			return fmt.Errorf("name is required for presentation %d", i+1)
+		}
+		if req.Factor == 0 {
+			logger.Logf("[Presentation Service] Validation failed: factor is required for presentation %d", i+1)
+			return fmt.Errorf("factor is required for presentation %d", i+1)
+		}
+
+		if req.ID != nil && *req.ID > 0 {
+			// Has ID - will update
+			toUpdate = append(toUpdate, req)
+		} else {
+			// No ID - will create
+			toCreate = append(toCreate, &Presentation{
+				ProductID:       productID,
+				Name:            req.Name,
+				Factor:          req.Factor,
+				Barcode:         req.Barcode,
+				CostPrice:       req.CostPrice,
+				SalePrice:       req.SalePrice,
+				DefaultPurchase: req.DefaultPurchase,
+				DefaultSale:     req.DefaultSale,
+				EnterpriseID:    enterpriseID,
+			})
+		}
+	}
+
+	// Create new presentations
+	if len(toCreate) > 0 {
+		logger.Logf("[Presentation Service] Creating %d new presentations", len(toCreate))
+		err := s.repo.CreateMany(ctx, tenantSlug, enterpriseID, toCreate)
+		if err != nil {
+			logger.Logf("[Presentation Service] Repository create failed: %v", err)
+			return fmt.Errorf("failed to create presentations: %w", err)
+		}
+	}
+
+	// Update existing presentations
+	for _, req := range toUpdate {
+		logger.Logf("[Presentation Service] Updating presentation ID: %d", *req.ID)
+
+		// Get existing presentation
+		existing, err := s.repo.GetByID(ctx, tenantSlug, *req.ID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				logger.Logf("[Presentation Service] Presentation not found with ID: %d", *req.ID)
+				return fmt.Errorf("presentation not found: %d", *req.ID)
+			}
+			logger.Logf("[Presentation Service] Error fetching presentation: %v", err)
+			return fmt.Errorf("error fetching presentation: %w", err)
+		}
+
+		// Update fields
+		existing.Name = req.Name
+		existing.Factor = req.Factor
+		existing.Barcode = req.Barcode
+		existing.CostPrice = req.CostPrice
+		existing.SalePrice = req.SalePrice
+		existing.DefaultPurchase = req.DefaultPurchase
+		existing.DefaultSale = req.DefaultSale
+
+		err = s.repo.Update(ctx, tenantSlug, existing)
+		if err != nil {
+			logger.Logf("[Presentation Service] Repository update failed: %v", err)
+			return fmt.Errorf("failed to update presentation: %w", err)
+		}
+	}
+
+	logger.Logf("[Presentation Service] Upsert completed: %d created, %d updated", len(toCreate), len(toUpdate))
+	return nil
+}
+
 // GetByID retrieves a presentation by its ID
 func (s *service) GetByID(ctx context.Context, tenantSlug string, id int64) (*Presentation, error) {
 	logger := logging.NewLoggerHandler("logs")

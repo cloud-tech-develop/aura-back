@@ -62,6 +62,49 @@ func (h *Handler) Create(c *gin.Context) {
 	response.Created(c, gin.H{"message": "Presentations created successfully", "count": len(req.Presentations)})
 }
 
+// Upsert handles PUT /products/:id/presentations
+// Creates or updates presentations for a product based on ID presence
+func (h *Handler) Upsert(c *gin.Context) {
+	tenantSlug, ok := tenant.SlugFromContext(c)
+	if !ok {
+		response.BadRequest(c, "tenant not found")
+		return
+	}
+
+	enterpriseID := c.GetInt64("enterprise_id")
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id not found")
+		return
+	}
+
+	// Get product ID from URL parameter
+	productID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "invalid product ID")
+		return
+	}
+
+	// Request structure for list of presentations
+	var req PresentationListRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	// Validate product ID is provided and valid
+	if productID == 0 {
+		response.BadRequest(c, "product_id is required")
+		return
+	}
+
+	if err := h.svc.Upsert(c.Request.Context(), tenantSlug, enterpriseID, productID, req.Presentations); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.OK(c, gin.H{"message": "Presentations upserted successfully", "count": len(req.Presentations)})
+}
+
 // Page handles POST /presentations/page
 // Returns a paginated list of presentations
 func (h *Handler) Page(c *gin.Context) {

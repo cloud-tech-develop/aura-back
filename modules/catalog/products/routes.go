@@ -20,4 +20,5 @@ func RegisterProductPresentations(public gin.IRouter, protected gin.IRouter, pro
 	// Product-specific presentation routes
 	protected.GET("/catalog/products/:id/presentations", presentationH.GetByProductID)
 	protected.POST("/catalog/products/:id/presentations", presentationH.Create)
+	protected.PUT("/catalog/products/:id/presentations", presentationH.Upsert)
 }

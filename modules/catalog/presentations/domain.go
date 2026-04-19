@@ -50,9 +50,10 @@ type ListFilters struct {
 
 // PresentationRequest represents the JSON structure for creating presentations
 type PresentationRequest struct {
-	Name            string  `json:"name" binding:"required"`
+	ID              *int64 `json:"id"`
+	Name            string `json:"name" binding:"required"`
 	Factor          float64 `json:"factor" binding:"required"`
-	Barcode         string  `json:"barcode"`
+	Barcode         string `json:"barcode"`
 	CostPrice       float64 `json:"cost_price" binding:"required"`
 	SalePrice       float64 `json:"sale_price" binding:"required"`
 	DefaultPurchase bool    `json:"default_purchase"`
@@ -81,6 +82,7 @@ type Repository interface {
 // Defines the business logic layer for presentations
 type Service interface {
 	Create(ctx context.Context, tenantSlug string, enterpriseID int64, productID int64, presentations []PresentationRequest) error
+	Upsert(ctx context.Context, tenantSlug string, enterpriseID int64, productID int64, presentations []PresentationRequest) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Presentation, error)
 	GetByProductID(ctx context.Context, tenantSlug string, productID int64) ([]Presentation, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)

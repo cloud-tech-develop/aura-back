@@ -48,6 +48,23 @@ El sistema debe permitir crear y gestionar presentaciones (variantes) de product
 - Cuando consulto GET `/presentations?product_id=123`
 - Entonces el sistema devuelve solo las presentaciones del producto especificado
 
+### Escenario 4: Crear o actualizar presentaciones (Upsert)
+- Dado que quiero gestionar presentaciones de un producto
+- Cuando envío una solicitud PUT a `/catalog/products/:id/presentations` con una lista de presentaciones
+- Y algunas tienen `id` y otras no
+- Entonces el sistema actualiza las que tienen `id` y crea las que no tienen
+- Y retorna mensaje de éxito con la cantidad procesada
+
+### Escenario 5: Actualizar presentación existente
+- Dado que existe una presentación con ID=5 para un producto
+- Cuando envío PUT con `{"id": 5, "name": "Nueva Libra", "factor": 0.5}`
+- Entonces el sistema actualiza los datos de esa presentación
+
+### Escenario 6: Crear nueva presentación en Upsert
+- Dado que quiero agregar una nueva presentación
+- Cuando envío PUT con `{"name": "Bulto", "factor": 10}`
+- Entonces el sistema crea una nueva presentación
+
 ---
 
 ## ❌ Casos de Error

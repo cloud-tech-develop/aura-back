@@ -127,6 +127,7 @@ func (s *service) Create(ctx context.Context, tenantSlug string, p *Product) err
 		presRequests := make([]presentations.PresentationRequest, len(p.Presentations))
 		for i, pres := range p.Presentations {
 			presRequests[i] = presentations.PresentationRequest{
+				ID:              pres.ID,
 				Name:            pres.Name,
 				Factor:          pres.Factor,
 				Barcode:         pres.Barcode,
@@ -291,6 +292,7 @@ func (s *service) Update(ctx context.Context, tenantSlug string, id int64, p *Pr
 		presRequests := make([]presentations.PresentationRequest, len(p.Presentations))
 		for i, pres := range p.Presentations {
 			presRequests[i] = presentations.PresentationRequest{
+				ID:              pres.ID,
 				Name:            pres.Name,
 				Factor:          pres.Factor,
 				Barcode:         pres.Barcode,
@@ -301,7 +303,7 @@ func (s *service) Update(ctx context.Context, tenantSlug string, id int64, p *Pr
 			}
 		}
 
-		if err := s.presentationSvc.Create(ctx, tenantSlug, p.EnterpriseID, id, presRequests); err != nil {
+		if err := s.presentationSvc.Upsert(ctx, tenantSlug, p.EnterpriseID, id, presRequests); err != nil {
 			logger.Logf("[Product Service] Failed to update presentations: %v", err)
 			return fmt.Errorf("failed to update presentations: %w", err)
 		}

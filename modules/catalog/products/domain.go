@@ -10,9 +10,10 @@ import (
 
 // PresentationRequest represents a presentation to be created with a product
 type PresentationRequest struct {
-	Name            string  `json:"name" binding:"required"`
+	ID              *int64 `json:"id"`
+	Name            string `json:"name" binding:"required"`
 	Factor          float64 `json:"factor" binding:"required"`
-	Barcode         string  `json:"barcode"`
+	Barcode         string `json:"barcode"`
 	SalePrice       float64 `json:"sale_price"`
 	CostPrice       float64 `json:"cost_price"`
 	DefaultPurchase bool    `json:"default_purchase"`
