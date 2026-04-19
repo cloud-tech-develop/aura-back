@@ -54,14 +54,6 @@ func (s *service) Create(ctx context.Context, tenantSlug string, productID int64
 			logger.Logf("[Presentation Service] Validation failed: factor is required for presentation %d", i+1)
 			return fmt.Errorf("factor is required for presentation %d", i+1)
 		}
-		if req.SalePrice == 0 {
-			logger.Logf("[Presentation Service] Validation failed: sale_price is required for presentation %d", i+1)
-			return fmt.Errorf("sale_price is required for presentation %d", i+1)
-		}
-		if req.CostPrice == 0 {
-			logger.Logf("[Presentation Service] Validation failed: cost_price is required for presentation %d", i+1)
-			return fmt.Errorf("cost_price is required for presentation %d", i+1)
-		}
 
 		entities[i] = &Presentation{
 			ProductID:       productID,

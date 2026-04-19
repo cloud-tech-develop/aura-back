@@ -8,44 +8,55 @@ import (
 	"github.com/cloud-tech-develop/aura-back/shared/events"
 )
 
+// PresentationRequest represents a presentation to be created with a product
+type PresentationRequest struct {
+	Name            string  `json:"name" binding:"required"`
+	Factor          float64 `json:"factor" binding:"required"`
+	Barcode         string  `json:"barcode"`
+	SalePrice       float64 `json:"sale_price"`
+	CostPrice       float64 `json:"cost_price"`
+	DefaultPurchase bool    `json:"default_purchase"`
+	DefaultSale     bool    `json:"default_sale"`
+}
+
 // Product entity
 // Represents a product in the catalog with all inventory and pricing information
 type Product struct {
-	ID                 int64      `json:"id"`
-	SKU                string     `json:"sku"`                  // Product SKU code (unique per enterprise)
-	Barcode            string     `json:"barcode"`              // Product barcode for scanning
-	Name               string     `json:"name"`                 // Product name
-	Description        string     `json:"description"`          // Product description
-	CategoryID         *int64     `json:"category_id"`          // Category foreign key reference
-	BrandID            *int64     `json:"brand_id"`             // Brand foreign key reference
-	UnitID             int64      `json:"unit_id"`              // Base unit of measure foreign key
-	ProductType        string     `json:"product_type"`         // Product type: ESTANDAR, SERVICIO, COMBO, RECETA
-	Active             bool       `json:"active"`               // Product active status
-	VisibleInPOS       bool       `json:"visible_in_pos"`       // Visibility in POS interface
-	CostPrice          float64    `json:"cost_price"`           // Product cost price (purchase price)
-	SalePrice          float64    `json:"sale_price"`           // Product sale price (retail price)
-	Price2             float64    `json:"price_2"`              // Alternative price level 2 (wholesale)
-	Price3             *float64   `json:"price_3"`              // Alternative price level 3 (special)
-	IVAPercentage      float64    `json:"iva_percentage"`       // IVA tax percentage
-	ConsumptionTax     float64    `json:"consumption_tax"`      // Consumption tax percentage
-	CurrentStock       int        `json:"current_stock"`        // Current inventory quantity
-	MinStock           int        `json:"min_stock"`            // Minimum stock threshold for alerts
-	MaxStock           int        `json:"max_stock"`            // Maximum stock level for inventory limits
-	ManagesInventory   bool       `json:"manages_inventory"`    // Enable inventory tracking
-	ManagesBatches     bool       `json:"manages_batches"`      // Enable batch/lot tracking
-	ManagesSerial      bool       `json:"manages_serial"`       // Enable serial number tracking
-	AllowNegativeStock bool       `json:"allow_negative_stock"` // Allow negative stock
-	ImageURL           string     `json:"image_url"`            // Product image URL
-	EnterpriseID       int64      `json:"enterprise_id"`        // Enterprise foreign key
-	CreatedAt          time.Time  `json:"created_at"`           // Creation timestamp
-	UpdatedAt          *time.Time `json:"updated_at"`           // Last update timestamp
-	DeletedAt          *time.Time `json:"deleted_at"`           // Soft delete timestamp
+	ID                 int64                 `json:"id"`
+	SKU                string                `json:"sku"`
+	Barcode            string                `json:"barcode"`
+	Name               string                `json:"name" binding:"required"`
+	Description        string                `json:"description"`
+	CategoryID         *int64                `json:"category_id"`
+	BrandID            *int64                `json:"brand_id"`
+	UnitID             int64                 `json:"unit_measure_id" binding:"required"`
+	ProductType        string                `json:"product_type"`
+	Active             bool                  `json:"active"`
+	VisibleInPOS       bool                  `json:"visible_in_pos"`
+	CostPrice          float64               `json:"cost_price" binding:"required"`
+	SalePrice          float64               `json:"sale_price" binding:"required"`
+	Price2             float64               `json:"price_2"`
+	Price3             *float64              `json:"price_3"`
+	IVAPercentage      float64               `json:"iva_percentage"`
+	ConsumptionTax     float64               `json:"consumption_tax"`
+	CurrentStock       int                   `json:"current_stock"`
+	MinStock           int                   `json:"min_stock"`
+	MaxStock           int                   `json:"max_stock"`
+	ManagesInventory   bool                  `json:"manages_inventory"`
+	ManagesBatches     bool                  `json:"manages_batches"`
+	ManagesSerial      bool                  `json:"manages_serial"`
+	AllowNegativeStock bool                  `json:"allow_negative_stock"`
+	ImageURL           string                `json:"image_url"`
+	Status             string                `json:"status"`
+	EnterpriseID       int64                 `json:"enterprise_id"`
+	CreatedAt          time.Time             `json:"created_at"`
+	UpdatedAt          *time.Time            `json:"updated_at"`
+	DeletedAt          *time.Time            `json:"deleted_at"`
+	Presentations      []PresentationRequest `json:"presentations"`
 }
 
 // ValidProductTypes defines the allowed product type values
-//
-//	."ESTANDAR", "KIT", "PESABLE",    "SERVICIO"
-var ValidProductTypes = []string{"ESTANDAR", "SERVICIO", "COMBO", "RECETA"}
+var ValidProductTypes = domain.ValidProductTypes
 
 // IsValidProductType checks if the product type is valid
 func IsValidProductType(productType string) bool {

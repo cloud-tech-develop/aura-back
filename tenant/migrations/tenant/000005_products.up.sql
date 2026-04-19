@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS product (
     unit_id BIGINT NOT NULL,                 -- Base unit of measure foreign key
     
     -- Product type classification
-    product_type VARCHAR(20) NOT NULL DEFAULT 'ESTANDAR' CHECK (product_type IN ('ESTANDAR', 'SERVICIO', 'COMBO', 'RECETA')),
+    product_type VARCHAR(20) NOT NULL DEFAULT 'STANDARD' CHECK (product_type IN ('STANDARD', 'SERVICE', 'KIT', 'WEIGHTABLE')),
     
     -- Status and visibility
     active BOOLEAN NOT NULL DEFAULT true,      -- Product active status
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS product (
     
     -- Tax configuration
     iva_percentage DECIMAL(5,2) NOT NULL DEFAULT 19.00,   -- IVA tax percentage
-    consumption_tax_percentage DECIMAL(5,2) NOT NULL DEFAULT 0, -- Consumption tax percentage
+    consumption_tax_value DECIMAL(12,2) NOT NULL DEFAULT 0, -- Consumption tax value
     
     -- Inventory control settings
     current_stock INTEGER NOT NULL DEFAULT 0,        -- Current inventory quantity
@@ -96,7 +96,7 @@ COMMENT ON COLUMN product.sale_price IS 'Precio de venta del producto (precio al
 COMMENT ON COLUMN product.price_2 IS 'Precio alternativo nivel 2 (mayoreo)';
 COMMENT ON COLUMN product.price_3 IS 'Precio alternativo nivel 3 (especial)';
 COMMENT ON COLUMN product.iva_percentage IS 'Porcentaje de IVA aplicado';
-COMMENT ON COLUMN product.consumption_tax_percentage IS 'Porcentaje de impuesto al consumo';
+COMMENT ON COLUMN product.consumption_tax_value IS 'Valor de impuesto al consumo';
 COMMENT ON COLUMN product.current_stock IS 'Cantidad actual en inventario';
 COMMENT ON COLUMN product.min_stock IS 'Stock mínimo para alertas de reposición';
 COMMENT ON COLUMN product.max_stock IS 'Stock máximo permitido';

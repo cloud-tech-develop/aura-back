@@ -39,38 +39,43 @@ func (h *Handler) Create(c *gin.Context) {
 	var req struct {
 		// Basic fields
 		SKU         string `json:"sku"`
-		Name        string `json:"nombre" binding:"required"`
-		Barcode     string `json:"codigoBarras"`
-		Description string `json:"descripcion"`
-		ImageURL    string `json:"imagenUrl"`
+		Barcode     string `json:"barcode"`
+		Name        string `json:"name" binding:"required"`
+		Description string `json:"description"`
+		ImageURL    string `json:"image_url"`
 
 		// Reference fields
-		CategoryID *int64 `json:"categoriaId"`
-		BrandID    *int64 `json:"marcaId"`
-		UnitID     int64  `json:"unidadMedidaBaseId" binding:"required"`
+		CategoryID *int64 `json:"category_id"`
+		BrandID    *int64 `json:"brand_id"`
+		UnitID     int64  `json:"unit_measure_id" binding:"required"`
 
 		// Product type and status
-		ProductType string `json:"tipoProducto" binding:"required"`
-		Active      *bool  `json:"activo"`
+		ProductType string `json:"product_type"`
+		Active      *bool  `json:"active"`
+		Status      string `json:"status"`
 
 		// Pricing
-		CostPrice float64  `json:"costo" binding:"required"`
-		SalePrice float64  `json:"precio" binding:"required"`
-		Price2    float64  `json:"precio2"`
-		Price3    *float64 `json:"precio3"`
+		CostPrice float64  `json:"cost_price" binding:"required"`
+		SalePrice float64  `json:"sale_price" binding:"required"`
+		Price2    float64  `json:"price_2"`
+		Price3    *float64 `json:"price_3"`
 
 		// Taxes
-		IVAPercentage  float64 `json:"ivaPorcentaje"`
-		ConsumptionTax float64 `json:"impoconsumo"`
+		IVAPercentage  float64 `json:"iva_percentage"`
+		ConsumptionTax float64 `json:"consumption_tax"`
 
 		// Inventory controls
-		ManagesInventory   *bool `json:"manejaInventario"`
-		ManagesBatches     *bool `json:"manejaLotes"`
-		ManagesSerial      *bool `json:"manejaSerial"`
-		AllowNegativeStock *bool `json:"permitirStockNegativo"`
+		ManagesInventory   *bool `json:"manages_inventory"`
+		ManagesBatches     *bool `json:"manages_batches"`
+		ManagesSerial      *bool `json:"manages_serial"`
+		AllowNegativeStock *bool `json:"allow_negative_stock"`
+		MinStock           *int  `json:"min_stock"`
 
 		// Visibility
-		VisibleInPOS *bool `json:"visibleEnPos"`
+		VisibleInPOS *bool `json:"visible_in_pos"`
+
+		// Presentations
+		Presentations []PresentationRequest `json:"presentations"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -80,22 +85,22 @@ func (h *Handler) Create(c *gin.Context) {
 	// Set defaults
 	productType := req.ProductType
 	if productType == "" {
-		productType = "ESTANDAR"
+		productType = "STANDARD"
 	}
 
-	active := req.Active != nil && *req.Active
-	if req.Active == nil {
-		active = true
+	active := true
+	if req.Active != nil {
+		active = *req.Active
 	}
 
-	visibleInPOS := req.VisibleInPOS != nil && *req.VisibleInPOS
-	if req.VisibleInPOS == nil {
-		visibleInPOS = true
+	visibleInPOS := true
+	if req.VisibleInPOS != nil {
+		visibleInPOS = *req.VisibleInPOS
 	}
 
-	managesInventory := req.ManagesInventory != nil && *req.ManagesInventory
-	if req.ManagesInventory == nil {
-		managesInventory = true
+	managesInventory := true
+	if req.ManagesInventory != nil {
+		managesInventory = *req.ManagesInventory
 	}
 
 	ivaPercentage := req.IVAPercentage
@@ -103,10 +108,15 @@ func (h *Handler) Create(c *gin.Context) {
 		ivaPercentage = 19.00
 	}
 
+	minStock := 0
+	if req.MinStock != nil {
+		minStock = *req.MinStock
+	}
+
 	product := &Product{
 		SKU:                req.SKU,
-		Name:               req.Name,
 		Barcode:            req.Barcode,
+		Name:               req.Name,
 		Description:        req.Description,
 		ImageURL:           req.ImageURL,
 		CategoryID:         req.CategoryID,
@@ -125,7 +135,10 @@ func (h *Handler) Create(c *gin.Context) {
 		ManagesBatches:     req.ManagesBatches != nil && *req.ManagesBatches,
 		ManagesSerial:      req.ManagesSerial != nil && *req.ManagesSerial,
 		AllowNegativeStock: req.AllowNegativeStock != nil && *req.AllowNegativeStock,
+		MinStock:           minStock,
 		EnterpriseID:       enterpriseID,
+		Status:             req.Status,
+		Presentations:      req.Presentations,
 	}
 
 	if err := h.svc.Create(c.Request.Context(), tenantSlug, product); err != nil {
@@ -285,38 +298,43 @@ func (h *Handler) Update(c *gin.Context) {
 	var req struct {
 		// Basic fields
 		SKU         string `json:"sku"`
-		Name        string `json:"nombre"`
-		Barcode     string `json:"codigoBarras"`
-		Description string `json:"descripcion"`
-		ImageURL    string `json:"imagenUrl"`
+		Name        string `json:"name"`
+		Barcode     string `json:"barcode"`
+		Description string `json:"description"`
+		ImageURL    string `json:"image_url"`
 
 		// Reference fields
-		CategoryID *int64 `json:"categoriaId"`
-		BrandID    *int64 `json:"marcaId"`
-		UnitID     int64  `json:"unidadMedidaBaseId"`
+		CategoryID *int64 `json:"category_id"`
+		BrandID    *int64 `json:"brand_id"`
+		UnitID     int64  `json:"unit_measure_id"`
 
 		// Product type and status
-		ProductType string `json:"tipoProducto"`
-		Active      *bool  `json:"activo"`
+		ProductType string `json:"product_type"`
+		Active      *bool  `json:"active"`
+		Status      string `json:"status"`
 
 		// Pricing
-		CostPrice float64  `json:"costo"`
-		SalePrice float64  `json:"precio"`
-		Price2    float64  `json:"precio2"`
-		Price3    *float64 `json:"precio3"`
+		CostPrice float64  `json:"cost_price"`
+		SalePrice float64  `json:"sale_price"`
+		Price2    float64  `json:"price_2"`
+		Price3    *float64 `json:"price_3"`
 
 		// Taxes
-		IVAPercentage  float64 `json:"ivaPorcentaje"`
-		ConsumptionTax float64 `json:"impoconsumo"`
+		IVAPercentage  float64 `json:"iva_percentage"`
+		ConsumptionTax float64 `json:"consumption_tax"`
 
 		// Inventory controls
-		ManagesInventory   *bool `json:"manejaInventario"`
-		ManagesBatches     *bool `json:"manejaLotes"`
-		ManagesSerial      *bool `json:"manejaSerial"`
-		AllowNegativeStock *bool `json:"permitirStockNegativo"`
+		ManagesInventory   *bool `json:"manages_inventory"`
+		ManagesBatches     *bool `json:"manages_batches"`
+		ManagesSerial      *bool `json:"manages_serial"`
+		AllowNegativeStock *bool `json:"allow_negative_stock"`
+		MinStock           *int  `json:"min_stock"`
 
 		// Visibility
-		VisibleInPOS *bool `json:"visibleEnPos"`
+		VisibleInPOS *bool `json:"visible_in_pos"`
+
+		// Presentations
+		Presentations []PresentationRequest `json:"presentations"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -394,6 +412,17 @@ func (h *Handler) Update(c *gin.Context) {
 	if negativeSet {
 		product.AllowNegativeStock = allowNegative
 	}
+
+	// Handle MinStock
+	if req.MinStock != nil {
+		product.MinStock = *req.MinStock
+	}
+
+	// Handle Status
+	product.Status = req.Status
+
+	// Handle Presentations
+	product.Presentations = req.Presentations
 
 	if err := h.svc.Update(c.Request.Context(), tenantSlug, id, product); err != nil {
 		if err == sql.ErrNoRows {

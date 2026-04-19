@@ -15,9 +15,9 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/admin/users"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
-	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	catalogProducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/joho/godotenv"
 )
@@ -107,12 +107,12 @@ func main() {
 	_ = eventBus.Subscribe(catalogProducts.EventUpdated, productsLogger)
 	_ = eventBus.Subscribe(catalogProducts.EventDeleted, productsLogger)
 
-	productSvc := catalogProducts.NewService(database, eventBus)
-	productHandler := catalogProducts.NewHandler(productSvc)
-
-	// Presentations module
+	// Presentations module (must be initialized before products)
 	presSvc := presentations.NewService(database, eventBus)
 	presHandler := presentations.NewHandler(presSvc)
+
+	productSvc := catalogProducts.NewService(database, eventBus, presSvc)
+	productHandler := catalogProducts.NewHandler(productSvc)
 
 	// Third Parties module
 	thirdPartiesHandler := thirdparties.NewHandler(database)

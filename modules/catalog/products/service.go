@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
 	"github.com/cloud-tech-develop/aura-back/shared/events"
 	"github.com/cloud-tech-develop/aura-back/shared/logging"
@@ -14,15 +15,16 @@ import (
 // service implements the Service interface
 // Contains business logic for product management
 type service struct {
-	repo     Repository
-	eventBus events.EventBus
+	repo              Repository
+	presentationSvc  presentations.Service
+	eventBus         events.EventBus
 }
 
 // NewService creates a new product service instance
 // db: database connection instance
 // eventBus: event bus for publishing domain events
-func NewService(db *db.DB, eventBus events.EventBus) Service {
-	return &service{repo: NewRepository(db), eventBus: eventBus}
+func NewService(db *db.DB, eventBus events.EventBus, presSvc presentations.Service) Service {
+	return &service{repo: NewRepository(db), presentationSvc: presSvc, eventBus: eventBus}
 }
 
 // Create creates a new product in the catalog
@@ -54,7 +56,7 @@ func (s *service) Create(ctx context.Context, tenantSlug string, p *Product) err
 
 	// Validate product type is valid
 	if p.ProductType == "" {
-		p.ProductType = "ESTANDAR"
+		p.ProductType = "STANDARD"
 	} else if !IsValidProductType(p.ProductType) {
 		logger.Logf("[Product Service] Validation failed: invalid product type '%s'", p.ProductType)
 		return fmt.Errorf("invalid product type: %s", p.ProductType)
@@ -116,6 +118,31 @@ func (s *service) Create(ctx context.Context, tenantSlug string, p *Product) err
 		return err
 	}
 	logger.Logf("[Product Service] Product created successfully with ID: %d", p.ID)
+
+	// Create presentations if provided
+	if len(p.Presentations) > 0 {
+		logger.Logf("[Product Service] Creating %d presentations for product ID: %d", len(p.Presentations), p.ID)
+		
+		// Convert Product.Presentations to presentations.PresentationRequest
+		presRequests := make([]presentations.PresentationRequest, len(p.Presentations))
+		for i, pres := range p.Presentations {
+			presRequests[i] = presentations.PresentationRequest{
+				Name:            pres.Name,
+				Factor:          pres.Factor,
+				Barcode:         pres.Barcode,
+				SalePrice:       pres.SalePrice,
+				CostPrice:       pres.CostPrice,
+				DefaultPurchase: pres.DefaultPurchase,
+				DefaultSale:     pres.DefaultSale,
+			}
+		}
+		
+		if err := s.presentationSvc.Create(ctx, tenantSlug, p.ID, presRequests); err != nil {
+			logger.Logf("[Product Service] Failed to create presentations: %v", err)
+			return fmt.Errorf("failed to create presentations: %w", err)
+		}
+		logger.Logf("[Product Service] Presentations created successfully")
+	}
 
 	// Publish domain event
 	logger.Log("[Product Service] Publishing ProductCreated event")
@@ -237,6 +264,31 @@ func (s *service) Update(ctx context.Context, tenantSlug string, id int64, p *Pr
 		return err
 	}
 	logger.Logf("[Product Service] Product updated successfully with ID: %d", id)
+
+	// Update presentations if provided
+	if len(p.Presentations) > 0 {
+		logger.Logf("[Product Service] Updating %d presentations for product ID: %d", len(p.Presentations), id)
+		
+		// Convert Product.Presentations to presentations.PresentationRequest
+		presRequests := make([]presentations.PresentationRequest, len(p.Presentations))
+		for i, pres := range p.Presentations {
+			presRequests[i] = presentations.PresentationRequest{
+				Name:            pres.Name,
+				Factor:          pres.Factor,
+				Barcode:         pres.Barcode,
+				SalePrice:       pres.SalePrice,
+				CostPrice:       pres.CostPrice,
+				DefaultPurchase: pres.DefaultPurchase,
+				DefaultSale:     pres.DefaultSale,
+			}
+		}
+		
+		if err := s.presentationSvc.Create(ctx, tenantSlug, id, presRequests); err != nil {
+			logger.Logf("[Product Service] Failed to update presentations: %v", err)
+			return fmt.Errorf("failed to update presentations: %w", err)
+		}
+		logger.Logf("[Product Service] Presentations updated successfully")
+	}
 
 	// Publish domain event
 	logger.Log("[Product Service] Publishing ProductUpdated event")
