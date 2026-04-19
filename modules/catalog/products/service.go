@@ -169,6 +169,24 @@ func (s *service) GetByID(ctx context.Context, tenantSlug string, id int64) (*Pr
 	return product, nil
 }
 
+// GetBySKU retrieves a product by its SKU code
+func (s *service) GetBySKU(ctx context.Context, tenantSlug string, sku string, enterpriseID int64) (*Product, error) {
+	logger := logging.NewLoggerHandler("logs")
+	logger.Logf("[Product Service] Fetching product by SKU: %s for enterprise: %d", sku, enterpriseID)
+
+	product, err := s.repo.GetBySKU(ctx, tenantSlug, sku, enterpriseID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			logger.Logf("[Product Service] Product not found with SKU: %s", sku)
+			return nil, sql.ErrNoRows
+		}
+		logger.Logf("[Product Service] Error fetching product by SKU: %v", err)
+		return nil, fmt.Errorf("error fetching product by sku: %w", err)
+	}
+	logger.Logf("[Product Service] Product found: ID=%d, SKU=%s, Name=%s", product.ID, product.SKU, product.Name)
+	return product, nil
+}
+
 // Page retrieves a paginated list of products
 func (s *service) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	if page < 1 {

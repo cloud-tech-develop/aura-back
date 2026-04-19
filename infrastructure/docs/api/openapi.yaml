@@ -1184,6 +1184,46 @@ paths:
         "401":
           description: Unauthorized
 
+  /catalog/products/exist/{sku}:
+    get:
+      summary: Check if product exists by SKU
+      tags:
+        - Catalog - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: sku
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product existence check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exists:
+                    type: boolean
+                  sku:
+                    type: string
+                  product:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        format: int64
+                      name:
+                        type: string
+                      sku:
+                        type: string
+                      barcode:
+                        type: string
+        "401":
+          description: Unauthorized
+
   /catalog/products/{id}:
     get:
       summary: Get product by ID

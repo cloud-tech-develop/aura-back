@@ -94,6 +94,7 @@ type Repository interface {
 type Service interface {
 	Create(ctx context.Context, tenantSlug string, p *Product) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Product, error)
+	GetBySKU(ctx context.Context, tenantSlug string, sku string, enterpriseID int64) (*Product, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
 	List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Product, error)
 	Update(ctx context.Context, tenantSlug string, id int64, p *Product) error

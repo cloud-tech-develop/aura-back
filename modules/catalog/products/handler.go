@@ -278,6 +278,52 @@ func (h *Handler) GetByID(c *gin.Context) {
 	response.OK(c, product)
 }
 
+// GetBySKU handles GET /catalog/products/exist/:sku
+// Checks if a product exists by SKU
+func (h *Handler) GetBySKU(c *gin.Context) {
+	tenantSlug, ok := tenant.SlugFromContext(c)
+	if !ok {
+		response.BadRequest(c, "tenant not found")
+		return
+	}
+
+	enterpriseID := c.GetInt64("enterprise_id")
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id not found")
+		return
+	}
+
+	sku := c.Param("sku")
+	if sku == "" {
+		response.BadRequest(c, "sku is required")
+		return
+	}
+
+	product, err := h.svc.GetBySKU(c.Request.Context(), tenantSlug, sku, enterpriseID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			response.OK(c, gin.H{
+				"exists": false,
+				"sku":    sku,
+			})
+			return
+		}
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.OK(c, gin.H{
+		"exists": true,
+		"sku":    sku,
+		"product": gin.H{
+			"id":    product.ID,
+			"name":  product.Name,
+			"sku":   product.SKU,
+			"barcode": product.Barcode,
+		},
+	})
+}
+
 // Update handles PUT /products/:id
 // Updates an existing product
 func (h *Handler) Update(c *gin.Context) {
