@@ -66,6 +66,25 @@ func GenerateToken(userID int64, e *Enterprise, roles []string, roleLevel int, i
 	return token.SignedString(jwtSecret)
 }
 
+// GenerateTokenOffline generates a JWT token for offline mode (simpler)
+func GenerateTokenOffline(userID int64, enterpriseID int64, email string) (string, error) {
+	claims := Claims{
+		UserID:       userID,
+		EnterpriseID: enterpriseID,
+		Slug:         "offline",
+		Email:        email,
+		Roles:        []string{"ADMIN"},
+		RoleLevel:    100,
+		IP:          "127.0.0.1",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret)
+}
+
 func getClientIP(c *gin.Context) string {
 	ip := c.GetHeader("X-Forwarded-For")
 	if ip != "" {

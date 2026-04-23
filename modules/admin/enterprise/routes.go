@@ -14,3 +14,9 @@ func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
 	protected.PUT("/enterprises/:slug", h.Update)
 	protected.PATCH("/enterprises/:slug/status", h.UpdateStatus)
 }
+
+// RegisterPublic mounts enterprise routes for public access (offline mode)
+func RegisterPublic(public gin.IRouter, h *Handler) {
+	public.POST("/enterprises", h.Create)
+	public.GET("/enterprises/:slug", h.GetBySlug)
+}

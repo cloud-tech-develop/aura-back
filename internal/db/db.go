@@ -142,6 +142,19 @@ func adaptQuery(query string, driver string) string {
 	newQuery = strings.ReplaceAll(newQuery, "ILIKE", "LIKE")
 	// Replace NOW() with datetime('now') if SQLite
 	newQuery = strings.ReplaceAll(newQuery, "NOW()", "datetime('now')")
+	// Replace BIGSERIAL with INTEGER AUTOINCREMENT for SQLite
+	newQuery = strings.ReplaceAll(newQuery, "BIGSERIAL", "INTEGER AUTOINCREMENT")
+	// Replace SERIAL with INTEGER AUTOINCREMENT for SQLite
+	newQuery = strings.ReplaceAll(newQuery, "SERIAL", "INTEGER AUTOINCREMENT")
+	// Replace TIMESTAMPTZ with TEXT for SQLite (basic support)
+	newQuery = strings.ReplaceAll(newQuery, "TIMESTAMPTZ", "TEXT")
+	// Replace BOOLEAN with INTEGER for SQLite (0/1)
+	newQuery = strings.ReplaceAll(newQuery, "BOOLEAN", "INTEGER")
+	// Replace RETURNING id with nothing (SQLite doesn't support RETURNING in all cases)
+	newQuery = strings.ReplaceAll(newQuery, "RETURNING id", "")
+	newQuery = strings.ReplaceAll(newQuery, "RETURNING id,", "")
+	// Replace public. table references with nothing (use table directly in SQLite)
+	newQuery = strings.ReplaceAll(newQuery, "public.", "")
 
 	for i := 100; i >= 1; i-- {
 		placeholder := fmt.Sprintf("$%d", i)

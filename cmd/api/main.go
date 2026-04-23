@@ -15,9 +15,9 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/admin/users"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	catalogProducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
-	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/joho/godotenv"
 )
@@ -29,16 +29,19 @@ func main() {
 
 	dsn := os.Getenv("DATABASE_URL")
 	driver := os.Getenv("DATABASE_DRIVER")
-	if driver == "" {
-		driver = "postgres"
-	}
-	if driver == "sqlite" && dsn == "" {
-		dsn = "aura_pos.db"
-	}
-
 	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8081"
+
+	// Default to SQLite (offline mode) if no DATABASE_URL is set
+	if dsn == "" {
+		driver = "sqlite"
+		dsn = "aura_pos.db"
+		port = "8091"
+		log.Println("Running in offline mode with SQLite")
+	} else if driver == "" {
+		driver = "postgres"
+		if port == "" {
+			port = "8081"
+		}
 	}
 
 	// Database
