@@ -17,11 +17,11 @@ func AdaptQueryForSQLite(query string) string {
 	// Replace NOW() with datetime('now')
 	newQuery = strings.ReplaceAll(newQuery, "NOW()", "datetime('now')")
 
-	// Replace BIGSERIAL with INTEGER AUTOINCREMENT
-	newQuery = strings.ReplaceAll(newQuery, "BIGSERIAL", "INTEGER AUTOINCREMENT")
+	// Replace BIGSERIAL PRIMARY KEY with INTEGER PRIMARY KEY AUTOINCREMENT
+	newQuery = strings.ReplaceAll(newQuery, "BIGSERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
 
-	// Replace SERIAL with INTEGER AUTOINCREMENT
-	newQuery = strings.ReplaceAll(newQuery, "SERIAL", "INTEGER AUTOINCREMENT")
+	// Replace SERIAL PRIMARY KEY with INTEGER PRIMARY KEY AUTOINCREMENT
+	newQuery = strings.ReplaceAll(newQuery, "SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
 
 	// Replace TIMESTAMPTZ with TEXT
 	newQuery = strings.ReplaceAll(newQuery, "TIMESTAMPTZ", "TEXT")
@@ -40,7 +40,7 @@ func AdaptQueryForSQLite(query string) string {
 	// TODO: si esta en modo offline reemplazar tenant desde el token
 	newQuery = strings.ReplaceAll(newQuery, "tenant.", "")
 
-	// Replace ON CONFLICT (...) DO UPDATE SET (PostgreSQL upsert) with OR REPLACE
+	// Replace ON CONFLICT (slug) DO UPDATE SET with OR REPLACE
 	newQuery = strings.ReplaceAll(newQuery, "ON CONFLICT (slug) DO UPDATE SET", "OR REPLACE")
 
 	// Convert $1, $2 placeholders to ?

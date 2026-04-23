@@ -18,6 +18,256 @@ var migrationsFS embed.FS
 
 var validSlug = regexp.MustCompile(`^[a-z0-9_]+$`)
 
+// isSQLite indicates if the database driver is SQLite
+var isSQLite = false
+
+// SetSQLiteMode sets the manager to use SQLite mode for query adaptation
+func SetSQLiteMode(sqlite bool) {
+	isSQLite = sqlite
+}
+
+// adaptQueryForSQLite adapts a PostgreSQL query to SQLite-compatible syntax
+func adaptQueryForSQLite(query string) string {
+	newQuery := query
+
+	// Replace ILIKE with LIKE
+	newQuery = strings.ReplaceAll(newQuery, "ILIKE", "LIKE")
+
+	// Replace NOW() with CURRENT_TIMESTAMP (SQLite compatible)
+	newQuery = strings.ReplaceAll(newQuery, "NOW()", "CURRENT_TIMESTAMP")
+
+	// Also replace datetime('now') with CURRENT_TIMESTAMP if already converted
+	newQuery = strings.ReplaceAll(newQuery, "datetime('now')", "CURRENT_TIMESTAMP")
+
+	// Replace BIGSERIAL PRIMARY KEY with INTEGER PRIMARY KEY AUTOINCREMENT
+	newQuery = strings.ReplaceAll(newQuery, "BIGSERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
+
+	// Replace BIGSERIAL alone with INTEGER
+	newQuery = strings.ReplaceAll(newQuery, "BIGSERIAL", "INTEGER")
+
+	// Replace SERIAL PRIMARY KEY with INTEGER PRIMARY KEY AUTOINCREMENT
+	newQuery = strings.ReplaceAll(newQuery, "SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
+
+	// Replace SERIAL alone with INTEGER
+	newQuery = strings.ReplaceAll(newQuery, "SERIAL", "INTEGER")
+
+	// Replace TIMESTAMPTZ with TEXT
+	newQuery = strings.ReplaceAll(newQuery, "TIMESTAMPTZ", "TEXT")
+
+	// Replace BOOLEAN with INTEGER
+	newQuery = strings.ReplaceAll(newQuery, "BOOLEAN", "INTEGER")
+
+	// Replace RETURNING clause (SQLite doesn't support it well)
+	newQuery = strings.ReplaceAll(newQuery, "RETURNING id", "")
+	newQuery = strings.ReplaceAll(newQuery, "RETURNING id,", "")
+	newQuery = strings.ReplaceAll(newQuery, "RETURNING ", "")
+
+	// Replace public. prefix (schema) with nothing
+	newQuery = strings.ReplaceAll(newQuery, "public.", "")
+
+	// Replace COMMENT ON COLUMN (SQLite doesn't support it)
+	newQuery = strings.ReplaceAll(newQuery, "COMMENT ON COLUMN", "-- COMMENT ON COLUMN")
+	newQuery = strings.ReplaceAll(newQuery, "COMMENT ON ", "-- COMMENT ON ")
+
+	// Replace ON CONFLICT (slug) DO UPDATE SET with OR REPLACE
+	newQuery = strings.ReplaceAll(newQuery, "ON CONFLICT (slug) DO UPDATE SET", "OR REPLACE")
+
+	// Remove CHECK constraints (SQLite doesn't support them properly)
+	newQuery = removeCheckConstraints(newQuery)
+
+	// Replace REFERENCES with nothing (foreign keys need special handling in SQLite)
+	newQuery = removeReferences(newQuery)
+
+	// Replace ADD COLUMN IF NOT EXISTS with just ADD COLUMN (SQLite doesn't support IF NOT EXISTS for columns)
+	newQuery = strings.ReplaceAll(newQuery, "ADD COLUMN IF NOT EXISTS", "ADD COLUMN")
+
+	// Remove CREATE OR REPLACE FUNCTION blocks (SQLite doesn't support plpgsql)
+	newQuery = removeFunctionDefinitions(newQuery)
+
+	// Remove CREATE TRIGGER blocks (SQLite triggers work differently)
+	newQuery = removeTriggerDefinitions(newQuery)
+
+	// Remove DROP TRIGGER statements (SQLite handles them differently)
+	newQuery = removeDropTriggers(newQuery)
+
+	// Convert $1, $2 placeholders to ?
+	for i := 100; i >= 1; i-- {
+		placeholder := fmt.Sprintf("$%d", i)
+		if !strings.Contains(newQuery, placeholder) {
+			continue
+		}
+		newQuery = strings.ReplaceAll(newQuery, placeholder, "?")
+	}
+
+	// Remove DROP TRIGGER statements (SQLite handles them differently)
+	newQuery = removeDropTriggers(newQuery)
+
+	return newQuery
+}
+
+// removeCheckConstraints removes CHECK constraints from the query (SQLite doesn't support them properly)
+func removeCheckConstraints(query string) string {
+	// Remove CHECK (...) patterns
+	result := query
+	for {
+		start := strings.Index(result, "CHECK (")
+		if start == -1 {
+			break
+		}
+		// Find matching closing parenthesis
+		depth := 0
+		end := start + 7 // After "CHECK ("
+		for end < len(result) {
+			if result[end] == '(' {
+				depth++
+			} else if result[end] == ')' {
+				if depth == 0 {
+					break
+				}
+				depth--
+			}
+			end++
+		}
+		// Remove CHECK constraint including comma before it if present
+		before := strings.TrimRight(result[:start], " ,")
+		result = before + result[end+1:]
+	}
+	return result
+}
+
+// removeReferences removes REFERENCES constraints (SQLite handles FK differently)
+func removeReferences(query string) string {
+	result := query
+
+	// Process each CREATE TABLE block separately
+	lines := strings.Split(result, "\n")
+	var cleanLines []string
+	inConstraint := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Start of constraint block
+		if strings.HasPrefix(trimmed, "CONSTRAINT") {
+			inConstraint = true
+			// Remove trailing comma from the previous line
+			if len(cleanLines) > 0 {
+				lastIdx := len(cleanLines) - 1
+				lastLine := strings.TrimRight(cleanLines[lastIdx], " \t,")
+				cleanLines[lastIdx] = lastLine
+			}
+			continue
+		}
+
+		// If we're in a constraint block
+		if inConstraint {
+			// Check if this line ends the constraint (has ) followed by ;)
+			if strings.Contains(trimmed, ")") && strings.HasSuffix(trimmed, ");") {
+				inConstraint = false
+				cleanLines = append(cleanLines, ");")
+			}
+			continue
+		}
+
+		// Skip empty lines
+		if trimmed == "" {
+			continue
+		}
+
+		cleanLines = append(cleanLines, line)
+	}
+
+	result = strings.Join(cleanLines, "\n")
+
+	// Remove standalone REFERENCES clauses from column definitions
+	re := regexp.MustCompile(`\s+REFERENCES\s+[\w.]+\([^)]+\)`)
+	result = re.ReplaceAllString(result, "")
+
+	// Remove trailing commas before closing parenthesis
+	result = regexp.MustCompile(`,\s*(\n\s*\))`).ReplaceAllString(result, "$1")
+
+	// Clean up multiple blank lines
+	for strings.Contains(result, "\n\n\n") {
+		result = strings.ReplaceAll(result, "\n\n\n", "\n\n")
+	}
+
+	// Final cleanup: remove lines that are just commas
+	lines = strings.Split(result, "\n")
+	cleanLines = nil
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && trimmed != "," {
+			cleanLines = append(cleanLines, line)
+		}
+	}
+	result = strings.Join(cleanLines, "\n")
+
+	return result
+}
+
+// removeFunctionDefinitions removes CREATE FUNCTION blocks (SQLite doesn't support plpgsql)
+func removeFunctionDefinitions(query string) string {
+	result := query
+	for {
+		start := strings.Index(result, "CREATE")
+		if start == -1 {
+			break
+		}
+		// Check if it's a FUNCTION definition
+		if strings.HasPrefix(strings.ToUpper(result[start:]), "CREATE OR REPLACE FUNCTION") ||
+			strings.HasPrefix(strings.ToUpper(result[start:]), "CREATE FUNCTION") {
+			// Find the end ($$ language or semicolon)
+			end := strings.Index(result[start:], "$$ language")
+			if end == -1 {
+				end = strings.Index(result[start:], ";")
+			}
+			if end == -1 {
+				break
+			}
+			result = result[:start] + result[start+end+len("$$ language 'plpgsql'")+1:]
+		} else {
+			break
+		}
+	}
+	return result
+}
+
+// removeTriggerDefinitions removes CREATE TRIGGER blocks
+func removeTriggerDefinitions(query string) string {
+	result := query
+	for {
+		triggerIdx := strings.Index(result, "CREATE TRIGGER")
+		if triggerIdx == -1 {
+			break
+		}
+		// Find end of trigger (semicolon)
+		end := strings.Index(result[triggerIdx:], ";")
+		if end == -1 {
+			break
+		}
+		result = result[:triggerIdx] + result[triggerIdx+end+1:]
+	}
+	return result
+}
+
+// removeDropTriggers removes DROP TRIGGER statements
+func removeDropTriggers(query string) string {
+	result := query
+	for {
+		dropIdx := strings.Index(result, "DROP TRIGGER")
+		if dropIdx == -1 {
+			break
+		}
+		// Find end of statement (semicolon)
+		end := strings.Index(result[dropIdx:], ";")
+		if end == -1 {
+			break
+		}
+		result = result[:dropIdx] + result[dropIdx+end+1:]
+	}
+	return result
+}
+
 type Enterprise struct {
 	ID             int64
 	TenantID       int64  `json:"tenant_id"`
@@ -270,17 +520,23 @@ func (m *Manager) RunMigrations(schema, subPath string) error {
 	}
 	defer conn.Close()
 
-	if _, err := conn.ExecContext(context.Background(), fmt.Sprintf("SET search_path TO %q", schema)); err != nil {
-		return fmt.Errorf("set search_path: %w", err)
+	// SET search_path is PostgreSQL-specific, skip for SQLite
+	if !isSQLite {
+		if _, err := conn.ExecContext(context.Background(), fmt.Sprintf("SET search_path TO %q", schema)); err != nil {
+			return fmt.Errorf("set search_path: %w", err)
+		}
 	}
 
-	_, _ = conn.ExecContext(context.Background(),
-		`CREATE TABLE IF NOT EXISTS schema_migrations (
-			version BIGSERIAL PRIMARY KEY,
-			dirty boolean NOT NULL DEFAULT false,
-			created_at TIMESTAMPTZ DEFAULT NOW()
-		)`,
-	)
+	// Adapt schema_migrations table for SQLite
+	schemaMigrationsTable := `CREATE TABLE IF NOT EXISTS schema_migrations (
+		version BIGSERIAL PRIMARY KEY,
+		dirty boolean NOT NULL DEFAULT false,
+		created_at TIMESTAMPTZ DEFAULT NOW()
+	)`
+	if isSQLite {
+		schemaMigrationsTable = adaptQueryForSQLite(schemaMigrationsTable)
+	}
+	_, _ = conn.ExecContext(context.Background(), schemaMigrationsTable)
 
 	fullPath := fmt.Sprintf("migrations/%s", subPath)
 	subFS, err := fs.Sub(migrationsFS, fullPath)
@@ -294,9 +550,11 @@ func (m *Manager) RunMigrations(schema, subPath string) error {
 	}
 
 	var version int64
-	err = conn.QueryRowContext(context.Background(),
-		"SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
-	).Scan(&version)
+	versionQuery := "SELECT COALESCE(MAX(version), 0) FROM schema_migrations"
+	if isSQLite {
+		versionQuery = adaptQueryForSQLite(versionQuery)
+	}
+	err = conn.QueryRowContext(context.Background(), versionQuery).Scan(&version)
 	if err != nil && err != sql.ErrNoRows {
 		version = 0
 	}
@@ -329,14 +587,20 @@ func (m *Manager) RunMigrations(schema, subPath string) error {
 			return fmt.Errorf("leer archivo [%s]: %w", name, err)
 		}
 
-		if _, err := conn.ExecContext(context.Background(), string(content)); err != nil {
+		sql := string(content)
+		if isSQLite {
+			sql = adaptQueryForSQLite(sql)
+		}
+
+		if _, err := conn.ExecContext(context.Background(), sql); err != nil {
 			return fmt.Errorf("ejecutar migración [%s]: %w", name, err)
 		}
 
-		_, err = conn.ExecContext(context.Background(),
-			"INSERT INTO schema_migrations (version, dirty) VALUES ($1, false)",
-			fileVersion,
-		)
+		insertVersion := "INSERT INTO schema_migrations (version, dirty) VALUES ($1, false)"
+		if isSQLite {
+			insertVersion = adaptQueryForSQLite(insertVersion)
+		}
+		_, err = conn.ExecContext(context.Background(), insertVersion, fileVersion)
 		if err != nil {
 			return fmt.Errorf("registrar versión [%s]: %w", name, err)
 		}

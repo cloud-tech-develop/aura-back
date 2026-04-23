@@ -18,6 +18,7 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	catalogProducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
+	"github.com/cloud-tech-develop/aura-back/modules/offline"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/joho/godotenv"
 )
@@ -49,7 +50,11 @@ func main() {
 	if err != nil {
 		log.Fatal("DB:", err)
 	}
-	defer database.Close()
+
+	// Set SQLite mode for tenant manager if offline
+	if driver == "sqlite" {
+		tenant.SetSQLiteMode(true)
+	}
 
 	// Event Bus
 	eventBus := memory.NewMemoryEventBus(100, 5)
@@ -64,15 +69,19 @@ func main() {
 		log.Fatal("MigratePublic:", err)
 	}
 
-	// Migrate existing tenants in background
-	go func() {
-		log.Println("Migrating existing tenants...")
-		if err := tenantMgr.MigrateAll(context.Background()); err != nil {
-			log.Printf("MigrateAll: %v", err)
-			return
-		}
-		log.Println("All tenants migrated successfully")
-	}()
+	// Migrate existing tenants in background (PostgreSQL only)
+	if driver != "sqlite" {
+		go func() {
+			log.Println("Migrating existing tenants...")
+			if err := tenantMgr.MigrateAll(context.Background()); err != nil {
+				log.Printf("MigrateAll: %v\n", err)
+				return
+			}
+			log.Println("All tenants migrated successfully")
+		}()
+	} else {
+		log.Println("Skipping MigrateAll in SQLite mode")
+	}
 
 	// Modules
 	// Enterprise module
@@ -120,14 +129,23 @@ func main() {
 	// Third Parties module
 	thirdPartiesHandler := thirdparties.NewHandler(database)
 
+	// Offline module (only in offline mode)
+	var offlineHandler *offline.Handler
+	if driver == "sqlite" {
+		offlineSvc := offline.NewService(database.DB)
+		offlineHandler = offline.NewHandler(offlineSvc)
+	}
+
 	// HTTP Server
 	srv := server.NewServer(database.DB, tenantMgr)
-	srv.RegisterModules(enterpriseHandler, usersHandler, categoryHandler, brandHandler, productHandler, presHandler, thirdPartiesHandler, unitHandler)
+	srv.RegisterModules(enterpriseHandler, usersHandler, categoryHandler, brandHandler, productHandler, presHandler, thirdPartiesHandler, unitHandler, offlineHandler)
 
 	log.Println("servidor en :" + port)
 
-	// Generate offline binary in background
-	go buildOfflineBinary()
+	if driver == "postgres" {
+		log.Println("Running in production mode")
+		go buildOfflineBinary()
+	}
 
 	if err := srv.Run(":" + port); err != nil {
 		log.Fatal(err)

@@ -11,6 +11,7 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	catalogproducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
+	"github.com/cloud-tech-develop/aura-back/modules/offline"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/gin-gonic/gin"
@@ -58,10 +59,11 @@ func (s *Server) RegisterModules(
 	presentationH *presentations.Handler,
 	thirdPartiesH *thirdparties.Handler,
 	unitH *units.Handler,
+	offlineH *offline.Handler,
 ) {
 	// Health Check
 	s.router.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "hello world", "status": "ok"})
+		response.OK(c, "Hello, Aura!")
 	})
 
 	// Auth
@@ -93,6 +95,11 @@ func (s *Server) RegisterModules(
 	presentations.Register(protected, presentationH)
 	thirdparties.Register(public, protected, thirdPartiesH)
 	units.Register(public, protected, unitH)
+
+	// Offline sync (only available in offline mode)
+	if offlineH != nil {
+		offline.Register(public, offlineH)
+	}
 }
 
 // Run starts the HTTP server on the given address.
