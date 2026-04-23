@@ -50,10 +50,10 @@ type ListFilters struct {
 
 // PresentationRequest represents the JSON structure for creating presentations
 type PresentationRequest struct {
-	ID              *int64 `json:"id"`
-	Name            string `json:"name" binding:"required"`
+	ID              *int64  `json:"id"`
+	Name            string  `json:"name" binding:"required"`
 	Factor          float64 `json:"factor" binding:"required"`
-	Barcode         string `json:"barcode"`
+	Barcode         string  `json:"barcode"`
 	CostPrice       float64 `json:"cost_price" binding:"required"`
 	SalePrice       float64 `json:"sale_price" binding:"required"`
 	DefaultPurchase bool    `json:"default_purchase"`

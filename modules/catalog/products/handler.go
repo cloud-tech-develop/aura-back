@@ -316,9 +316,9 @@ func (h *Handler) GetBySKU(c *gin.Context) {
 		"exists": true,
 		"sku":    sku,
 		"product": gin.H{
-			"id":    product.ID,
-			"name":  product.Name,
-			"sku":   product.SKU,
+			"id":      product.ID,
+			"name":    product.Name,
+			"sku":     product.SKU,
 			"barcode": product.Barcode,
 		},
 	})

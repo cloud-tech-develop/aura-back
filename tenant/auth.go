@@ -75,7 +75,7 @@ func GenerateTokenOffline(userID int64, enterpriseID int64, email string) (strin
 		Email:        email,
 		Roles:        []string{"ADMIN"},
 		RoleLevel:    100,
-		IP:          "127.0.0.1",
+		IP:           "127.0.0.1",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

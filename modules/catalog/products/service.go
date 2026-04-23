@@ -15,9 +15,9 @@ import (
 // service implements the Service interface
 // Contains business logic for product management
 type service struct {
-	repo              Repository
-	presentationSvc  presentations.Service
-	eventBus         events.EventBus
+	repo            Repository
+	presentationSvc presentations.Service
+	eventBus        events.EventBus
 }
 
 // NewService creates a new product service instance
