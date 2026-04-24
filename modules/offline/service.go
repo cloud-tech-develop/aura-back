@@ -24,14 +24,14 @@ func NewService(db *sql.DB) Service {
 	}
 }
 
-// SyncEnterprises fetches enterprises from production and saves them to local SQLite
-func (s *service) SyncEnterprises(ctx context.Context, prodURL, token string) (int, error) {
-	// Fetch enterprises from production
-	url := prodURL + "/enterprises"
+// SyncEnterpriseBySlug fetches a single enterprise by slug from production and saves it to local SQLite
+func (s *service) SyncEnterpriseBySlug(ctx context.Context, prodURL, token, slug string) (*Enterprise, error) {
+	// Fetch enterprise by slug from production
+	url := prodURL + "/enterprises/" + slug
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return 0, fmt.Errorf("crear petición: %w", err)
+		return nil, fmt.Errorf("crear petición: %w", err)
 	}
 
 	// Add Authorization header if token provided
@@ -41,37 +41,32 @@ func (s *service) SyncEnterprises(ctx context.Context, prodURL, token string) (i
 
 	resp, err := s.http.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("conectar a producción: %w", err)
+		return nil, fmt.Errorf("conectar a producción: %w", err)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("empresa no encontrada: %s", slug)
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("respuesta inválida de producción: %d", resp.StatusCode)
+		return nil, fmt.Errorf("respuesta inválida de producción: %d", resp.StatusCode)
 	}
 
 	var result struct {
-		Data struct {
-			Data []Enterprise `json:"data"`
-		} `json:"data"`
+		Data Enterprise `json:"data"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return 0, fmt.Errorf("decodificar respuesta: %w", err)
+		return nil, fmt.Errorf("decodificar respuesta: %w", err)
 	}
 
-	// Save each enterprise that doesn't exist locally
-	saved := 0
-	for _, ent := range result.Data.Data {
-		// Enterprise doesn't exist, insert it
-		fmt.Println("insertando empresa", ent.Name)
-		fmt.Println(ent)
-		if err := s.repo.Upsert(ctx, &ent); err != nil {
-			return saved, fmt.Errorf("guardar empresa %s: %w", ent.Name, err)
-		}
-		saved++
+	// Save enterprise to local SQLite
+	if err := s.repo.Upsert(ctx, &result.Data); err != nil {
+		return nil, fmt.Errorf("guardar empresa %s: %w", result.Data.Name, err)
 	}
 
-	return saved, nil
+	return &result.Data, nil
 }
 
 // GetLocalEnterprises returns all enterprises stored locally

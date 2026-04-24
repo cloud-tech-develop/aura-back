@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/cloud-tech-develop/aura-back/shared/response"
+	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,6 +19,7 @@ func NewHandler(svc Service) *Handler {
 
 // Ping handles GET /offline/ping
 // This endpoint only works in offline mode (SQLite)
+// Gets the enterprise slug from the JWT token (set by AuthMiddleware)
 func (h *Handler) Ping(c *gin.Context) {
 	// Verify we are in offline mode (SQLite)
 	driver := os.Getenv("DATABASE_DRIVER")
@@ -32,6 +34,13 @@ func (h *Handler) Ping(c *gin.Context) {
 
 	if !isOffline {
 		response.Forbidden(c, "Endpoint solo disponible en modo offline")
+		return
+	}
+
+	// Get slug from JWT token (set by AuthMiddleware)
+	slug, ok := tenant.SlugFromContext(c)
+	if !ok || slug == "" {
+		response.BadRequest(c, "No se pudo obtener el slug del token")
 		return
 	}
 
@@ -53,14 +62,8 @@ func (h *Handler) Ping(c *gin.Context) {
 		}
 	}
 
-	// Debug: log token presence
-	if token == "" {
-		response.BadRequest(c, "Token de autenticación requerido. Use header 'Authorization: Bearer <token>'")
-		return
-	}
-
-	// Sync enterprises from production
-	saved, err := h.svc.SyncEnterprises(c.Request.Context(), prodURL, token)
+	// Sync single enterprise by slug from production
+	enterprise, err := h.svc.SyncEnterpriseBySlug(c.Request.Context(), prodURL, token, slug)
 	if err != nil {
 		response.BadRequest(c, "Error al sincronizar: "+err.Error())
 		return
@@ -68,10 +71,12 @@ func (h *Handler) Ping(c *gin.Context) {
 
 	// Return sync result
 	response.OK(c, gin.H{
-		"synced":  saved,
-		"source":  prodURL,
-		"mode":    "offline",
-		"message": "Sincronización completada",
+		"synced":    1,
+		"slug":      slug,
+		"source":    prodURL,
+		"mode":      "offline",
+		"enterprise": enterprise,
+		"message":   "Sincronización completada",
 	})
 }
 
