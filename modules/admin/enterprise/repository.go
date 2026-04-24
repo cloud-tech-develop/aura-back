@@ -32,11 +32,11 @@ func (r *postgresRepository) Create(ctx context.Context, e *Enterprise) error {
 
 	_, err = r.db.ExecContext(ctx,
 		`INSERT INTO public.enterprises 
-		 (tenant_id, name, commercial_name, slug, sub_domain, email, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at) 
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) 
+		 (tenant_id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at) 
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) 
 		 ON CONFLICT (slug) DO NOTHING`,
 		e.TenantID, e.Name, e.CommercialName, e.Slug, e.SubDomain, e.Email,
-		e.DV, e.Phone, e.MunicipalityID, e.Municipality, e.Status,
+		e.Document, e.DV, e.Phone, e.MunicipalityID, e.Municipality, e.Status,
 		settingsJSON, e.CreatedAt, e.UpdatedAt,
 	)
 	return err
@@ -46,11 +46,11 @@ func (r *postgresRepository) GetBySlug(ctx context.Context, slug string) (*Enter
 	var e Enterprise
 	var settingsJSON []byte
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, tenant_id, name, commercial_name, slug, sub_domain, email, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at 
+		`SELECT id, tenant_id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at 
 		 FROM public.enterprises WHERE slug = $1 AND deleted_at IS NULL`,
 		slug,
 	).Scan(&e.ID, &e.TenantID, &e.Name, &e.CommercialName, &e.Slug, &e.SubDomain,
-		&e.Email, &e.DV, &e.Phone, &e.MunicipalityID, &e.Municipality, &e.Status,
+		&e.Email, &e.Document, &e.DV, &e.Phone, &e.MunicipalityID, &e.Municipality, &e.Status,
 		&settingsJSON, &e.CreatedAt, &e.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -63,11 +63,11 @@ func (r *postgresRepository) GetBySubDomain(ctx context.Context, subDomain strin
 	var e Enterprise
 	var settingsJSON []byte
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, tenant_id, name, commercial_name, slug, sub_domain, email, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at 
+		`SELECT id, tenant_id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at 
 		 FROM public.enterprises WHERE sub_domain = $1 AND status = 'ACTIVE' AND deleted_at IS NULL`,
 		subDomain,
 	).Scan(&e.ID, &e.TenantID, &e.Name, &e.CommercialName, &e.Slug, &e.SubDomain,
-		&e.Email, &e.DV, &e.Phone, &e.MunicipalityID, &e.Municipality, &e.Status,
+		&e.Email, &e.Document, &e.DV, &e.Phone, &e.MunicipalityID, &e.Municipality, &e.Status,
 		&settingsJSON, &e.CreatedAt, &e.UpdatedAt)
 	if err != nil {
 		return nil, err

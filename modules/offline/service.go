@@ -25,13 +25,18 @@ func NewService(db *sql.DB) Service {
 }
 
 // SyncEnterprises fetches enterprises from production and saves them to local SQLite
-func (s *service) SyncEnterprises(ctx context.Context, prodURL string) (int, error) {
+func (s *service) SyncEnterprises(ctx context.Context, prodURL, token string) (int, error) {
 	// Fetch enterprises from production
 	url := prodURL + "/enterprises"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return 0, fmt.Errorf("crear petición: %w", err)
+	}
+
+	// Add Authorization header if token provided
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	resp, err := s.http.Do(req)
@@ -57,17 +62,13 @@ func (s *service) SyncEnterprises(ctx context.Context, prodURL string) (int, err
 	// Save each enterprise that doesn't exist locally
 	saved := 0
 	for _, ent := range result.Data.Data {
-		_, err := s.repo.GetBySlug(ctx, ent.Slug)
-		if err == sql.ErrNoRows {
-			// Enterprise doesn't exist, insert it
-			if err := s.repo.Upsert(ctx, &ent); err != nil {
-				return saved, fmt.Errorf("guardar empresa %s: %w", ent.Slug, err)
-			}
-			saved++
-		} else if err != nil {
-			return saved, fmt.Errorf("verificar empresa: %w", err)
+		// Enterprise doesn't exist, insert it
+		fmt.Println("insertando empresa", ent.Name)
+		fmt.Println(ent)
+		if err := s.repo.Upsert(ctx, &ent); err != nil {
+			return saved, fmt.Errorf("guardar empresa %s: %w", ent.Name, err)
 		}
-		// If enterprise exists, skip (don't overwrite)
+		saved++
 	}
 
 	return saved, nil

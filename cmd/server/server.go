@@ -98,7 +98,7 @@ func (s *Server) RegisterModules(
 
 	// Offline sync (only available in offline mode)
 	if offlineH != nil {
-		offline.Register(public, offlineH)
+		offline.Register(public, protected, offlineH)
 	}
 }
 

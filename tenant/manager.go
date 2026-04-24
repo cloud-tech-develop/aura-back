@@ -366,11 +366,11 @@ func (m *Manager) CreateEnterprise(ctx context.Context, e *Enterprise, passwordH
 	// 3. Register Enterprise
 	var enterpriseID int64
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO public.enterprises (tenant_id, name, commercial_name, slug, sub_domain, email, dv, phone, municipality_id, municipality) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+		`INSERT INTO public.enterprises (tenant_id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
 		 ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
 		 RETURNING id`,
-		e.TenantID, e.Name, e.CommercialName, e.Slug, e.SubDomain, e.Email, e.DV, e.Phone, e.MunicipalityID, e.Municipality,
+		e.TenantID, e.Name, e.CommercialName, e.Slug, e.SubDomain, e.Email, e.Document, e.DV, e.Phone, e.MunicipalityID, e.Municipality,
 	).Scan(&enterpriseID)
 	if err != nil {
 		return fmt.Errorf("registrar enterprise: %w", err)
@@ -438,10 +438,10 @@ func (m *Manager) CreateEnterprise(ctx context.Context, e *Enterprise, passwordH
 func (m *Manager) GetEnterpriseBySlug(ctx context.Context, slug string) (*Enterprise, error) {
 	var e Enterprise
 	err := m.db.QueryRowContext(ctx,
-		`SELECT id, name, commercial_name, slug, sub_domain, email, dv, phone, municipality_id, municipality, status, created_at, updated_at 
+		`SELECT id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality, status, created_at, updated_at 
 		 FROM public.enterprises WHERE slug = $1`,
 		slug,
-	).Scan(&e.ID, &e.Name, &e.CommercialName, &e.Slug, &e.SubDomain, &e.Email, &e.DV, &e.Phone, &e.MunicipalityID, &e.Municipality, &e.Status, &e.CreatedAt, &e.UpdatedAt)
+	).Scan(&e.ID, &e.Name, &e.CommercialName, &e.Slug, &e.SubDomain, &e.Email, &e.Document, &e.DV, &e.Phone, &e.MunicipalityID, &e.Municipality, &e.Status, &e.CreatedAt, &e.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}

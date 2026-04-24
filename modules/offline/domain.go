@@ -39,6 +39,6 @@ type Repository interface {
 // ─── Service Interface ────────────────────────────────────────────────────────────
 
 type Service interface {
-	SyncEnterprises(ctx context.Context, prodURL string) (int, error)
+	SyncEnterprises(ctx context.Context, prodURL, token string) (int, error)
 	GetLocalEnterprises(ctx context.Context) ([]Enterprise, error)
 }

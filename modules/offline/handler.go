@@ -41,8 +41,26 @@ func (h *Handler) Ping(c *gin.Context) {
 		prodURL = "http://localhost:8081" // fallback to default
 	}
 
+	// Get token from Authorization header
+	token := ""
+	authHeader := c.GetHeader("Authorization")
+	if authHeader != "" {
+		// Extract Bearer token
+		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			token = authHeader[7:]
+		} else {
+			token = authHeader
+		}
+	}
+
+	// Debug: log token presence
+	if token == "" {
+		response.BadRequest(c, "Token de autenticación requerido. Use header 'Authorization: Bearer <token>'")
+		return
+	}
+
 	// Sync enterprises from production
-	saved, err := h.svc.SyncEnterprises(c.Request.Context(), prodURL)
+	saved, err := h.svc.SyncEnterprises(c.Request.Context(), prodURL, token)
 	if err != nil {
 		response.BadRequest(c, "Error al sincronizar: "+err.Error())
 		return

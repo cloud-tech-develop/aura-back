@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS public.enterprises (
     slug            VARCHAR(100) UNIQUE NOT NULL,
     sub_domain      VARCHAR(50),
     email           VARCHAR(150) NOT NULL UNIQUE,
+    document        VARCHAR(50),
     dv              VARCHAR(2),
     phone           VARCHAR(20),
     municipality_id VARCHAR(10),
