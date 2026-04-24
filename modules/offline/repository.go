@@ -41,11 +41,11 @@ func (r *repository) Upsert(ctx context.Context, e *Enterprise) error {
 
 	_, err = r.db.ExecContext(ctx,
 		`INSERT INTO enterprises 
-		 (id, tenant_id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at) 
+		 (id, tenant_id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at, deleted_at) 
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		e.ID, e.TenantID, e.Name, e.CommercialName, e.Slug, e.SubDomain,
 		e.Email, e.Document, e.DV, e.Phone, e.MunicipalityID, e.Municipality,
-		e.Status, settingsJSON, e.CreatedAt, e.UpdatedAt,
+		e.Status, settingsJSON, e.CreatedAt, e.UpdatedAt, nil,
 	)
 	return err
 }

@@ -46,7 +46,7 @@ type Enterprise struct {
 	MunicipalityID string                 `json:"municipality_id"`
 	Municipality   string                 `json:"municipality"`
 	Status         string                 `json:"status"`
-	Settings       map[string]interface{} `json:"settings,omitempty"`
+	Settings       map[string]interface{} `json:"settings"`
 	CreatedAt      time.Time              `json:"created_at"`
 	UpdatedAt      time.Time              `json:"updated_at"`
 	DeletedAt      *time.Time             `json:"deleted_at,omitempty"`
