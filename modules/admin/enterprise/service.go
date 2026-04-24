@@ -166,6 +166,11 @@ func (s *service) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
+// GetPlansByEnterpriseID retrieves all plans for an enterprise
+func (s *service) GetPlansByEnterpriseID(ctx context.Context, enterpriseID int64) ([]Plan, error) {
+	return s.repo.GetPlansByEnterpriseID(ctx, enterpriseID)
+}
+
 func (s *service) publish(event events.Event) {
 	if s.eventBus == nil {
 		return

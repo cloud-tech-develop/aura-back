@@ -4,6 +4,10 @@ import "github.com/gin-gonic/gin"
 
 // Register mounts all user routes onto the given router group.
 func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
+	// Public — no auth required (for offline sync)
+	public.GET("/users", h.ListByEnterpriseID)
+	public.GET("/user-roles", h.ListUserRolesByEnterpriseID)
+
 	// Protected routes (require auth)
 	protected.GET("/admin/users", h.List)
 	protected.GET("/admin/users/:id", h.GetByID)

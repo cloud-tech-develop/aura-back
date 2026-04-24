@@ -230,6 +230,29 @@ func (r *postgresRepository) GetPlanByEnterpriseID(ctx context.Context, enterpri
 	return &p, nil
 }
 
+// GetPlansByEnterpriseID retrieves all plans for a given enterprise
+func (r *postgresRepository) GetPlansByEnterpriseID(ctx context.Context, enterpriseID int64) ([]Plan, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, enterprise_id, max_users, max_enterprises, trial_until, created_at, updated_at, deleted_at 
+		 FROM public.plans WHERE enterprise_id = $1 AND deleted_at IS NULL`,
+		enterpriseID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var plans []Plan
+	for rows.Next() {
+		var p Plan
+		if err := rows.Scan(&p.ID, &p.EnterpriseID, &p.MaxUsers, &p.MaxEnterprises, &p.TrialUntil, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt); err != nil {
+			return nil, err
+		}
+		plans = append(plans, p)
+	}
+	return plans, nil
+}
+
 // CountEnterprisesByTenant counts the number of enterprises for a tenant
 func (r *postgresRepository) CountEnterprisesByTenant(ctx context.Context, tenantID int64) (int64, error) {
 	var count int64

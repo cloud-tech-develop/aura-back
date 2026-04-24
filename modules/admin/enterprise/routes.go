@@ -8,6 +8,7 @@ func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
 	// Public — no auth required (for offline sync)
 	public.POST("/enterprises", h.Create)
 	public.GET("/enterprises/:slug", h.GetBySlug)
+	public.GET("/plans", h.GetPlans) // Public for offline sync - requires enterprise_id
 
 	// Protected — behind AuthMiddleware
 	protected.GET("/enterprises", h.List)

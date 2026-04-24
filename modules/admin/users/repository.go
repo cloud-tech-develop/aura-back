@@ -188,3 +188,33 @@ func (r *repository) ListRolesByMinLevel(ctx context.Context, minLevel int) ([]R
 
 	return roles, nil
 }
+
+// ListUserRolesByEnterpriseID retrieves all user roles for an enterprise
+func (r *repository) ListUserRolesByEnterpriseID(ctx context.Context, enterpriseID int64) ([]UserRole, error) {
+	query := `
+		SELECT ur.user_id, ur.role_id
+		FROM public.user_roles ur
+		JOIN public.users u ON u.id = ur.user_id
+		WHERE u.enterprise_id = $1 AND u.deleted_at IS NULL`
+
+	rows, err := r.q.QueryContext(ctx, query, enterpriseID)
+	if err != nil {
+		return nil, fmt.Errorf("repository: failed to list user roles: %w", err)
+	}
+	defer rows.Close()
+
+	var userRoles []UserRole
+	for rows.Next() {
+		var ur UserRole
+		if err := rows.Scan(&ur.UserID, &ur.RoleID); err != nil {
+			return nil, fmt.Errorf("repository: failed to scan user role: %w", err)
+		}
+		userRoles = append(userRoles, ur)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repository: rows error: %w", err)
+	}
+
+	return userRoles, nil
+}

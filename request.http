@@ -2,7 +2,7 @@
 @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJlbnRlcnByaXNlX2lkIjoxLCJ0ZW5hbnRfaWQiOjEsInNsdWciOiJjbG91ZF90ZWNubyIsImVtYWlsIjoic3VwZXItYWRtaW5AY2xvdWR0ZWNuby5jb20iLCJyb2xlcyI6WyJTVVBFUkFETUlOIl0sInJvbGVfbGV2ZWwiOjAsImlwIjoiMTI3LjAuMC4xIiwiZXhwIjoxNzc3MDg5MTk5LCJpYXQiOjE3NzcwMDI3OTl9.OF3bBr_OkG9a4hYZUPbZQsMMo57j1bCOkc0RaExXz_Q
 
 
-GET http://localhost:{{port}}/enterprises HTTP/1.1
+GET http://localhost:{{port}}/enterprises/cloud_tecno HTTP/1.1
 Authorization: Bearer {{token}}
 
 ### Create Enterprise

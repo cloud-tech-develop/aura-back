@@ -44,6 +44,13 @@ type Role struct {
 	Level       int    `json:"level"`
 }
 
+// UserRole represents a user-role assignment in public.user_roles table
+type UserRole struct {
+	ID      int64 `json:"id"`
+	UserID  int64 `json:"user_id"`
+	RoleID  int64 `json:"role_id"`
+}
+
 // Repository defines the data access operations for users.
 type Repository interface {
 	Create(ctx context.Context, user *User) error
@@ -53,6 +60,7 @@ type Repository interface {
 	Update(ctx context.Context, user *User) error
 	UpdateStatus(ctx context.Context, id int64, active bool) error
 	ListRolesByMinLevel(ctx context.Context, minLevel int) ([]Role, error)
+	ListUserRolesByEnterpriseID(ctx context.Context, enterpriseID int64) ([]UserRole, error)
 }
 
 // Service defines the business logic for users.
@@ -64,4 +72,5 @@ type Service interface {
 	UpdateStatus(ctx context.Context, id int64, active bool) error
 	AssignRoles(ctx context.Context, userID int64, roleIDs []int64, minLevel int) error
 	ListRolesByMinLevel(ctx context.Context, minLevel int) ([]Role, error)
+	ListUserRolesByEnterpriseID(ctx context.Context, enterpriseID int64) ([]UserRole, error)
 }

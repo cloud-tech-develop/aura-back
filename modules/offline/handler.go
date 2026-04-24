@@ -20,6 +20,7 @@ func NewHandler(svc Service) *Handler {
 // Ping handles GET /offline/ping
 // This endpoint only works in offline mode (SQLite)
 // Gets the enterprise slug from the JWT token (set by AuthMiddleware)
+// Syncs enterprises matching the slug pattern and all related data (plans, users, user_roles)
 func (h *Handler) Ping(c *gin.Context) {
 	// Verify we are in offline mode (SQLite)
 	driver := os.Getenv("DATABASE_DRIVER")
@@ -28,7 +29,6 @@ func (h *Handler) Ping(c *gin.Context) {
 	isOffline := driver == "sqlite" || dsn == ""
 
 	if !isOffline {
-		// Check if DATABASE_URL is empty (offline mode in main.go)
 		isOffline = dsn == ""
 	}
 
@@ -47,14 +47,13 @@ func (h *Handler) Ping(c *gin.Context) {
 	// Get production URL from environment
 	prodURL := os.Getenv("URL_PROD")
 	if prodURL == "" {
-		prodURL = "http://localhost:8081" // fallback to default
+		prodURL = "http://localhost:8081"
 	}
 
 	// Get token from Authorization header
 	token := ""
 	authHeader := c.GetHeader("Authorization")
 	if authHeader != "" {
-		// Extract Bearer token
 		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
 			token = authHeader[7:]
 		} else {
@@ -62,8 +61,8 @@ func (h *Handler) Ping(c *gin.Context) {
 		}
 	}
 
-	// Sync single enterprise by slug from production
-	enterprise, err := h.svc.SyncEnterpriseBySlug(c.Request.Context(), prodURL, token, slug)
+	// Sync all data by slug
+	result, err := h.svc.SyncAllBySlug(c.Request.Context(), prodURL, token, slug)
 	if err != nil {
 		response.BadRequest(c, "Error al sincronizar: "+err.Error())
 		return
@@ -71,19 +70,17 @@ func (h *Handler) Ping(c *gin.Context) {
 
 	// Return sync result
 	response.OK(c, gin.H{
-		"synced":    1,
-		"slug":      slug,
-		"source":    prodURL,
-		"mode":      "offline",
-		"enterprise": enterprise,
-		"message":   "Sincronización completada",
+		"slug":    slug,
+		"source":  prodURL,
+		"mode":    "offline",
+		"result":  result,
+		"message": "Sincronización completada",
 	})
 }
 
 // ListEnterprises handles GET /offline/enterprises
 // Returns all enterprises stored locally in SQLite
 func (h *Handler) ListEnterprises(c *gin.Context) {
-	// Verify we are in offline mode (SQLite)
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn != "" && os.Getenv("DATABASE_DRIVER") != "sqlite" {
 		response.Forbidden(c, "Endpoint solo disponible en modo offline")

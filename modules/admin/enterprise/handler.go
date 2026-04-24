@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	errs "github.com/cloud-tech-develop/aura-back/shared/errors"
@@ -293,5 +294,29 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		"slug":      ent.Slug,
 		"status":    ent.Status,
 		"updatedAt": ent.UpdatedAt,
+	})
+}
+
+// ─── GET /plans?enterprise_id=X ─────────────────────────────────────────────────────
+
+func (h *Handler) GetPlans(c *gin.Context) {
+	enterpriseID := c.GetInt64("enterprise_id")
+	if enterpriseID == 0 {
+		// Try to get from query param
+		enterpriseID, _ = strconv.ParseInt(c.Query("enterprise_id"), 10, 64)
+	}
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id es requerido")
+		return
+	}
+
+	plans, err := h.svc.GetPlansByEnterpriseID(c.Request.Context(), enterpriseID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.OK(c, gin.H{
+		"data": plans,
 	})
 }

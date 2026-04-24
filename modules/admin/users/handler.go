@@ -99,6 +99,30 @@ func (h *Handler) Create(c *gin.Context) {
 	response.Created(c, user)
 }
 
+// ─── GET /users?enterprise_id=X (Public for offline sync) ─────────────────────
+
+func (h *Handler) ListByEnterpriseID(c *gin.Context) {
+	enterpriseID, _ := strconv.ParseInt(c.Query("enterprise_id"), 10, 64)
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id es requerido")
+		return
+	}
+
+	// Parse pagination
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+
+	users, err := h.svc.ListByEnterprise(c.Request.Context(), enterpriseID, page, limit)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.OK(c, gin.H{
+		"data": users,
+	})
+}
+
 // ─── GET /users ─────────────────────────────────────────────────────────
 
 func (h *Handler) List(c *gin.Context) {
@@ -377,4 +401,24 @@ func (h *Handler) ListRoles(c *gin.Context) {
 	}
 
 	response.OK(c, roles)
+}
+
+// ─── GET /user-roles?enterprise_id=X (Public for offline sync) ─────────────────────────────
+
+func (h *Handler) ListUserRolesByEnterpriseID(c *gin.Context) {
+	enterpriseID, _ := strconv.ParseInt(c.Query("enterprise_id"), 10, 64)
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id es requerido")
+		return
+	}
+
+	userRoles, err := h.svc.ListUserRolesByEnterpriseID(c.Request.Context(), enterpriseID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.OK(c, gin.H{
+		"data": userRoles,
+	})
 }

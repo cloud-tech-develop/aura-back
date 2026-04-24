@@ -194,6 +194,11 @@ func (s *service) ListRolesByMinLevel(ctx context.Context, minLevel int) ([]Role
 	return s.repo.ListRolesByMinLevel(ctx, minLevel)
 }
 
+// ListUserRolesByEnterpriseID retrieves all user roles for an enterprise
+func (s *service) ListUserRolesByEnterpriseID(ctx context.Context, enterpriseID int64) ([]UserRole, error) {
+	return s.repo.ListUserRolesByEnterpriseID(ctx, enterpriseID)
+}
+
 func (s *service) publish(event events.Event) {
 	if s.eventBus == nil {
 		return

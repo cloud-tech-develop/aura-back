@@ -99,6 +99,7 @@ type Repository interface {
 	Update(ctx context.Context, e *Enterprise) error
 	Delete(ctx context.Context, id int64) error
 	GetPlanByEnterpriseID(ctx context.Context, enterpriseID int64) (*Plan, error)
+	GetPlansByEnterpriseID(ctx context.Context, enterpriseID int64) ([]Plan, error)
 	CountEnterprisesByTenant(ctx context.Context, tenantID int64) (int64, error)
 }
 
@@ -112,6 +113,7 @@ type Service interface {
 	List(ctx context.Context, params ListParams) (ListResult, error)
 	Update(ctx context.Context, e *Enterprise) error
 	Delete(ctx context.Context, id int64) error
+	GetPlansByEnterpriseID(ctx context.Context, enterpriseID int64) ([]Plan, error)
 }
 
 // ─── Migrator Interface ───────────────────────────────────────────────────────
