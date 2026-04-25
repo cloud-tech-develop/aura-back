@@ -513,18 +513,57 @@ func (m *Manager) RunMigrations(schema, subPath string) error {
 		if fileVersion <= version {
 			continue
 		}
-		if !strings.HasSuffix(name, ".up.sql") {
+		if !strings.HasSuffix(name, ".up.sql") && !strings.HasSuffix(name, ".offline.sql") {
 			continue
 		}
 		filesToMigrate = append(filesToMigrate, name)
 	}
-
+ 
 	sort.Strings(filesToMigrate)
-
-	for _, name := range filesToMigrate {
+ 
+	// Filter files for current mode (Postgres or SQLite)
+	var finalFiles []string
+	if isSQLite {
+		// Group files by version to choose .offline.sql over .up.sql
+		versionMap := make(map[int64]string)
+		var versions []int64
+		for _, name := range filesToMigrate {
+			var v int64
+			fmt.Sscanf(name, "%d", &v)
+			if strings.HasSuffix(name, ".offline.sql") {
+				versionMap[v] = name
+			} else if _, exists := versionMap[v]; !exists {
+				versionMap[v] = name
+			}
+			found := false
+			for _, exV := range versions {
+				if exV == v {
+					found = true
+					break
+				}
+			}
+			if !found {
+				versions = append(versions, v)
+			}
+		}
+		sort.Slice(versions, func(i, j int) bool { return versions[i] < versions[j] })
+		for _, v := range versions {
+			finalFiles = append(finalFiles, versionMap[v])
+		}
+	} else {
+		// Postgres mode: only .up.sql
+		for _, name := range filesToMigrate {
+			if strings.HasSuffix(name, ".up.sql") {
+				finalFiles = append(finalFiles, name)
+			}
+		}
+	}
+ 
+	for _, name := range finalFiles {
 		var fileVersion int64
 		fmt.Sscanf(name, "%d", &fileVersion)
 
+		fmt.Printf("➜ aplicando migración [%s/%s]\n", schema, name)
 		content, err := migrationsFS.ReadFile(fullPath + "/" + name)
 		if err != nil {
 			return fmt.Errorf("leer archivo [%s]: %w", name, err)

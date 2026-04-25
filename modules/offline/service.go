@@ -11,6 +11,8 @@ import (
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/events"
+	"github.com/cloud-tech-develop/aura-back/shared/logging"
+	"github.com/cloud-tech-develop/aura-back/tenant"
 )
 
 // Events
@@ -38,18 +40,22 @@ type EventPayload struct {
 
 // service implements Service
 type service struct {
-	repo     Repository
-	http     *http.Client
-	eventBus events.EventBus
+	repo      Repository
+	http      *http.Client
+	eventBus  events.EventBus
+	tenantMgr *tenant.Manager
+	logger    *logging.LoggerHandler
 }
 
-func NewService(database *db.DB, eventBus events.EventBus) Service {
+func NewService(database *db.DB, eventBus events.EventBus, tenantMgr *tenant.Manager) Service {
 	return &service{
 		repo: NewRepository(database),
 		http: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		eventBus: eventBus,
+		eventBus:  eventBus,
+		tenantMgr: tenantMgr,
+		logger:    logging.NewLoggerHandler("logs"),
 	}
 }
 
@@ -66,6 +72,17 @@ func (s *service) SyncTenantBySlug(ctx context.Context, prodURL, token, slug str
 	}
 	if enterprise == nil {
 		return nil, fmt.Errorf("empresa no encontrada: %s", slug)
+	}
+
+	// Run migrations before saving data
+	if s.tenantMgr != nil {
+		s.logger.Logf("[offline.Service] Running tenant migrations for slug: %s", slug)
+		if err := s.tenantMgr.RunMigrations(slug, "tenant"); err != nil {
+			s.logger.Logf("[offline.Service] warn: RunMigrations failed: %v", err)
+			// We continue because some tables might already exist
+		} else {
+			s.logger.Logf("[offline.Service] Migrations completed for slug: %s", slug)
+		}
 	}
 
 	// Save enterprise locally
