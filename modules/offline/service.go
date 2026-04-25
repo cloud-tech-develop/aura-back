@@ -227,8 +227,14 @@ func (s *service) syncUsers(ctx context.Context, prodURL, token string, enterpri
 			UpdatedAt:    apiResp.Data[i].UpdatedAt,
 		}
 		if err := s.repo.UpsertUser(ctx, u); err != nil {
+			fmt.Printf("[DEBUG] Sync: failed to upsert user %s: %v\n", u.Email, err)
 			continue
 		}
+		hashPreview := "empty"
+		if len(u.PasswordHash) > 10 {
+			hashPreview = u.PasswordHash[:10]
+		}
+		fmt.Printf("[DEBUG] Sync: synced user %s (ID: %d, Hash: %s...)\n", u.Email, u.ID, hashPreview)
 		count++
 	}
 

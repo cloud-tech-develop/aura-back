@@ -153,9 +153,9 @@ func (r *repository) UpsertUser(ctx context.Context, u *User) error {
 
 	if exists {
 		_, err = r.db.ExecContext(ctx,
-			`UPDATE users SET enterprise_id = ?, name = ?, email = ?, active = ?, updated_at = ?
+			`UPDATE users SET enterprise_id = ?, name = ?, email = ?, active = ?, password_hash = ?, updated_at = ?
 			 WHERE id = ?`,
-			u.EnterpriseID, u.Name, u.Email, u.Active, time.Now(), u.ID,
+			u.EnterpriseID, u.Name, u.Email, u.Active, u.PasswordHash, time.Now(), u.ID,
 		)
 	} else {
 		u.CreatedAt = time.Now()
