@@ -18,19 +18,24 @@ type querier = db.Querier
 // repository implements the Repository interface
 // Handles all database operations for products
 type repository struct {
-	db *db.DB
+	db        *db.DB
+	isOffline bool
 }
 
 // NewRepository creates a new product repository instance
 // db: database connection instance
 func NewRepository(db *db.DB) Repository {
-	return &repository{db: db}
+	return &repository{
+		db:        db,
+		isOffline: db.IsSQLite(),
+	}
 }
 
 // Create inserts a new product into the database
 func (r *repository) Create(ctx context.Context, tenantSlug string, p *Product) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		INSERT INTO "%s".product (
+		INSERT INTO %sproduct (
 			sku, barcode, name, description, category_id, brand_id, unit_id,
 			product_type, active, visible_in_pos,
 			cost_price, sale_price, price_2, price_3,
@@ -39,7 +44,7 @@ func (r *repository) Create(ctx context.Context, tenantSlug string, p *Product) 
 			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
 			image_url, enterprise_id
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
-		RETURNING id, created_at`, tenantSlug)
+		RETURNING id, created_at`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query,
 		p.SKU, p.Barcode, p.Name, p.Description,
@@ -60,6 +65,7 @@ func (r *repository) Create(ctx context.Context, tenantSlug string, p *Product) 
 // GetByID retrieves a product by its ID
 func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (*Product, error) {
 	p := &Product{}
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT 
 			id, sku, barcode, name, description, category_id, brand_id, unit_id,
@@ -70,7 +76,7 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
 			image_url, enterprise_id,
 			created_at, updated_at, deleted_at
-		FROM "%s".product WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
+		FROM %sproduct WHERE id = $1 AND deleted_at IS NULL`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&p.ID, &p.SKU, &p.Barcode, &p.Name, &p.Description,
@@ -95,6 +101,7 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 // GetBySKU retrieves a product by its SKU code
 func (r *repository) GetBySKU(ctx context.Context, tenantSlug string, sku string, enterpriseID int64) (*Product, error) {
 	p := &Product{}
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT 
 			id, sku, barcode, name, description, category_id, brand_id, unit_id,
@@ -105,7 +112,7 @@ func (r *repository) GetBySKU(ctx context.Context, tenantSlug string, sku string
 			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
 			image_url, enterprise_id,
 			created_at, updated_at, deleted_at
-		FROM "%s".product WHERE sku = $1 AND enterprise_id = $2 AND deleted_at IS NULL LIMIT 1`, tenantSlug)
+		FROM %sproduct WHERE sku = $1 AND enterprise_id = $2 AND deleted_at IS NULL LIMIT 1`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, sku, enterpriseID).Scan(
 		&p.ID, &p.SKU, &p.Barcode, &p.Name, &p.Description,
@@ -130,6 +137,7 @@ func (r *repository) GetBySKU(ctx context.Context, tenantSlug string, sku string
 // GetByBarcode retrieves a product by its barcode
 func (r *repository) GetByBarcode(ctx context.Context, tenantSlug string, barcode string, enterpriseID int64) (*Product, error) {
 	p := &Product{}
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT 
 			id, sku, barcode, name, description, category_id, brand_id, unit_id,
@@ -140,7 +148,7 @@ func (r *repository) GetByBarcode(ctx context.Context, tenantSlug string, barcod
 			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
 			image_url, enterprise_id,
 			created_at, updated_at, deleted_at
-		FROM "%s".product WHERE barcode = $1 AND enterprise_id = $2 AND deleted_at IS NULL`, tenantSlug)
+		FROM %sproduct WHERE barcode = $1 AND enterprise_id = $2 AND deleted_at IS NULL`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, barcode, enterpriseID).Scan(
 		&p.ID, &p.SKU, &p.Barcode, &p.Name, &p.Description,
@@ -166,25 +174,26 @@ func (r *repository) GetByBarcode(ctx context.Context, tenantSlug string, barcod
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Product, error) {
 	// Prevents lib/pq connection state corruption when client cancels request
 	ctx = context.WithoutCancel(ctx)
-
+ 
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL AND active = true`, enterpriseID)
-
+ 
 	// Apply search filter
 	if filters.Search != "" {
 		safeSearch := strings.ReplaceAll(filters.Search, "'", "''")
 		baseWhere += fmt.Sprintf(" AND (name ILIKE '%%%s%%' OR sku ILIKE '%%%s%%' OR barcode ILIKE '%%%s%%')", safeSearch, safeSearch, safeSearch)
 	}
-
+ 
 	// Apply category filter
 	if filters.CategoryID != nil {
 		baseWhere += fmt.Sprintf(" AND category_id = %d", *filters.CategoryID)
 	}
-
+ 
 	// Apply brand filter
 	if filters.BrandID != nil {
 		baseWhere += fmt.Sprintf(" AND brand_id = %d", *filters.BrandID)
 	}
-
+ 
 	offset := (filters.Page - 1) * filters.Limit
 	query := fmt.Sprintf(`
 		SELECT 
@@ -196,7 +205,7 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
 			image_url, enterprise_id,
 			created_at, updated_at, deleted_at
-		FROM "%s".product WHERE `+baseWhere+` ORDER BY name LIMIT %d OFFSET %d`, tenantSlug, filters.Limit, offset)
+		FROM %sproduct WHERE `+baseWhere+` ORDER BY name LIMIT %d OFFSET %d`, tenant, filters.Limit, offset)
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -229,10 +238,11 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	// Prevents lib/pq connection state corruption when client cancels request
 	ctx = context.WithoutCancel(ctx)
-
+ 
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	// Build base WHERE clause
 	baseWhere := fmt.Sprintf(`p.enterprise_id = %d AND p.deleted_at IS NULL`, enterpriseID)
-
+ 
 	// Apply filters from params
 	if params != nil {
 		if categoryID, ok := params["category_id"]; ok && categoryID != nil {
@@ -266,17 +276,17 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 			}
 		}
 	}
-
+ 
 	// Apply search filter
 	searchCond := ""
 	if search != "" {
 		safeSearch := strings.ReplaceAll(search, "'", "''")
 		searchCond = fmt.Sprintf(" AND (p.name ILIKE '%%%s%%' OR p.sku ILIKE '%%%s%%' OR p.barcode ILIKE '%%%s%%')", safeSearch, safeSearch, safeSearch)
 	}
-
+ 
 	// COUNT query
-	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".product AS p WHERE `+baseWhere+searchCond, tenantSlug)
-
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %sproduct AS p WHERE `+baseWhere+searchCond, tenant)
+ 
 	var total int64
 	if err := r.db.QueryRowContext(ctx, countQuery).Scan(&total); err != nil {
 		return domain.PageResult{}, fmt.Errorf("failed to count products: %w", err)
@@ -316,12 +326,12 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 			p.manages_inventory, p.manages_batches, p.manages_serial, p.allow_negative_stock,
 			p.image_url, p.enterprise_id,
 			p.created_at, p.updated_at, p.deleted_at
-		FROM "%s".product AS p
-		LEFT JOIN "%s".category c ON p.category_id = c.id
-		LEFT JOIN "%s".brand b ON p.brand_id = b.id
-		LEFT JOIN "%s".unit u ON p.unit_id = u.id
+		FROM %sproduct AS p
+		LEFT JOIN %scategory c ON p.category_id = c.id
+		LEFT JOIN %sbrand b ON p.brand_id = b.id
+		LEFT JOIN %sunit u ON p.unit_id = u.id
 		WHERE `+baseWhere+searchCond+` ORDER BY %s %s LIMIT %d OFFSET %d`,
-		tenantSlug, tenantSlug, tenantSlug, tenantSlug, sort, order, limit, offset)
+		tenant, tenant, tenant, tenant, sort, order, limit, offset)
 
 	resultRows, err := r.db.QueryContext(ctx, selectQuery)
 	if err != nil {
@@ -367,8 +377,9 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 
 // Update updates an existing product in the database
 func (r *repository) Update(ctx context.Context, tenantSlug string, p *Product) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		UPDATE "%s".product SET 
+		UPDATE %sproduct SET 
 			sku = $1, barcode = $2, name = $3, description = $4, 
 			category_id = $5, brand_id = $6, unit_id = $7,
 			product_type = $8, active = $9, visible_in_pos = $10,
@@ -377,7 +388,7 @@ func (r *repository) Update(ctx context.Context, tenantSlug string, p *Product) 
 			current_stock = $17, min_stock = $18, max_stock = $19,
 			manages_inventory = $20, manages_batches = $21, manages_serial = $22, allow_negative_stock = $23,
 			image_url = $24, updated_at = NOW()
-		WHERE id = $25 AND deleted_at IS NULL`, tenantSlug)
+		WHERE id = $25 AND deleted_at IS NULL`, tenant)
 
 	_, err := r.db.ExecContext(ctx, query,
 		p.SKU, p.Barcode, p.Name, p.Description,
@@ -398,7 +409,8 @@ func (r *repository) Update(ctx context.Context, tenantSlug string, p *Product) 
 // Delete performs a soft delete of a product
 func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) error {
 	skuDel := "DEL-" + time.Now().Format("20060102150405")
-	query := fmt.Sprintf(`UPDATE "%s".product SET deleted_at = NOW(), sku = $1 WHERE id = $2`, tenantSlug)
+	tenant := r.db.SchemaPrefix(tenantSlug)
+	query := fmt.Sprintf(`UPDATE %sproduct SET deleted_at = NOW(), sku = $1 WHERE id = $2`, tenant)
 	_, err := r.db.ExecContext(ctx, query, skuDel, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete product: %w", err)

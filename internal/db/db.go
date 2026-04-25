@@ -22,11 +22,27 @@ func New(driver, dsn string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("abrir db (%s): %w", driver, err)
 	}
-
+ 
 	if err := conn.Ping(); err != nil {
 		return nil, fmt.Errorf("conectar db (%s): %w", driver, err)
 	}
 	return &DB{DB: conn, DSN: dsn, Driver: driver}, nil
+}
+ 
+// NewMock creates a DB wrapper for testing, defaults to postgres
+func NewMock(conn *sql.DB) *DB {
+	return &DB{DB: conn, Driver: "postgres"}
+}
+
+func (db *DB) IsSQLite() bool {
+	return db.Driver == "sqlite"
+}
+
+func (db *DB) SchemaPrefix(slug string) string {
+	if db.IsSQLite() {
+		return ""
+	}
+	return fmt.Sprintf("%q.", slug)
 }
 
 func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
@@ -46,10 +62,19 @@ type Querier interface {
 	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	IsSQLite() bool
+	SchemaPrefix(slug string) string
 }
-
+ 
+// BaseQuerier matches the standard library's Query/Exec methods (sql.DB, sql.Tx)
+type BaseQuerier interface {
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+}
+ 
 // Wrap returns a Querier that automatically adapts queries for the current driver
-func (db *DB) Wrap(q Querier) Querier {
+func (db *DB) Wrap(q BaseQuerier) Querier {
 	return &wrappedQuerier{q: q, driver: db.Driver}
 }
 
@@ -63,6 +88,17 @@ type schemaQuerier struct {
 	q      Querier
 	driver string
 	schema string
+}
+
+func (s *schemaQuerier) IsSQLite() bool {
+	return s.driver == "sqlite"
+}
+
+func (s *schemaQuerier) SchemaPrefix(slug string) string {
+	if s.driver == "sqlite" {
+		return ""
+	}
+	return fmt.Sprintf("%q.", slug)
 }
 
 func (s *schemaQuerier) execWithSchema(ctx context.Context, fn func() error) error {
@@ -130,8 +166,19 @@ func (s *schemaQuerier) ExecContext(ctx context.Context, query string, args ...i
 }
 
 type wrappedQuerier struct {
-	q      Querier
+	q      BaseQuerier
 	driver string
+}
+
+func (w *wrappedQuerier) IsSQLite() bool {
+	return w.driver == "sqlite"
+}
+
+func (w *wrappedQuerier) SchemaPrefix(slug string) string {
+	if w.driver == "sqlite" {
+		return ""
+	}
+	return fmt.Sprintf("%q.", slug)
 }
 
 func (w *wrappedQuerier) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {

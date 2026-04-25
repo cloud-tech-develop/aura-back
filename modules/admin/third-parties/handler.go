@@ -91,7 +91,7 @@ func (h *Handler) ListThirdParties(c *gin.Context) {
 	}
 
 	enterpriseID := c.GetInt64("enterprise_id")
-	
+
 	// Try to get from query params for offline sync (no JWT context)
 	if enterpriseID == 0 {
 		idStr := c.Query("enterprise_id")

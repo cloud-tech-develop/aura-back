@@ -7,15 +7,17 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
+ 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 )
 
 func TestRepository_Create_Success(t *testing.T) {
 	// Test: Inserción exitosa de unidad
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	unit := &Unit{
 		Name:          "Kilogramo",
@@ -28,7 +30,7 @@ func TestRepository_Create_Success(t *testing.T) {
 	// Expect INSERT with RETURNING - QueryRowContext executes single query with INSERT+RETURNING
 	rows := sqlmock.NewRows([]string{"id", "created_at"}).
 		AddRow(1, "2024-01-01T00:00:00Z")
-	mock.ExpectQuery(`INSERT INTO "test_tenant"`).
+	mock.ExpectQuery(`(?s)INSERT INTO "test_tenant".unit.*`).
 		WithArgs("Kilogramo", "kg", true, true, int64(1)).
 		WillReturnRows(rows)
 
@@ -41,11 +43,11 @@ func TestRepository_Create_Success(t *testing.T) {
 
 func TestRepository_Create_DuplicateName(t *testing.T) {
 	// Test: Error de nombre duplicado
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	unit := &Unit{
 		Name:          "Kilogramo",
@@ -56,7 +58,7 @@ func TestRepository_Create_DuplicateName(t *testing.T) {
 	}
 
 	// Simular error de PostgreSQL por restricción única
-	mock.ExpectQuery(`INSERT INTO "test_tenant"`).
+	mock.ExpectQuery(`(?s)INSERT INTO "test_tenant".unit.*`).
 		WithArgs("Kilogramo", "kg", true, true, int64(1)).
 		WillReturnError(&pqError{code: "23505", message: "duplicate key value violates unique constraint"})
 
@@ -78,17 +80,17 @@ func (e *pqError) Error() string {
 
 func TestRepository_GetByID_Success(t *testing.T) {
 	// Test: Obtención por ID exitosa
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	rows := sqlmock.NewRows([]string{
 		"id", "name", "abbreviation", "active", "allow_decimals", "enterprise_id", "created_at", "updated_at", "deleted_at",
 	}).AddRow(1, "Kilogramo", "kg", true, true, 1, "2024-01-01T00:00:00Z", nil, nil)
 
-	mock.ExpectQuery(`SELECT .* FROM "test_tenant".unit`).
+	mock.ExpectQuery(`(?s)SELECT .* FROM "test_tenant".unit WHERE id`).
 		WithArgs(int64(1)).
 		WillReturnRows(rows)
 
@@ -103,13 +105,13 @@ func TestRepository_GetByID_Success(t *testing.T) {
 
 func TestRepository_GetByID_NotFound(t *testing.T) {
 	// Test: No encontrado
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
-	repo := &repository{db: db}
-
-	mock.ExpectQuery(`SELECT .* FROM "test_tenant".unit`).
+	mock.ExpectQuery(`(?s)SELECT .* FROM "test_tenant".unit WHERE id`).
 		WithArgs(int64(999)).
 		WillReturnError(sql.ErrNoRows)
 
@@ -120,17 +122,17 @@ func TestRepository_GetByID_NotFound(t *testing.T) {
 }
 
 func TestRepository_List_Success(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
-	repo := &repository{db: db}
+	rows := sqlmock.NewRows([]string{"id", "name", "abbreviation"}).
+		AddRow(1, "Kilogramo", "kg").
+		AddRow(2, "Litro", "L")
 
-	rows := sqlmock.NewRows([]string{"id", "name"}).
-		AddRow(1, "Kilogramo").
-		AddRow(2, "Litro")
-
-	mock.ExpectQuery(`SELECT id, name FROM "test_tenant".unit WHERE enterprise_id`).
+	mock.ExpectQuery(`(?s)SELECT id, name, abbreviation FROM "test_tenant".unit WHERE enterprise_id.*`).
 		WithArgs(int64(1)).
 		WillReturnRows(rows)
 
@@ -143,15 +145,15 @@ func TestRepository_List_Success(t *testing.T) {
 }
 
 func TestRepository_List_Empty(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
-	repo := &repository{db: db}
+	rows := sqlmock.NewRows([]string{"id", "name", "abbreviation"})
 
-	rows := sqlmock.NewRows([]string{"id", "name"})
-
-	mock.ExpectQuery(`SELECT id, name FROM "test_tenant".unit WHERE enterprise_id`).
+	mock.ExpectQuery(`(?s)SELECT id, name, abbreviation FROM "test_tenant".unit WHERE enterprise_id.*`).
 		WithArgs(int64(1)).
 		WillReturnRows(rows)
 
@@ -163,11 +165,11 @@ func TestRepository_List_Empty(t *testing.T) {
 
 func TestRepository_Update_Success(t *testing.T) {
 	// Test: Actualización exitosa
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	unit := &Unit{
 		ID:            1,
@@ -177,7 +179,7 @@ func TestRepository_Update_Success(t *testing.T) {
 		AllowDecimals: false,
 	}
 
-	mock.ExpectExec(`UPDATE "test_tenant".unit SET`).
+	mock.ExpectExec(`(?s)UPDATE "test_tenant".unit SET`).
 		WithArgs("Kilogramo Updated", "kgg", false, false, int64(1)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -188,13 +190,13 @@ func TestRepository_Update_Success(t *testing.T) {
 
 func TestRepository_Delete_Success(t *testing.T) {
 	// Test: Eliminación lógica exitosa
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
-	repo := &repository{db: db}
-
-	mock.ExpectExec(`UPDATE "test_tenant".unit SET deleted_at`).
+	mock.ExpectExec(`(?s)UPDATE "test_tenant".unit SET deleted_at.*`).
 		WithArgs(int64(1)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -205,15 +207,15 @@ func TestRepository_Delete_Success(t *testing.T) {
 
 func TestRepository_Page_Success(t *testing.T) {
 	// Test: Paginación exitosa
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	// COUNT query
 	countRows := sqlmock.NewRows([]string{"count"}).AddRow(2)
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM "test_tenant".unit`).
+	mock.ExpectQuery(`(?s)SELECT COUNT\(\*\) FROM "test_tenant".unit.*`).
 		WithArgs(int64(1)).
 		WillReturnRows(countRows)
 
@@ -223,7 +225,7 @@ func TestRepository_Page_Success(t *testing.T) {
 	}).AddRow(1, "Kilogramo", "kg", true, true, 1, "2024-01-01T00:00:00Z", nil, nil).
 		AddRow(2, "Litro", "L", true, false, 1, "2024-01-01T00:00:00Z", nil, nil)
 
-	mock.ExpectQuery(`SELECT .* FROM "test_tenant".unit WHERE enterprise_id`).
+	mock.ExpectQuery(`(?s)SELECT .* FROM "test_tenant".unit WHERE enterprise_id.*`).
 		WithArgs(int64(1), int64(10), int64(0)).
 		WillReturnRows(selectRows)
 
@@ -242,15 +244,15 @@ func TestRepository_Page_Success(t *testing.T) {
 
 func TestRepository_Page_WithSearch(t *testing.T) {
 	// Test: Paginación con búsqueda
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	// COUNT query con búsqueda - args: enterprise_id (1), search (kg%)
 	countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM "test_tenant".unit`).
+	mock.ExpectQuery(`(?s)SELECT COUNT\(\*\) FROM "test_tenant".unit.*`).
 		WithArgs(int64(1), "%kg%").
 		WillReturnRows(countRows)
 
@@ -259,7 +261,7 @@ func TestRepository_Page_WithSearch(t *testing.T) {
 		"id", "name", "abbreviation", "active", "allow_decimals", "enterprise_id", "created_at", "updated_at", "deleted_at",
 	}).AddRow(1, "Kilogramo", "kg", true, true, 1, "2024-01-01T00:00:00Z", nil, nil)
 
-	mock.ExpectQuery(`SELECT .* FROM "test_tenant".unit WHERE enterprise_id`).
+	mock.ExpectQuery(`(?s)SELECT .* FROM "test_tenant".unit WHERE enterprise_id.*`).
 		WithArgs(int64(1), "%kg%", int64(10), int64(0)).
 		WillReturnRows(selectRows)
 
@@ -272,15 +274,15 @@ func TestRepository_Page_WithSearch(t *testing.T) {
 
 func TestRepository_Page_Empty(t *testing.T) {
 	// Test: Paginación vacía
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	// COUNT query vacío
 	countRows := sqlmock.NewRows([]string{"count"}).AddRow(0)
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM "test_tenant".unit`).
+	mock.ExpectQuery(`(?s)SELECT COUNT\(\*\) FROM "test_tenant".unit.*`).
 		WithArgs(int64(1)).
 		WillReturnRows(countRows)
 
@@ -289,7 +291,7 @@ func TestRepository_Page_Empty(t *testing.T) {
 		"id", "name", "abbreviation", "active", "allow_decimals", "enterprise_id", "created_at", "updated_at", "deleted_at",
 	})
 
-	mock.ExpectQuery(`SELECT .* FROM "test_tenant".unit WHERE enterprise_id`).
+	mock.ExpectQuery(`(?s)SELECT .* FROM "test_tenant".unit WHERE enterprise_id.*`).
 		WithArgs(int64(1), int64(10), int64(0)).
 		WillReturnRows(selectRows)
 
@@ -303,15 +305,15 @@ func TestRepository_Page_Empty(t *testing.T) {
 
 func TestRepository_Page_InvalidSort(t *testing.T) {
 	// Test: Paginación con ordenamiento inválido - usa valores por defecto
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	// COUNT query
 	countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM "test_tenant".unit`).
+	mock.ExpectQuery(`(?s)SELECT COUNT\(\*\) FROM "test_tenant".unit.*`).
 		WithArgs(int64(1)).
 		WillReturnRows(countRows)
 
@@ -320,7 +322,7 @@ func TestRepository_Page_InvalidSort(t *testing.T) {
 		"id", "name", "abbreviation", "active", "allow_decimals", "enterprise_id", "created_at", "updated_at", "deleted_at",
 	}).AddRow(1, "kg", "kg", true, true, 1, "2024-01-01T00:00:00Z", nil, nil)
 
-	mock.ExpectQuery(`SELECT .* FROM "test_tenant".unit WHERE enterprise_id`).
+	mock.ExpectQuery(`(?s)SELECT .* FROM "test_tenant".unit WHERE enterprise_id.*`).
 		WithArgs(int64(1), int64(10), int64(0)).
 		WillReturnRows(selectRows)
 

@@ -12,18 +12,23 @@ import (
 type querier = db.Querier
 
 type repository struct {
-	db querier
+	db        querier
+	isOffline bool
 }
 
 func NewRepository(db querier) Repository {
-	return &repository{db: db}
+	return &repository{
+		db:        db,
+		isOffline: db.IsSQLite(),
+	}
 }
 
 func (r *repository) Create(ctx context.Context, tenantSlug string, b *Brand) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		INSERT INTO "%s".brand (name, description, active, enterprise_id)
+		INSERT INTO %sbrand (name, description, active, enterprise_id)
 		VALUES ($1, $2, $3, $4)
-		RETURNING id, created_at`, tenantSlug)
+		RETURNING id, created_at`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, b.Name, b.Description, b.Active, b.EnterpriseID).
 		Scan(&b.ID, &b.CreatedAt)
@@ -35,9 +40,10 @@ func (r *repository) Create(ctx context.Context, tenantSlug string, b *Brand) er
 
 func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (*Brand, error) {
 	b := &Brand{}
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, name, description, active, enterprise_id, created_at, updated_at, deleted_at
-		FROM "%s".brand WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
+		FROM %sbrand WHERE id = $1 AND deleted_at IS NULL`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&b.ID, &b.Name, &b.Description, &b.Active, &b.EnterpriseID,
@@ -55,13 +61,14 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]BrandList, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
-
+ 
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, name 
-		FROM "%s".brand WHERE enterprise_id = $1
+		FROM %sbrand WHERE enterprise_id = $1
 			AND deleted_at IS NULL
 			AND active = true
-		ORDER BY name;`, tenantSlug)
+		ORDER BY name;`, tenant)
 
 	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
 	if err != nil {
@@ -81,9 +88,10 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 }
 
 func (r *repository) Update(ctx context.Context, tenantSlug string, b *Brand) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		UPDATE "%s".brand SET name = $1, description = $2, active = $3, updated_at = NOW()
-		WHERE id = $4 AND deleted_at IS NULL`, tenantSlug)
+		UPDATE %sbrand SET name = $1, description = $2, active = $3, updated_at = NOW()
+		WHERE id = $4 AND deleted_at IS NULL`, tenant)
 
 	_, err := r.db.ExecContext(ctx, query, b.Name, b.Description, b.Active, b.ID)
 	if err != nil {
@@ -93,7 +101,8 @@ func (r *repository) Update(ctx context.Context, tenantSlug string, b *Brand) er
 }
 
 func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) error {
-	query := fmt.Sprintf(`UPDATE "%s".brand SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
+	tenant := r.db.SchemaPrefix(tenantSlug)
+	query := fmt.Sprintf(`UPDATE %sbrand SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`, tenant)
 	_, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete brand: %w", err)
@@ -104,14 +113,15 @@ func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) er
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
-
+ 
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	// Build base WHERE clause
 	baseWhere := `enterprise_id = $1 AND deleted_at IS NULL`
 	args := []interface{}{enterpriseID}
 	argPos := 2
-
+ 
 	// COUNT query
-	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".brand WHERE `+baseWhere, tenantSlug)
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %sbrand WHERE `+baseWhere, tenant)
 	if search != "" {
 		countQuery += fmt.Sprintf(" AND name ILIKE $%d", argPos)
 		searchTerm := "%" + search + "%"
@@ -142,7 +152,7 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	// SELECT query with pagination
 	selectQuery := fmt.Sprintf(`
 		SELECT id, name, description, active, enterprise_id, created_at, updated_at, deleted_at
-		FROM "%s".brand WHERE `+baseWhere, tenantSlug)
+		FROM %sbrand WHERE `+baseWhere, tenant)
 
 	args = []interface{}{enterpriseID}
 	argPos = 2

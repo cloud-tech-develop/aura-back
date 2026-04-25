@@ -10,22 +10,27 @@ import (
 )
 
 type repository struct {
-	db db.Querier
+	db        db.Querier
+	isOffline bool
 }
 
 func NewRepository(db db.Querier) Repository {
-	return &repository{db: db}
+	return &repository{
+		db:        db,
+		isOffline: db.IsSQLite(),
+	}
 }
 
 func (r *repository) Create(ctx context.Context, tenantSlug string, tp *ThirdParty) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		INSERT INTO "%s".third_parties (
+		INSERT INTO %sthird_parties (
 			user_id, first_name, last_name, document_number, document_type,
 			personal_email, commercial_name, address, phone, additional_email,
 			tax_responsibility, is_client, is_provider, is_employee,
 			municipality_id, municipality
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-		RETURNING id, created_at`, tenantSlug)
+		RETURNING id, created_at`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query,
 		tp.UserID, tp.FirstName, tp.LastName, tp.DocumentNumber, tp.DocumentType,
@@ -41,12 +46,13 @@ func (r *repository) Create(ctx context.Context, tenantSlug string, tp *ThirdPar
 
 func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (*ThirdParty, error) {
 	tp := &ThirdParty{}
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, user_id, first_name, last_name, document_number, document_type,
 			personal_email, commercial_name, address, phone, additional_email,
 			tax_responsibility, is_client, is_provider, is_employee,
 			municipality_id, municipality, created_at, deleted_at
-		FROM "%s".third_parties WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
+		FROM %sthird_parties WHERE id = $1 AND deleted_at IS NULL`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&tp.ID, &tp.UserID, &tp.FirstName, &tp.LastName, &tp.DocumentNumber, &tp.DocumentType,
@@ -65,12 +71,13 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 
 func (r *repository) GetByDocument(ctx context.Context, tenantSlug string, docNumber string) (*ThirdParty, error) {
 	tp := &ThirdParty{}
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, user_id, first_name, last_name, document_number, document_type,
 			personal_email, commercial_name, address, phone, additional_email,
 			tax_responsibility, is_client, is_provider, is_employee,
 			municipality_id, municipality, created_at, deleted_at
-		FROM "%s".third_parties WHERE document_number = $1 AND deleted_at IS NULL`, tenantSlug)
+		FROM %sthird_parties WHERE document_number = $1 AND deleted_at IS NULL`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, docNumber).Scan(
 		&tp.ID, &tp.UserID, &tp.FirstName, &tp.LastName, &tp.DocumentNumber, &tp.DocumentType,
@@ -88,13 +95,14 @@ func (r *repository) GetByDocument(ctx context.Context, tenantSlug string, docNu
 }
 
 func (r *repository) Update(ctx context.Context, tenantSlug string, id int64, tp *ThirdParty) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		UPDATE "%s".third_parties SET
+		UPDATE %sthird_parties SET
 			user_id = $1, first_name = $2, last_name = $3, document_type = $4,
 			personal_email = $5, commercial_name = $6, address = $7, phone = $8,
 			additional_email = $9, tax_responsibility = $10, is_client = $11,
 			is_provider = $12, is_employee = $13, municipality_id = $14, municipality = $15
-		WHERE id = $16 AND deleted_at IS NULL`, tenantSlug)
+		WHERE id = $16 AND deleted_at IS NULL`, tenant)
 
 	result, err := r.db.ExecContext(ctx, query,
 		tp.UserID, tp.FirstName, tp.LastName, tp.DocumentType,
@@ -114,7 +122,8 @@ func (r *repository) Update(ctx context.Context, tenantSlug string, id int64, tp
 }
 
 func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) error {
-	query := fmt.Sprintf(`UPDATE "%s".third_parties SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
+	tenant := r.db.SchemaPrefix(tenantSlug)
+	query := fmt.Sprintf(`UPDATE %sthird_parties SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`, tenant)
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete third party: %w", err)
@@ -127,12 +136,13 @@ func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) er
 }
 
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ThirdPartyFilters) ([]ThirdParty, error) {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, user_id, first_name, last_name, document_number, document_type,
 			personal_email, commercial_name, address, phone, additional_email,
 			tax_responsibility, is_client, is_provider, is_employee,
 			municipality_id, municipality, created_at, deleted_at
-		FROM "%s".third_parties WHERE deleted_at IS NULL`, tenantSlug)
+		FROM %sthird_parties WHERE deleted_at IS NULL`, tenant)
 
 	args := []interface{}{}
 	argPos := 1
@@ -193,7 +203,8 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 }
 
 func (r *repository) Count(ctx context.Context, tenantSlug string, enterpriseID int64, filters ThirdPartyFilters) (int, error) {
-	query := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".third_parties WHERE deleted_at IS NULL`, tenantSlug)
+	tenant := r.db.SchemaPrefix(tenantSlug)
+	query := fmt.Sprintf(`SELECT COUNT(*) FROM %sthird_parties WHERE deleted_at IS NULL`, tenant)
 
 	var count int
 	err := r.db.QueryRowContext(ctx, query).Scan(&count)

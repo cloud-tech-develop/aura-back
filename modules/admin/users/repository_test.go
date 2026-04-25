@@ -7,17 +7,19 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
+ 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 )
 
 func TestListRolesByMinLevel(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{q: db}
+	defer conn.Close()
+ 
+	repo := &repository{q: db.NewMock(conn)}
 
 	// Test: roles with level >= 1 (ADMIN level)
-	mock.ExpectQuery("SELECT id, name, description, level FROM public.roles").
+	mock.ExpectQuery(`(?s)SELECT .* FROM "public".roles`).
 		WithArgs(1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "description", "level"}).
 			AddRow(2, "ADMIN", "Administrator", 1).
@@ -32,14 +34,14 @@ func TestListRolesByMinLevel(t *testing.T) {
 }
 
 func TestListRolesByMinLevel_SuperAdmin(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{q: db}
+	defer conn.Close()
+ 
+	repo := &repository{q: db.NewMock(conn)}
 
 	// Test: roles with level >= 0 (SUPERADMIN level - all roles)
-	mock.ExpectQuery("SELECT id, name, description, level FROM public.roles").
+	mock.ExpectQuery(`(?s)SELECT .* FROM "public".roles`).
 		WithArgs(0).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "description", "level"}).
 			AddRow(1, "SUPERADMIN", "Super admin", 0).
@@ -54,14 +56,14 @@ func TestListRolesByMinLevel_SuperAdmin(t *testing.T) {
 }
 
 func TestListRolesByMinLevel_Empty(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{q: db}
+	defer conn.Close()
+ 
+	repo := &repository{q: db.NewMock(conn)}
 
 	// Test: no roles found
-	mock.ExpectQuery("SELECT id, name, description, level FROM public.roles").
+	mock.ExpectQuery(`(?s)SELECT .* FROM "public".roles`).
 		WithArgs(5).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "description", "level"}))
 
@@ -71,15 +73,15 @@ func TestListRolesByMinLevel_Empty(t *testing.T) {
 }
 
 func TestService_AssignRoles_ValidatesLevel(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	svc := NewService(db, nil)
+	defer conn.Close()
+ 
+	svc := NewService(db.NewMock(conn), nil)
 	ctx := context.Background()
 
 	// Mock: check role level for role ID 1 (SUPERADMIN level 0)
-	mock.ExpectQuery("SELECT level FROM public.roles").
+	mock.ExpectQuery(`(?s)SELECT level FROM "public".roles`).
 		WithArgs(int64(1)).
 		WillReturnRows(sqlmock.NewRows([]string{"level"}).AddRow(0))
 
@@ -90,15 +92,15 @@ func TestService_AssignRoles_ValidatesLevel(t *testing.T) {
 }
 
 func TestService_AssignRoles_Success(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	svc := NewService(db, nil)
+	defer conn.Close()
+ 
+	svc := NewService(db.NewMock(conn), nil)
 	ctx := context.Background()
 
 	// Mock: check role level for role ID 2 (ADMIN level 1)
-	mock.ExpectQuery("SELECT level FROM public.roles").
+	mock.ExpectQuery(`(?s)SELECT level FROM "public".roles`).
 		WithArgs(int64(2)).
 		WillReturnRows(sqlmock.NewRows([]string{"level"}).AddRow(1))
 
@@ -106,12 +108,12 @@ func TestService_AssignRoles_Success(t *testing.T) {
 	mock.ExpectBegin()
 
 	// Delete existing roles
-	mock.ExpectExec("DELETE FROM public.user_roles").
+	mock.ExpectExec(`(?s)DELETE FROM "public".user_roles`).
 		WithArgs(int64(1)).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	// Insert new role
-	mock.ExpectExec("INSERT INTO public.user_roles").
+	mock.ExpectExec(`(?s)INSERT INTO "public".user_roles`).
 		WithArgs(int64(1), int64(2)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -124,15 +126,15 @@ func TestService_AssignRoles_Success(t *testing.T) {
 }
 
 func TestService_AssignRoles_InvalidRole(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	svc := NewService(db, nil)
+	defer conn.Close()
+ 
+	svc := NewService(db.NewMock(conn), nil)
 	ctx := context.Background()
 
 	// Mock: role not found
-	mock.ExpectQuery("SELECT level FROM public.roles").
+	mock.ExpectQuery(`(?s)SELECT level FROM "public".roles`).
 		WithArgs(int64(999)).
 		WillReturnError(sql.ErrNoRows)
 

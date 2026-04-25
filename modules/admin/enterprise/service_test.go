@@ -74,6 +74,11 @@ func (m *MockRepository) GetPlanByEnterpriseID(ctx context.Context, enterpriseID
 	return args.Get(0).(*Plan), args.Error(1)
 }
 
+func (m *MockRepository) GetPlansByEnterpriseID(ctx context.Context, enterpriseID int64) ([]Plan, error) {
+	args := m.Called(ctx, enterpriseID)
+	return args.Get(0).([]Plan), args.Error(1)
+}
+
 func (m *MockRepository) CountEnterprisesByTenant(ctx context.Context, tenantID int64) (int64, error) {
 	args := m.Called(ctx, tenantID)
 	return args.Get(0).(int64), args.Error(1)

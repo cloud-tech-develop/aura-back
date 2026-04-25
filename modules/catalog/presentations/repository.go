@@ -18,22 +18,27 @@ type querier = db.Querier
 // repository implements the Repository interface
 // Handles all database operations for presentations
 type repository struct {
-	db *db.DB
+	db        *db.DB
+	isOffline bool
 }
 
 // NewRepository creates a new presentation repository instance
 func NewRepository(db *db.DB) Repository {
-	return &repository{db: db}
+	return &repository{
+		db:        db,
+		isOffline: db.IsSQLite(),
+	}
 }
 
 // Create inserts a new presentation into the database
 func (r *repository) Create(ctx context.Context, tenantSlug string, enterpriseID int64, p *Presentation) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		INSERT INTO "%s".presentation (
+		INSERT INTO %spresentation (
 			product_id, name, factor, barcode, cost_price, sale_price,
 			default_purchase, default_sale, enterprise_id
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id, created_at`, tenantSlug)
+		RETURNING id, created_at`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query,
 		p.ProductID, p.Name, p.Factor, p.Barcode,
@@ -58,12 +63,13 @@ func (r *repository) CreateMany(ctx context.Context, tenantSlug string, enterpri
 // GetByID retrieves a presentation by its ID
 func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (*Presentation, error) {
 	p := &Presentation{}
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT 
 			id, product_id, name, factor, barcode, cost_price, sale_price,
 			default_purchase, default_sale, enterprise_id,
 			created_at, updated_at, deleted_at
-		FROM "%s".presentation WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
+		FROM %spresentation WHERE id = $1 AND deleted_at IS NULL`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&p.ID, &p.ProductID, &p.Name, &p.Factor, &p.Barcode,
@@ -81,14 +87,15 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 
 // GetByProductID retrieves all presentations for a product
 func (r *repository) GetByProductID(ctx context.Context, tenantSlug string, productID int64) ([]Presentation, error) {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT 
 			id, product_id, name, factor, barcode, cost_price, sale_price,
 			default_purchase, default_sale, enterprise_id,
 			created_at, updated_at, deleted_at
-		FROM "%s".presentation 
+		FROM %spresentation 
 		WHERE product_id = $1 AND deleted_at IS NULL
-		ORDER BY name`, tenantSlug)
+		ORDER BY name`, tenant)
 
 	rows, err := r.db.QueryContext(ctx, query, productID)
 	if err != nil {
@@ -114,26 +121,27 @@ func (r *repository) GetByProductID(ctx context.Context, tenantSlug string, prod
 // List retrieves a list of presentations with filters
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Presentation, error) {
 	ctx = context.WithoutCancel(ctx)
-
+ 
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL`, enterpriseID)
-
+ 
 	if filters.ProductID != nil {
 		baseWhere += fmt.Sprintf(" AND product_id = %d", *filters.ProductID)
 	}
-
+ 
 	if filters.Search != "" {
 		safeSearch := strings.ReplaceAll(filters.Search, "'", "''")
 		baseWhere += fmt.Sprintf(" AND name ILIKE '%%%s%%'", safeSearch)
 	}
-
+ 
 	offset := (filters.Page - 1) * filters.Limit
 	query := fmt.Sprintf(`
 		SELECT 
 			id, product_id, name, factor, barcode, cost_price, sale_price,
 			default_purchase, default_sale, enterprise_id,
 			created_at, updated_at, deleted_at
-		FROM "%s".presentation WHERE `+baseWhere+` ORDER BY name LIMIT %d OFFSET %d`,
-		tenantSlug, filters.Limit, offset)
+		FROM %spresentation WHERE `+baseWhere+` ORDER BY name LIMIT %d OFFSET %d`,
+		tenant, filters.Limit, offset)
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -159,9 +167,10 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 // Page retrieves a paginated list of presentations
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	ctx = context.WithoutCancel(ctx)
-
+ 
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL`, enterpriseID)
-
+ 
 	// Apply filters from params
 	if params != nil {
 		if productID, ok := params["product_id"]; ok && productID != nil {
@@ -175,16 +184,16 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 			baseWhere += fmt.Sprintf(" AND product_id = %d", pID)
 		}
 	}
-
+ 
 	// Apply search filter
 	searchCond := ""
 	if search != "" {
 		safeSearch := strings.ReplaceAll(search, "'", "''")
 		searchCond = fmt.Sprintf(" AND name ILIKE '%%%s%%'", safeSearch)
 	}
-
+ 
 	// COUNT query
-	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".presentation WHERE `+baseWhere+searchCond, tenantSlug)
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %spresentation WHERE `+baseWhere+searchCond, tenant)
 
 	var total int64
 	if err := r.db.QueryRowContext(ctx, countQuery).Scan(&total); err != nil {
@@ -214,9 +223,9 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 			id, product_id, name, factor, barcode, cost_price, sale_price,
 			default_purchase, default_sale, enterprise_id,
 			created_at, updated_at, deleted_at
-		FROM "%s".presentation 
+		FROM %spresentation 
 		WHERE `+baseWhere+searchCond+` ORDER BY %s %s LIMIT %d OFFSET %d`,
-		tenantSlug, sort, order, limit, offset)
+		tenant, sort, order, limit, offset)
 
 	resultRows, err := r.db.QueryContext(ctx, selectQuery)
 	if err != nil {
@@ -254,12 +263,13 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 
 // Update updates an existing presentation
 func (r *repository) Update(ctx context.Context, tenantSlug string, p *Presentation) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		UPDATE "%s".presentation SET 
+		UPDATE %spresentation SET 
 			name = $1, factor = $2, barcode = $3, 
 			cost_price = $4, sale_price = $5,
 			default_purchase = $6, default_sale = $7, updated_at = NOW()
-		WHERE id = $8 AND deleted_at IS NULL`, tenantSlug)
+		WHERE id = $8 AND deleted_at IS NULL`, tenant)
 
 	_, err := r.db.ExecContext(ctx, query,
 		p.Name, p.Factor, p.Barcode,
@@ -279,7 +289,8 @@ func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) er
 		return fmt.Errorf("failed to get presentation: %w", err)
 	}
 	nameDelete := fmt.Sprintf("%s_deleted_%s", nameProduct.Name, time.Now().Format("20060102150405"))
-	query := fmt.Sprintf(`UPDATE "%s".presentation SET deleted_at = NOW(), name = $1 WHERE id = $2`, tenantSlug)
+	tenant := r.db.SchemaPrefix(tenantSlug)
+	query := fmt.Sprintf(`UPDATE %spresentation SET deleted_at = NOW(), name = $1 WHERE id = $2`, tenant)
 	_, err = r.db.ExecContext(ctx, query, nameDelete, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete presentation: %w", err)

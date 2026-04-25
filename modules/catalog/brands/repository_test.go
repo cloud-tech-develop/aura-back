@@ -8,6 +8,8 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
+ 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 )
 
 // pqError simula un error de PostgreSQL
@@ -22,11 +24,11 @@ func (e *pqError) Error() string {
 
 func TestRepository_Create_WithActive(t *testing.T) {
 	// Test: Verifica que se guarde el campo active correctamente
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	brand := &Brand{
 		Name:         "Nueva Marca",
@@ -53,11 +55,11 @@ func TestRepository_Create_WithActive(t *testing.T) {
 
 func TestRepository_Create_WithInactive(t *testing.T) {
 	// Test: Verifica que se guarde active=false correctamente
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	brand := &Brand{
 		Name:         "Marca Inactiva",
@@ -82,11 +84,11 @@ func TestRepository_Create_WithInactive(t *testing.T) {
 
 func TestRepository_Create_Success(t *testing.T) {
 	// Test: Inserción exitosa de marca
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	brand := &Brand{
 		Name:         "Marca Ejemplo",
@@ -111,11 +113,11 @@ func TestRepository_Create_Success(t *testing.T) {
 
 func TestRepository_GetByID_Success(t *testing.T) {
 	// Test: Obtención por ID exitosa
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	rows := sqlmock.NewRows([]string{
@@ -138,11 +140,11 @@ func TestRepository_GetByID_Success(t *testing.T) {
 
 func TestRepository_GetByID_NotFound(t *testing.T) {
 	// Test: No encontrado
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	mock.ExpectQuery(`SELECT .* FROM "test_tenant".brand WHERE id`).
 		WithArgs(int64(999)).
@@ -156,11 +158,11 @@ func TestRepository_GetByID_NotFound(t *testing.T) {
 }
 
 func TestRepository_List_FilterActive(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	rows := sqlmock.NewRows([]string{"id", "name"}).
 		AddRow(1, "Marca Activa 1").
@@ -178,11 +180,11 @@ func TestRepository_List_FilterActive(t *testing.T) {
 }
 
 func TestRepository_List_Success(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	rows := sqlmock.NewRows([]string{"id", "name"}).
 		AddRow(1, "Marca A").
@@ -201,11 +203,11 @@ func TestRepository_List_Success(t *testing.T) {
 }
 
 func TestRepository_List_Empty(t *testing.T) {
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	rows := sqlmock.NewRows([]string{"id", "name"})
 
@@ -221,11 +223,11 @@ func TestRepository_List_Empty(t *testing.T) {
 
 func TestRepository_Update_Active(t *testing.T) {
 	// Test: Verifica que se actualice el campo active correctamente
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	brand := &Brand{
 		ID:          1,
@@ -246,11 +248,11 @@ func TestRepository_Update_Active(t *testing.T) {
 
 func TestRepository_Update_Success(t *testing.T) {
 	// Test: Actualización exitosa
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	brand := &Brand{
 		ID:          1,
@@ -270,11 +272,11 @@ func TestRepository_Update_Success(t *testing.T) {
 
 func TestRepository_Delete_Success(t *testing.T) {
 	// Test: Eliminación lógica exitosa
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	mock.ExpectExec(`UPDATE "test_tenant".brand SET deleted_at`).
 		WithArgs(int64(1)).
@@ -287,11 +289,11 @@ func TestRepository_Delete_Success(t *testing.T) {
 
 func TestRepository_Page_Success(t *testing.T) {
 	// Test: Paginación exitosa
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -327,11 +329,11 @@ func TestRepository_Page_Success(t *testing.T) {
 
 func TestRepository_Page_WithSearch(t *testing.T) {
 	// Test: Paginación con búsqueda
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -359,11 +361,11 @@ func TestRepository_Page_WithSearch(t *testing.T) {
 
 func TestRepository_Page_Empty(t *testing.T) {
 	// Test: Paginación vacía
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	// COUNT query vacío
 	countRows := sqlmock.NewRows([]string{"count"}).AddRow(0)
@@ -390,11 +392,11 @@ func TestRepository_Page_Empty(t *testing.T) {
 
 func TestRepository_Page_InvalidSort(t *testing.T) {
 	// Test: Paginación con ordenamiento inválido - usa valores por defecto
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -422,11 +424,11 @@ func TestRepository_Page_InvalidSort(t *testing.T) {
 
 func TestRepository_Page_VerifyActiveField(t *testing.T) {
 	// Test: Verifica que el campo active se devuelva correctamente en paginación
-	db, mock, err := sqlmock.New()
+	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
-	defer db.Close()
-
-	repo := &repository{db: db}
+	defer conn.Close()
+ 
+	repo := &repository{db: db.NewMock(conn)}
 
 	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 

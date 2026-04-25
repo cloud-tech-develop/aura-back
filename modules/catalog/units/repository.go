@@ -11,18 +11,23 @@ import (
 type querier = db.Querier
 
 type repository struct {
-	db querier
+	db        querier
+	isOffline bool
 }
 
 func NewRepository(db querier) Repository {
-	return &repository{db: db}
+	return &repository{
+		db:        db,
+		isOffline: db.IsSQLite(),
+	}
 }
 
 func (r *repository) Create(ctx context.Context, tenantSlug string, u *Unit) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		INSERT INTO "%s".unit (name, abbreviation, active, allow_decimals, enterprise_id)
+		INSERT INTO %sunit (name, abbreviation, active, allow_decimals, enterprise_id)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at`, tenantSlug)
+		RETURNING id, created_at`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, u.Name, u.Abbreviation, u.Active, u.AllowDecimals, u.EnterpriseID).
 		Scan(&u.ID, &u.CreatedAt)
@@ -34,9 +39,10 @@ func (r *repository) Create(ctx context.Context, tenantSlug string, u *Unit) err
 
 func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (*Unit, error) {
 	u := &Unit{}
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, name, abbreviation, active, allow_decimals, enterprise_id, created_at, updated_at, deleted_at
-		FROM "%s".unit WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
+		FROM %sunit WHERE id = $1 AND deleted_at IS NULL`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&u.ID, &u.Name, &u.Abbreviation, &u.Active, &u.AllowDecimals, &u.EnterpriseID,
@@ -51,11 +57,12 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]UnitList, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
-
+ 
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, name, abbreviation
-		FROM "%s".unit WHERE enterprise_id = $1 AND deleted_at IS NULL
-		ORDER BY name`, tenantSlug)
+		FROM %sunit WHERE enterprise_id = $1 AND deleted_at IS NULL
+		ORDER BY name`, tenant)
 
 	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
 	if err != nil {
@@ -77,14 +84,15 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
-
+ 
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	// Build base WHERE clause
 	baseWhere := `enterprise_id = $1 AND deleted_at IS NULL`
 	args := []interface{}{enterpriseID}
 	argPos := 2
-
+ 
 	// COUNT query
-	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".unit WHERE `+baseWhere, tenantSlug)
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %sunit WHERE `+baseWhere, tenant)
 	if search != "" {
 		countQuery += fmt.Sprintf(" AND (name ILIKE $%d OR abbreviation ILIKE $%d)", argPos, argPos)
 		searchTerm := "%" + search + "%"
@@ -117,7 +125,7 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	// SELECT query with pagination
 	selectQuery := fmt.Sprintf(`
 		SELECT id, name, abbreviation, active, allow_decimals, enterprise_id, created_at, updated_at, deleted_at
-		FROM "%s".unit WHERE `+baseWhere, tenantSlug)
+		FROM %sunit WHERE `+baseWhere, tenant)
 
 	args = []interface{}{enterpriseID}
 	argPos = 2
@@ -169,9 +177,10 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 }
 
 func (r *repository) Update(ctx context.Context, tenantSlug string, u *Unit) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		UPDATE "%s".unit SET name = $1, abbreviation = $2, active = $3, allow_decimals = $4, updated_at = NOW()
-		WHERE id = $5 AND deleted_at IS NULL`, tenantSlug)
+		UPDATE %sunit SET name = $1, abbreviation = $2, active = $3, allow_decimals = $4, updated_at = NOW()
+		WHERE id = $5 AND deleted_at IS NULL`, tenant)
 
 	_, err := r.db.ExecContext(ctx, query, u.Name, u.Abbreviation, u.Active, u.AllowDecimals, u.ID)
 	if err != nil {
@@ -181,7 +190,8 @@ func (r *repository) Update(ctx context.Context, tenantSlug string, u *Unit) err
 }
 
 func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) error {
-	query := fmt.Sprintf(`UPDATE "%s".unit SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
+	tenant := r.db.SchemaPrefix(tenantSlug)
+	query := fmt.Sprintf(`UPDATE %sunit SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`, tenant)
 	_, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete unit: %w", err)

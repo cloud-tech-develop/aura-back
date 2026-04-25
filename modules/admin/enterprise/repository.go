@@ -12,11 +12,15 @@ import (
 )
 
 type postgresRepository struct {
-	q db.Querier
+	q         db.Querier
+	isOffline bool
 }
 
 func NewRepository(q db.Querier) Repository {
-	return &postgresRepository{q: q}
+	return &postgresRepository{
+		q:         q,
+		isOffline: q.IsSQLite(),
+	}
 }
 
 func (r *postgresRepository) Create(ctx context.Context, e *Enterprise) error {
@@ -25,17 +29,20 @@ func (r *postgresRepository) Create(ctx context.Context, e *Enterprise) error {
 	if e.Status == "" {
 		e.Status = "ACTIVE"
 	}
-
+ 
 	settingsJSON, err := json.Marshal(e.Settings)
 	if err != nil || string(settingsJSON) == "null" {
 		settingsJSON = []byte("{}")
 	}
-
-	_, err = r.q.ExecContext(ctx,
-		`INSERT INTO public.enterprises 
+ 
+	prefix := r.q.SchemaPrefix("public")
+	query := fmt.Sprintf(`
+		INSERT INTO %senterprises 
 		 (tenant_id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at) 
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) 
-		 ON CONFLICT (slug) DO NOTHING`,
+		 ON CONFLICT (slug) DO NOTHING`, prefix)
+ 
+	_, err = r.q.ExecContext(ctx, query,
 		e.TenantID, e.Name, e.CommercialName, e.Slug, e.SubDomain, e.Email,
 		e.Document, e.DV, e.Phone, e.MunicipalityID, e.Municipality, e.Status,
 		settingsJSON, e.CreatedAt, e.UpdatedAt,
@@ -46,11 +53,12 @@ func (r *postgresRepository) Create(ctx context.Context, e *Enterprise) error {
 func (r *postgresRepository) GetBySlug(ctx context.Context, slug string) (*Enterprise, error) {
 	var e Enterprise
 	var settingsJSON []byte
-	err := r.q.QueryRowContext(ctx,
-		`SELECT id, tenant_id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at 
-		 FROM public.enterprises WHERE slug = $1 AND deleted_at IS NULL`,
-		slug,
-	).Scan(&e.ID, &e.TenantID, &e.Name, &e.CommercialName, &e.Slug, &e.SubDomain,
+	prefix := r.q.SchemaPrefix("public")
+	query := fmt.Sprintf(`
+		SELECT id, tenant_id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at 
+		 FROM %senterprises WHERE slug = $1 AND deleted_at IS NULL`, prefix)
+ 
+	err := r.q.QueryRowContext(ctx, query, slug).Scan(&e.ID, &e.TenantID, &e.Name, &e.CommercialName, &e.Slug, &e.SubDomain,
 		&e.Email, &e.Document, &e.DV, &e.Phone, &e.MunicipalityID, &e.Municipality, &e.Status,
 		&settingsJSON, &e.CreatedAt, &e.UpdatedAt)
 	if err != nil {
@@ -63,11 +71,12 @@ func (r *postgresRepository) GetBySlug(ctx context.Context, slug string) (*Enter
 func (r *postgresRepository) GetBySubDomain(ctx context.Context, subDomain string) (*Enterprise, error) {
 	var e Enterprise
 	var settingsJSON []byte
-	err := r.q.QueryRowContext(ctx,
-		`SELECT id, tenant_id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at 
-		 FROM public.enterprises WHERE sub_domain = $1 AND status = 'ACTIVE' AND deleted_at IS NULL`,
-		subDomain,
-	).Scan(&e.ID, &e.TenantID, &e.Name, &e.CommercialName, &e.Slug, &e.SubDomain,
+	prefix := r.q.SchemaPrefix("public")
+	query := fmt.Sprintf(`
+		SELECT id, tenant_id, name, commercial_name, slug, sub_domain, email, document, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at 
+		 FROM %senterprises WHERE sub_domain = $1 AND status = 'ACTIVE' AND deleted_at IS NULL`, prefix)
+ 
+	err := r.q.QueryRowContext(ctx, query, subDomain).Scan(&e.ID, &e.TenantID, &e.Name, &e.CommercialName, &e.Slug, &e.SubDomain,
 		&e.Email, &e.Document, &e.DV, &e.Phone, &e.MunicipalityID, &e.Municipality, &e.Status,
 		&settingsJSON, &e.CreatedAt, &e.UpdatedAt)
 	if err != nil {
@@ -80,11 +89,12 @@ func (r *postgresRepository) GetBySubDomain(ctx context.Context, subDomain strin
 func (r *postgresRepository) GetByEmail(ctx context.Context, email vo.Email) (*Enterprise, error) {
 	var e Enterprise
 	var settingsJSON []byte
-	err := r.q.QueryRowContext(ctx,
-		`SELECT id, tenant_id, name, commercial_name, slug, sub_domain, email, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at 
-		 FROM public.enterprises WHERE email = $1 AND deleted_at IS NULL`,
-		email,
-	).Scan(&e.ID, &e.TenantID, &e.Name, &e.CommercialName, &e.Slug, &e.SubDomain,
+	prefix := r.q.SchemaPrefix("public")
+	query := fmt.Sprintf(`
+		SELECT id, tenant_id, name, commercial_name, slug, sub_domain, email, dv, phone, municipality_id, municipality, status, settings, created_at, updated_at 
+		 FROM %senterprises WHERE email = $1 AND deleted_at IS NULL`, prefix)
+ 
+	err := r.q.QueryRowContext(ctx, query, email).Scan(&e.ID, &e.TenantID, &e.Name, &e.CommercialName, &e.Slug, &e.SubDomain,
 		&e.Email, &e.DV, &e.Phone, &e.MunicipalityID, &e.Municipality, &e.Status,
 		&settingsJSON, &e.CreatedAt, &e.UpdatedAt)
 	if err != nil {
@@ -109,8 +119,9 @@ func (r *postgresRepository) List(ctx context.Context, params ListParams) (ListR
 		params.Limit = 100
 	}
  
+	prefix := r.q.SchemaPrefix("public")
 	// Build query with filters
-	baseQuery := "FROM public.enterprises WHERE deleted_at IS NULL"
+	baseQuery := fmt.Sprintf("FROM %senterprises WHERE deleted_at IS NULL", prefix)
 	var args []interface{}
 	argIndex := 1
  
@@ -174,11 +185,14 @@ func (r *postgresRepository) Update(ctx context.Context, e *Enterprise) error {
 	if err != nil || string(settingsJSON) == "null" {
 		settingsJSON = []byte("{}")
 	}
-	_, err = r.q.ExecContext(ctx,
-		`UPDATE public.enterprises 
+	prefix := r.q.SchemaPrefix("public")
+	query := fmt.Sprintf(`
+		UPDATE %senterprises 
 		 SET name=$1, commercial_name=$2, sub_domain=$3, email=$4, dv=$5, phone=$6, 
 		     municipality_id=$7, municipality=$8, status=$9, settings=$10, updated_at=$11 
-		 WHERE id=$12 AND deleted_at IS NULL`,
+		 WHERE id=$12 AND deleted_at IS NULL`, prefix)
+ 
+	_, err = r.q.ExecContext(ctx, query,
 		e.Name, e.CommercialName, e.SubDomain, e.Email, e.DV, e.Phone,
 		e.MunicipalityID, e.Municipality, e.Status, settingsJSON, e.UpdatedAt, e.ID,
 	)
@@ -186,9 +200,9 @@ func (r *postgresRepository) Update(ctx context.Context, e *Enterprise) error {
 }
  
 func (r *postgresRepository) Delete(ctx context.Context, id int64) error {
-	_, err := r.q.ExecContext(ctx,
-		`UPDATE public.enterprises SET deleted_at = NOW() WHERE id = $1`, id,
-	)
+	prefix := r.q.SchemaPrefix("public")
+	query := fmt.Sprintf(`UPDATE %senterprises SET deleted_at = NOW() WHERE id = $1`, prefix)
+	_, err := r.q.ExecContext(ctx, query, id)
 	return err
 }
  
@@ -200,31 +214,29 @@ func (r *postgresRepository) dropSchema(slug string) {
 // EmailExistsInUsers checks if email already exists in public.users (HU-002)
 func (r *postgresRepository) EmailExistsInUsers(ctx context.Context, email vo.Email) (bool, error) {
 	var exists bool
-	err := r.q.QueryRowContext(ctx,
-		`SELECT EXISTS(SELECT 1 FROM public.users WHERE email = $1)`,
-		email,
-	).Scan(&exists)
+	prefix := r.q.SchemaPrefix("public")
+	query := fmt.Sprintf(`SELECT EXISTS(SELECT 1 FROM %susers WHERE email = $1)`, prefix)
+	err := r.q.QueryRowContext(ctx, query, email).Scan(&exists)
 	return exists, err
 }
  
 // EnterpriseExistsByStatus checks if an enterprise exists with given status
 func (r *postgresRepository) EnterpriseExistsByStatus(ctx context.Context, slug string, status string) (bool, error) {
 	var exists bool
-	err := r.q.QueryRowContext(ctx,
-		`SELECT EXISTS(SELECT 1 FROM public.enterprises WHERE slug = $1 AND status = $2 AND deleted_at IS NULL)`,
-		slug, status,
-	).Scan(&exists)
+	prefix := r.q.SchemaPrefix("public")
+	query := fmt.Sprintf(`SELECT EXISTS(SELECT 1 FROM %senterprises WHERE slug = $1 AND status = $2 AND deleted_at IS NULL)`, prefix)
+	err := r.q.QueryRowContext(ctx, query, slug, status).Scan(&exists)
 	return exists, err
 }
  
 // GetPlanByEnterpriseID retrieves the plan for a given enterprise
 func (r *postgresRepository) GetPlanByEnterpriseID(ctx context.Context, enterpriseID int64) (*Plan, error) {
 	var p Plan
-	err := r.q.QueryRowContext(ctx,
-		`SELECT id, enterprise_id, max_users, max_enterprises, trial_until, created_at, updated_at 
-		 FROM public.plans WHERE enterprise_id = $1 AND deleted_at IS NULL`,
-		enterpriseID,
-	).Scan(&p.ID, &p.EnterpriseID, &p.MaxUsers, &p.MaxEnterprises, &p.TrialUntil, &p.CreatedAt, &p.UpdatedAt)
+	prefix := r.q.SchemaPrefix("public")
+	query := fmt.Sprintf(`
+		SELECT id, enterprise_id, max_users, max_enterprises, trial_until, created_at, updated_at 
+		 FROM %splans WHERE enterprise_id = $1 AND deleted_at IS NULL`, prefix)
+	err := r.q.QueryRowContext(ctx, query, enterpriseID).Scan(&p.ID, &p.EnterpriseID, &p.MaxUsers, &p.MaxEnterprises, &p.TrialUntil, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -233,11 +245,12 @@ func (r *postgresRepository) GetPlanByEnterpriseID(ctx context.Context, enterpri
  
 // GetPlansByEnterpriseID retrieves all plans for a given enterprise
 func (r *postgresRepository) GetPlansByEnterpriseID(ctx context.Context, enterpriseID int64) ([]Plan, error) {
-	rows, err := r.q.QueryContext(ctx,
-		`SELECT id, enterprise_id, max_users, max_enterprises, trial_until, created_at, updated_at, deleted_at 
-		 FROM public.plans WHERE enterprise_id = $1 AND deleted_at IS NULL`,
-		enterpriseID,
-	)
+	prefix := r.q.SchemaPrefix("public")
+	query := fmt.Sprintf(`
+		SELECT id, enterprise_id, max_users, max_enterprises, trial_until, created_at, updated_at, deleted_at 
+		 FROM %splans WHERE enterprise_id = $1 AND deleted_at IS NULL`, prefix)
+ 
+	rows, err := r.q.QueryContext(ctx, query, enterpriseID)
 	if err != nil {
 		return nil, err
 	}
@@ -257,9 +270,8 @@ func (r *postgresRepository) GetPlansByEnterpriseID(ctx context.Context, enterpr
 // CountEnterprisesByTenant counts the number of enterprises for a tenant
 func (r *postgresRepository) CountEnterprisesByTenant(ctx context.Context, tenantID int64) (int64, error) {
 	var count int64
-	err := r.q.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM public.enterprises WHERE tenant_id = $1 AND deleted_at IS NULL`,
-		tenantID,
-	).Scan(&count)
+	prefix := r.q.SchemaPrefix("public")
+	query := fmt.Sprintf(`SELECT COUNT(*) FROM %senterprises WHERE tenant_id = $1 AND deleted_at IS NULL`, prefix)
+	err := r.q.QueryRowContext(ctx, query, tenantID).Scan(&count)
 	return count, err
 }

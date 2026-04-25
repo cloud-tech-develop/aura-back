@@ -56,7 +56,7 @@ func (s *service) Create(ctx context.Context, tenantSlug string, p *Product) err
 
 	// Validate product type is valid
 	if p.ProductType == "" {
-		p.ProductType = "STANDARD"
+		p.ProductType = "ESTANDAR"
 	} else if !IsValidProductType(p.ProductType) {
 		logger.Logf("[Product Service] Validation failed: invalid product type '%s'", p.ProductType)
 		return fmt.Errorf("invalid product type: %s", p.ProductType)

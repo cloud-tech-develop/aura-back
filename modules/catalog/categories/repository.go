@@ -12,18 +12,23 @@ import (
 type querier = db.Querier
 
 type repository struct {
-	db querier
+	db        querier
+	isOffline bool
 }
 
 func NewRepository(db querier) Repository {
-	return &repository{db: db}
+	return &repository{
+		db:        db,
+		isOffline: db.IsSQLite(),
+	}
 }
 
 func (r *repository) Create(ctx context.Context, tenantSlug string, c *Category) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		INSERT INTO "%s".category (name, description, parent_id, default_tax_rate, active, enterprise_id)
+		INSERT INTO %scategory (name, description, parent_id, default_tax_rate, active, enterprise_id)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, created_at`, tenantSlug)
+		RETURNING id, created_at`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, c.Name, c.Description, c.ParentID, c.DefaultTaxRate, c.Active, c.EnterpriseID).
 		Scan(&c.ID, &c.CreatedAt)
@@ -35,9 +40,10 @@ func (r *repository) Create(ctx context.Context, tenantSlug string, c *Category)
 
 func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (*Category, error) {
 	c := &Category{}
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, name, description, parent_id, default_tax_rate, active, enterprise_id, created_at, updated_at, deleted_at
-		FROM "%s".category WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
+		FROM %scategory WHERE id = $1 AND deleted_at IS NULL`, tenant)
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&c.ID, &c.Name, &c.Description, &c.ParentID, &c.DefaultTaxRate, &c.Active, &c.EnterpriseID,
@@ -55,11 +61,12 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]domain.ListId, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
-
+ 
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, name
-		FROM "%s".category WHERE enterprise_id = %d AND deleted_at IS NULL AND active = true
-		ORDER BY name`, tenantSlug, enterpriseID)
+		FROM %scategory WHERE enterprise_id = %d AND deleted_at IS NULL AND active = true
+		ORDER BY name`, tenant, enterpriseID)
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -81,14 +88,15 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
-
+ 
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	// Build base WHERE clause
 	baseWhere := `enterprise_id = $1 AND deleted_at IS NULL`
 	args := []interface{}{enterpriseID}
 	argPos := 2
-
+ 
 	// COUNT query
-	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".category WHERE `+baseWhere, tenantSlug)
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %scategory WHERE `+baseWhere, tenant)
 	if search != "" {
 		countQuery += fmt.Sprintf(" AND name ILIKE $%d", argPos)
 		searchTerm := "%" + search + "%"
@@ -121,7 +129,7 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	// SELECT query with pagination
 	selectQuery := fmt.Sprintf(`
 		SELECT id, name, description, parent_id, default_tax_rate, active, enterprise_id, created_at, updated_at, deleted_at
-		FROM "%s".category WHERE `+baseWhere, tenantSlug)
+		FROM %scategory WHERE `+baseWhere, tenant)
 
 	args = []interface{}{enterpriseID}
 	argPos = 2
@@ -173,9 +181,10 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 }
 
 func (r *repository) Update(ctx context.Context, tenantSlug string, c *Category) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		UPDATE "%s".category SET name = $1, description = $2, parent_id = $3, default_tax_rate = $4, active = $5, updated_at = NOW()
-		WHERE id = $6 AND deleted_at IS NULL`, tenantSlug)
+		UPDATE %scategory SET name = $1, description = $2, parent_id = $3, default_tax_rate = $4, active = $5, updated_at = NOW()
+		WHERE id = $6 AND deleted_at IS NULL`, tenant)
 
 	_, err := r.db.ExecContext(ctx, query, c.Name, c.Description, c.ParentID, c.DefaultTaxRate, c.Active, c.ID)
 	if err != nil {
@@ -185,7 +194,8 @@ func (r *repository) Update(ctx context.Context, tenantSlug string, c *Category)
 }
 
 func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) error {
-	query := fmt.Sprintf(`UPDATE "%s".category SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
+	tenant := r.db.SchemaPrefix(tenantSlug)
+	query := fmt.Sprintf(`UPDATE %scategory SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`, tenant)
 	_, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete category: %w", err)

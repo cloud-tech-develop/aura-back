@@ -9,11 +9,15 @@ import (
 )
 
 type repository struct {
-	db *db.DB
+	db        *db.DB
+	isOffline bool
 }
 
 func NewRepository(database *db.DB) Repository {
-	return &repository{db: database}
+	return &repository{
+		db:        database,
+		isOffline: database.IsSQLite(),
+	}
 }
 
 // ─── Enterprise Operations ─────────────────────────────────────────────────────

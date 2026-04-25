@@ -49,7 +49,7 @@ func (s *service) Create(ctx context.Context, tenantSlug string, user *User, pas
 	defer tx.Rollback()
 
 	// Create repository instance with transaction
-	repoTx := NewRepositoryWithQuerier(tx)
+	repoTx := NewRepositoryWithQuerier(s.db.Wrap(tx))
 
 	// Check email uniqueness within the transaction
 	existingUser, err := repoTx.GetByEmail(ctx, user.Email)
@@ -158,15 +158,21 @@ func (s *service) AssignRoles(ctx context.Context, userID int64, roleIDs []int64
 	}
 	defer tx.Rollback()
 
+	// Wrap transaction to handle schema prefixing
+	wrappedTx := s.db.Wrap(tx)
+	prefix := wrappedTx.SchemaPrefix("public")
+
 	// Delete existing roles for this user
-	_, err = tx.ExecContext(ctx, `DELETE FROM public.user_roles WHERE user_id = $1`, userID)
+	deleteQuery := fmt.Sprintf(`DELETE FROM %suser_roles WHERE user_id = $1`, prefix)
+	_, err = wrappedTx.ExecContext(ctx, deleteQuery, userID)
 	if err != nil {
 		return fmt.Errorf("failed to clear existing roles: %w", err)
 	}
 
 	// Insert new roles
+	insertQuery := fmt.Sprintf(`INSERT INTO %suser_roles (user_id, role_id) VALUES ($1, $2)`, prefix)
 	for _, roleID := range roleIDs {
-		_, err = tx.ExecContext(ctx, `INSERT INTO public.user_roles (user_id, role_id) VALUES ($1, $2)`, userID, roleID)
+		_, err = wrappedTx.ExecContext(ctx, insertQuery, userID, roleID)
 		if err != nil {
 			return fmt.Errorf("failed to assign role %d: %w", roleID, err)
 		}
@@ -181,7 +187,9 @@ func (s *service) AssignRoles(ctx context.Context, userID int64, roleIDs []int64
 
 func (s *service) getRoleLevel(ctx context.Context, roleID int64) (int, error) {
 	var level int
-	err := s.db.QueryRowContext(ctx, `SELECT level FROM public.roles WHERE id = $1 AND deleted_at IS NULL`, roleID).Scan(&level)
+	prefix := s.db.SchemaPrefix("public")
+	query := fmt.Sprintf(`SELECT level FROM %sroles WHERE id = $1 AND deleted_at IS NULL`, prefix)
+	err := s.db.QueryRowContext(ctx, query, roleID).Scan(&level)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return -1, sql.ErrNoRows
