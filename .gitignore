@@ -30,6 +30,9 @@ go.work
 .DS_Store
 Thumbs.db
 
+# Database
+*.db
+
 # Test coverage
 coverage.out
 coverage.html
