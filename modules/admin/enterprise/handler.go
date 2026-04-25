@@ -316,7 +316,5 @@ func (h *Handler) GetPlans(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, gin.H{
-		"data": plans,
-	})
+	response.OK(c, plans)
 }

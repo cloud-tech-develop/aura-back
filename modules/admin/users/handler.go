@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	"github.com/cloud-tech-develop/aura-back/shared/errors"
@@ -118,9 +119,54 @@ func (h *Handler) ListByEnterpriseID(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, gin.H{
-		"data": users,
-	})
+	response.OK(c, users)
+}
+
+// ─── GET /users-sync?enterprise_id=X (For offline sync - includes password hashes) ─────────────────────
+
+func (h *Handler) ListByEnterpriseIDForSync(c *gin.Context) {
+	enterpriseID, _ := strconv.ParseInt(c.Query("enterprise_id"), 10, 64)
+	if enterpriseID == 0 {
+		response.BadRequest(c, "enterprise_id es requerido")
+		return
+	}
+
+	// This endpoint is for offline sync only, so we get all users without limit
+	users, err := h.svc.ListByEnterprise(c.Request.Context(), enterpriseID, 1, 10000)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	// Return users with password hashes (for offline mode)
+	type UserWithPassword struct {
+		ID            int64     `json:"id"`
+		EnterpriseID int64     `json:"enterprise_id"`
+		Name         string    `json:"name"`
+		Email        string    `json:"email"`
+		PasswordHash string    `json:"password_hash"`
+		Active       bool      `json:"active"`
+		CreatedAt    time.Time `json:"created_at"`
+		UpdatedAt    time.Time `json:"updated_at"`
+		DeletedAt    *time.Time `json:"deleted_at,omitempty"`
+	}
+
+	var result []UserWithPassword
+	for _, u := range users {
+		result = append(result, UserWithPassword{
+			ID:            u.ID,
+			EnterpriseID: u.EnterpriseID,
+			Name:         u.Name,
+			Email:        u.Email.String(),
+			PasswordHash: u.PasswordHash,
+			Active:       u.Active,
+			CreatedAt:    u.CreatedAt,
+			UpdatedAt:    u.UpdatedAt,
+			DeletedAt:    u.DeletedAt,
+		})
+	}
+
+	response.OK(c, result)
 }
 
 // ─── GET /users ─────────────────────────────────────────────────────────
@@ -418,7 +464,5 @@ func (h *Handler) ListUserRolesByEnterpriseID(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, gin.H{
-		"data": userRoles,
-	})
+	response.OK(c, userRoles)
 }

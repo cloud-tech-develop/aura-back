@@ -86,7 +86,7 @@ func main() {
 	// Modules
 	// Enterprise module
 	enterpriseMigrator := &enterpriseMigratorAdapter{manager: tenantMgr}
-	enterpriseSvc := enterprise.NewService(database.DB, eventBus, enterpriseMigrator)
+	enterpriseSvc := enterprise.NewService(database, eventBus, enterpriseMigrator)
 	enterpriseHandler := enterprise.NewHandler(enterpriseSvc, tenantMgr)
 
 	// Logging (Enterprise)
@@ -96,7 +96,7 @@ func main() {
 	_ = eventBus.Subscribe(enterprise.EventDeleted, enterpriseLogger)
 
 	// Users module
-	usersSvc := users.NewService(database.DB, eventBus)
+	usersSvc := users.NewService(database, eventBus)
 	usersHandler := users.NewHandler(usersSvc)
 
 	// Logging (Users)
@@ -105,13 +105,13 @@ func main() {
 	_ = eventBus.Subscribe(users.EventUpdated, usersLogger)
 
 	// Catalog modules
-	categorySvc := categories.NewService(database.Wrap(database.DB))
+	categorySvc := categories.NewService(database)
 	categoryHandler := categories.NewHandler(categorySvc)
 
-	brandSvc := brands.NewService(database.Wrap(database.DB))
+	brandSvc := brands.NewService(database)
 	brandHandler := brands.NewHandler(brandSvc)
 
-	unitSvc := units.NewService(database.Wrap(database.DB))
+	unitSvc := units.NewService(database)
 	unitHandler := units.NewHandler(unitSvc)
 
 	productsLogger := catalogProducts.NewLoggerHandler("logs")
@@ -132,12 +132,12 @@ func main() {
 	// Offline module (only in offline mode)
 	var offlineHandler *offline.Handler
 	if driver == "sqlite" {
-		offlineSvc := offline.NewService(database.DB, eventBus)
+		offlineSvc := offline.NewService(database, eventBus)
 		offlineHandler = offline.NewHandler(offlineSvc)
 	}
 
 	// HTTP Server
-	srv := server.NewServer(database.DB, tenantMgr)
+	srv := server.NewServer(database, tenantMgr)
 	srv.RegisterModules(enterpriseHandler, usersHandler, categoryHandler, brandHandler, productHandler, presHandler, thirdPartiesHandler, unitHandler, offlineHandler)
 
 	log.Println("servidor en :" + port)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 )
 
@@ -20,8 +21,8 @@ type repository struct {
 	q querier
 }
 
-func NewRepository(db *sql.DB) Repository {
-	return &repository{q: db}
+func NewRepository(q db.Querier) Repository {
+	return &repository{q: q}
 }
 
 // NewRepositoryWithQuerier creates a repository with a specific querier (e.g., a transaction).

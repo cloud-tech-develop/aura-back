@@ -6,8 +6,11 @@ import (
 )
 
 func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
+	// Public for offline sync
+	public.GET("/catalog/products", h.List)
+	
+	// Protected routes
 	protected.POST("/catalog/products", h.Create)
-	protected.GET("/catalog/products", h.List)
 	protected.GET("/catalog/products/exist/:sku", h.GetBySKU)
 	protected.GET("/catalog/products/:id", h.GetByID)
 	protected.POST("/catalog/products/page", h.Page)
@@ -17,8 +20,10 @@ func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
 
 // RegisterProductPresentations registers the product presentations routes
 func RegisterProductPresentations(public gin.IRouter, protected gin.IRouter, productH *Handler, presentationH *presentations.Handler) {
-	// Product-specific presentation routes
-	protected.GET("/catalog/products/:id/presentations", presentationH.GetByProductID)
+	// Public for offline sync
+	public.GET("/catalog/products/:id/presentations", presentationH.GetByProductID)
+	
+	// Protected routes
 	protected.POST("/catalog/products/:id/presentations", presentationH.Create)
 	protected.PUT("/catalog/products/:id/presentations", presentationH.UpsertArray)
 }

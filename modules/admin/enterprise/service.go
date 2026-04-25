@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	"github.com/cloud-tech-develop/aura-back/shared/events"
 )
@@ -29,15 +30,15 @@ type service struct {
 	repo     Repository
 	eventBus events.EventBus
 	migrator Migrator
-	rawDB    *sql.DB // used for schema dropping
+	rawDB    *db.DB // used for schema dropping
 }
 
-func NewService(db *sql.DB, eventBus events.EventBus, migrator Migrator) Service {
+func NewService(database *db.DB, eventBus events.EventBus, migrator Migrator) Service {
 	return &service{
-		repo:     NewRepository(db),
+		repo:     NewRepository(database),
 		eventBus: eventBus,
 		migrator: migrator,
-		rawDB:    db,
+		rawDB:    database,
 	}
 }
 

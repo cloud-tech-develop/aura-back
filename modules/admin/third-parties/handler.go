@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
+	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,6 +21,11 @@ func NewHandler(database *db.DB) *Handler {
 
 // CreateThirdParty - POST /third-parties
 func (h *Handler) CreateThirdParty(c *gin.Context) {
+	tenantSlug, ok := tenant.SlugFromContext(c)
+	if !ok || tenantSlug == "" {
+		tenantSlug = c.Query("slug")
+	}
+
 	enterpriseID := c.GetInt64("enterprise_id")
 	if enterpriseID == 0 {
 		response.BadRequest(c, "enterprise_id not found")
@@ -68,7 +74,7 @@ func (h *Handler) CreateThirdParty(c *gin.Context) {
 		Municipality:      req.Municipality,
 	}
 
-	if err := h.svc.Create(c.Request.Context(), tp); err != nil {
+	if err := h.svc.Create(c.Request.Context(), tenantSlug, tp); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
@@ -77,10 +83,30 @@ func (h *Handler) CreateThirdParty(c *gin.Context) {
 }
 
 // ListThirdParties - GET /third-parties
+// Supports enterprise_id from context (JWT) or query params (for offline sync)
 func (h *Handler) ListThirdParties(c *gin.Context) {
+	tenantSlug, hasSlug := tenant.SlugFromContext(c)
+	if !hasSlug || tenantSlug == "" {
+		tenantSlug = c.Query("slug")
+	}
+
 	enterpriseID := c.GetInt64("enterprise_id")
+	
+	// Try to get from query params for offline sync (no JWT context)
 	if enterpriseID == 0 {
-		response.BadRequest(c, "enterprise_id not found")
+		idStr := c.Query("enterprise_id")
+		if idStr != "" {
+			var err error
+			enterpriseID, err = strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				response.BadRequest(c, "enterprise_id inválido")
+				return
+			}
+		}
+	}
+
+	if enterpriseID == 0 || tenantSlug == "" {
+		response.BadRequest(c, "enterprise_id y slug son requeridos")
 		return
 	}
 
@@ -96,7 +122,7 @@ func (h *Handler) ListThirdParties(c *gin.Context) {
 		Search: search,
 	}
 
-	list, err := h.svc.List(c.Request.Context(), enterpriseID, filters)
+	list, err := h.svc.List(c.Request.Context(), tenantSlug, enterpriseID, filters)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -114,7 +140,12 @@ func (h *Handler) GetThirdParty(c *gin.Context) {
 		return
 	}
 
-	tp, err := h.svc.GetByID(c.Request.Context(), id)
+	tenantSlug, ok := tenant.SlugFromContext(c)
+	if !ok || tenantSlug == "" {
+		tenantSlug = c.Query("slug")
+	}
+
+	tp, err := h.svc.GetByID(c.Request.Context(), tenantSlug, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			response.NotFound(c, "Tercero no encontrado")
@@ -129,9 +160,14 @@ func (h *Handler) GetThirdParty(c *gin.Context) {
 
 // GetThirdPartyByDocument - GET /third-parties/document/:documentNumber
 func (h *Handler) GetThirdPartyByDocument(c *gin.Context) {
+	tenantSlug, ok := tenant.SlugFromContext(c)
+	if !ok || tenantSlug == "" {
+		tenantSlug = c.Query("slug")
+	}
+
 	docNumber := c.Param("documentNumber")
 
-	tp, err := h.svc.GetByDocument(c.Request.Context(), docNumber)
+	tp, err := h.svc.GetByDocument(c.Request.Context(), tenantSlug, docNumber)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			response.NotFound(c, "Tercero no encontrado")
@@ -201,7 +237,12 @@ func (h *Handler) UpdateThirdParty(c *gin.Context) {
 		tp.IsEmployee = *req.IsEmployee
 	}
 
-	if err := h.svc.Update(c.Request.Context(), id, tp); err != nil {
+	tenantSlug, ok := tenant.SlugFromContext(c)
+	if !ok || tenantSlug == "" {
+		tenantSlug = c.Query("slug")
+	}
+
+	if err := h.svc.Update(c.Request.Context(), tenantSlug, id, tp); err != nil {
 		if err == sql.ErrNoRows {
 			response.NotFound(c, "Tercero no encontrado")
 			return
@@ -210,12 +251,17 @@ func (h *Handler) UpdateThirdParty(c *gin.Context) {
 		return
 	}
 
-	tp, _ = h.svc.GetByID(c.Request.Context(), id)
+	tp, _ = h.svc.GetByID(c.Request.Context(), tenantSlug, id)
 	response.OK(c, tp)
 }
 
 // DeleteThirdParty - DELETE /third-parties/:id
 func (h *Handler) DeleteThirdParty(c *gin.Context) {
+	tenantSlug, ok := tenant.SlugFromContext(c)
+	if !ok || tenantSlug == "" {
+		tenantSlug = c.Query("slug")
+	}
+
 	idParam := c.Param("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
@@ -223,7 +269,7 @@ func (h *Handler) DeleteThirdParty(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.Delete(c.Request.Context(), id); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), tenantSlug, id); err != nil {
 		if err == sql.ErrNoRows {
 			response.NotFound(c, "Tercero no encontrado")
 			return

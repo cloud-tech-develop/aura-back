@@ -57,21 +57,21 @@ type ThirdPartyFilters struct {
 
 // Repository interface for third party operations
 type Repository interface {
-	Create(ctx context.Context, tp *ThirdParty) error
-	GetByID(ctx context.Context, id int64) (*ThirdParty, error)
-	GetByDocument(ctx context.Context, docNumber string) (*ThirdParty, error)
-	Update(ctx context.Context, id int64, tp *ThirdParty) error
-	Delete(ctx context.Context, id int64) error
-	List(ctx context.Context, enterpriseID int64, filters ThirdPartyFilters) ([]ThirdParty, error)
-	Count(ctx context.Context, enterpriseID int64, filters ThirdPartyFilters) (int, error)
+	Create(ctx context.Context, tenantSlug string, tp *ThirdParty) error
+	GetByID(ctx context.Context, tenantSlug string, id int64) (*ThirdParty, error)
+	GetByDocument(ctx context.Context, tenantSlug string, docNumber string) (*ThirdParty, error)
+	Update(ctx context.Context, tenantSlug string, id int64, tp *ThirdParty) error
+	Delete(ctx context.Context, tenantSlug string, id int64) error
+	List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ThirdPartyFilters) ([]ThirdParty, error)
+	Count(ctx context.Context, tenantSlug string, enterpriseID int64, filters ThirdPartyFilters) (int, error)
 }
 
 // Service interface for third party business logic
 type Service interface {
-	Create(ctx context.Context, tp *ThirdParty) error
-	GetByID(ctx context.Context, id int64) (*ThirdParty, error)
-	GetByDocument(ctx context.Context, docNumber string) (*ThirdParty, error)
-	Update(ctx context.Context, id int64, tp *ThirdParty) error
-	Delete(ctx context.Context, id int64) error
-	List(ctx context.Context, enterpriseID int64, filters ThirdPartyFilters) ([]ThirdParty, error)
+	Create(ctx context.Context, tenantSlug string, tp *ThirdParty) error
+	GetByID(ctx context.Context, tenantSlug string, id int64) (*ThirdParty, error)
+	GetByDocument(ctx context.Context, tenantSlug string, docNumber string) (*ThirdParty, error)
+	Update(ctx context.Context, tenantSlug string, id int64, tp *ThirdParty) error
+	Delete(ctx context.Context, tenantSlug string, id int64) error
+	List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ThirdPartyFilters) ([]ThirdParty, error)
 }

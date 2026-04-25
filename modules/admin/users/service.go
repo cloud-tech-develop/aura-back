@@ -5,20 +5,21 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/events"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 )
 
 type service struct {
-	db       *sql.DB
+	db       *db.DB
 	repo     Repository
 	eventBus events.EventBus
 }
 
-func NewService(db *sql.DB, eventBus events.EventBus) Service {
+func NewService(database *db.DB, eventBus events.EventBus) Service {
 	return &service{
-		db:       db,
-		repo:     NewRepository(db),
+		db:       database,
+		repo:     NewRepository(database),
 		eventBus: eventBus,
 	}
 }

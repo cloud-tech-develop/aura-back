@@ -17,15 +17,15 @@ func NewRepository(db db.Querier) Repository {
 	return &repository{db: db}
 }
 
-func (r *repository) Create(ctx context.Context, tp *ThirdParty) error {
-	query := `
-		INSERT INTO third_parties (
+func (r *repository) Create(ctx context.Context, tenantSlug string, tp *ThirdParty) error {
+	query := fmt.Sprintf(`
+		INSERT INTO "%s".third_parties (
 			user_id, first_name, last_name, document_number, document_type,
 			personal_email, commercial_name, address, phone, additional_email,
 			tax_responsibility, is_client, is_provider, is_employee,
 			municipality_id, municipality
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-		RETURNING id, created_at`
+		RETURNING id, created_at`, tenantSlug)
 
 	err := r.db.QueryRowContext(ctx, query,
 		tp.UserID, tp.FirstName, tp.LastName, tp.DocumentNumber, tp.DocumentType,
@@ -39,14 +39,14 @@ func (r *repository) Create(ctx context.Context, tp *ThirdParty) error {
 	return nil
 }
 
-func (r *repository) GetByID(ctx context.Context, id int64) (*ThirdParty, error) {
+func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (*ThirdParty, error) {
 	tp := &ThirdParty{}
-	query := `
+	query := fmt.Sprintf(`
 		SELECT id, user_id, first_name, last_name, document_number, document_type,
 			personal_email, commercial_name, address, phone, additional_email,
 			tax_responsibility, is_client, is_provider, is_employee,
 			municipality_id, municipality, created_at, deleted_at
-		FROM third_parties WHERE id = $1 AND deleted_at IS NULL`
+		FROM "%s".third_parties WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&tp.ID, &tp.UserID, &tp.FirstName, &tp.LastName, &tp.DocumentNumber, &tp.DocumentType,
@@ -63,14 +63,14 @@ func (r *repository) GetByID(ctx context.Context, id int64) (*ThirdParty, error)
 	return tp, nil
 }
 
-func (r *repository) GetByDocument(ctx context.Context, docNumber string) (*ThirdParty, error) {
+func (r *repository) GetByDocument(ctx context.Context, tenantSlug string, docNumber string) (*ThirdParty, error) {
 	tp := &ThirdParty{}
-	query := `
+	query := fmt.Sprintf(`
 		SELECT id, user_id, first_name, last_name, document_number, document_type,
 			personal_email, commercial_name, address, phone, additional_email,
 			tax_responsibility, is_client, is_provider, is_employee,
 			municipality_id, municipality, created_at, deleted_at
-		FROM third_parties WHERE document_number = $1 AND deleted_at IS NULL`
+		FROM "%s".third_parties WHERE document_number = $1 AND deleted_at IS NULL`, tenantSlug)
 
 	err := r.db.QueryRowContext(ctx, query, docNumber).Scan(
 		&tp.ID, &tp.UserID, &tp.FirstName, &tp.LastName, &tp.DocumentNumber, &tp.DocumentType,
@@ -87,14 +87,14 @@ func (r *repository) GetByDocument(ctx context.Context, docNumber string) (*Thir
 	return tp, nil
 }
 
-func (r *repository) Update(ctx context.Context, id int64, tp *ThirdParty) error {
-	query := `
-		UPDATE third_parties SET
+func (r *repository) Update(ctx context.Context, tenantSlug string, id int64, tp *ThirdParty) error {
+	query := fmt.Sprintf(`
+		UPDATE "%s".third_parties SET
 			user_id = $1, first_name = $2, last_name = $3, document_type = $4,
 			personal_email = $5, commercial_name = $6, address = $7, phone = $8,
 			additional_email = $9, tax_responsibility = $10, is_client = $11,
 			is_provider = $12, is_employee = $13, municipality_id = $14, municipality = $15
-		WHERE id = $16 AND deleted_at IS NULL`
+		WHERE id = $16 AND deleted_at IS NULL`, tenantSlug)
 
 	result, err := r.db.ExecContext(ctx, query,
 		tp.UserID, tp.FirstName, tp.LastName, tp.DocumentType,
@@ -113,8 +113,8 @@ func (r *repository) Update(ctx context.Context, id int64, tp *ThirdParty) error
 	return nil
 }
 
-func (r *repository) Delete(ctx context.Context, id int64) error {
-	query := `UPDATE third_parties SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
+func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) error {
+	query := fmt.Sprintf(`UPDATE "%s".third_parties SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`, tenantSlug)
 	result, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete third party: %w", err)
@@ -126,13 +126,13 @@ func (r *repository) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *repository) List(ctx context.Context, enterpriseID int64, filters ThirdPartyFilters) ([]ThirdParty, error) {
-	query := `
+func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ThirdPartyFilters) ([]ThirdParty, error) {
+	query := fmt.Sprintf(`
 		SELECT id, user_id, first_name, last_name, document_number, document_type,
 			personal_email, commercial_name, address, phone, additional_email,
 			tax_responsibility, is_client, is_provider, is_employee,
 			municipality_id, municipality, created_at, deleted_at
-		FROM third_parties WHERE deleted_at IS NULL`
+		FROM "%s".third_parties WHERE deleted_at IS NULL`, tenantSlug)
 
 	args := []interface{}{}
 	argPos := 1
@@ -192,8 +192,8 @@ func (r *repository) List(ctx context.Context, enterpriseID int64, filters Third
 	return thirdParties, nil
 }
 
-func (r *repository) Count(ctx context.Context, enterpriseID int64, filters ThirdPartyFilters) (int, error) {
-	query := `SELECT COUNT(*) FROM third_parties WHERE deleted_at IS NULL`
+func (r *repository) Count(ctx context.Context, tenantSlug string, enterpriseID int64, filters ThirdPartyFilters) (int, error) {
+	query := fmt.Sprintf(`SELECT COUNT(*) FROM "%s".third_parties WHERE deleted_at IS NULL`, tenantSlug)
 
 	var count int
 	err := r.db.QueryRowContext(ctx, query).Scan(&count)
@@ -212,7 +212,7 @@ func NewService(db db.Querier) Service {
 	return &service{repo: NewRepository(db)}
 }
 
-func (s *service) Create(ctx context.Context, tp *ThirdParty) error {
+func (s *service) Create(ctx context.Context, tenantSlug string, tp *ThirdParty) error {
 	// Validate document type
 	validDocTypes := map[string]bool{
 		DocumentTypeCC:       true,
@@ -235,7 +235,7 @@ func (s *service) Create(ctx context.Context, tp *ThirdParty) error {
 	}
 
 	// Check for duplicate document number
-	existing, err := s.repo.GetByDocument(ctx, tp.DocumentNumber)
+	existing, err := s.repo.GetByDocument(ctx, tenantSlug, tp.DocumentNumber)
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
@@ -243,18 +243,18 @@ func (s *service) Create(ctx context.Context, tp *ThirdParty) error {
 		return fmt.Errorf("document number already exists: %s", tp.DocumentNumber)
 	}
 
-	return s.repo.Create(ctx, tp)
+	return s.repo.Create(ctx, tenantSlug, tp)
 }
 
-func (s *service) GetByID(ctx context.Context, id int64) (*ThirdParty, error) {
-	return s.repo.GetByID(ctx, id)
+func (s *service) GetByID(ctx context.Context, tenantSlug string, id int64) (*ThirdParty, error) {
+	return s.repo.GetByID(ctx, tenantSlug, id)
 }
 
-func (s *service) GetByDocument(ctx context.Context, docNumber string) (*ThirdParty, error) {
-	return s.repo.GetByDocument(ctx, docNumber)
+func (s *service) GetByDocument(ctx context.Context, tenantSlug string, docNumber string) (*ThirdParty, error) {
+	return s.repo.GetByDocument(ctx, tenantSlug, docNumber)
 }
 
-func (s *service) Update(ctx context.Context, id int64, tp *ThirdParty) error {
+func (s *service) Update(ctx context.Context, tenantSlug string, id int64, tp *ThirdParty) error {
 	// Validate document type
 	validDocTypes := map[string]bool{
 		DocumentTypeCC:       true,
@@ -276,19 +276,19 @@ func (s *service) Update(ctx context.Context, id int64, tp *ThirdParty) error {
 		return fmt.Errorf("invalid tax responsibility: %s", tp.TaxResponsibility)
 	}
 
-	return s.repo.Update(ctx, id, tp)
+	return s.repo.Update(ctx, tenantSlug, id, tp)
 }
 
-func (s *service) Delete(ctx context.Context, id int64) error {
-	return s.repo.Delete(ctx, id)
+func (s *service) Delete(ctx context.Context, tenantSlug string, id int64) error {
+	return s.repo.Delete(ctx, tenantSlug, id)
 }
 
-func (s *service) List(ctx context.Context, enterpriseID int64, filters ThirdPartyFilters) ([]ThirdParty, error) {
+func (s *service) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ThirdPartyFilters) ([]ThirdParty, error) {
 	if filters.Page < 1 {
 		filters.Page = 1
 	}
 	if filters.Limit < 1 {
 		filters.Limit = 20
 	}
-	return s.repo.List(ctx, enterpriseID, filters)
+	return s.repo.List(ctx, tenantSlug, enterpriseID, filters)
 }

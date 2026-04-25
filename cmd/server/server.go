@@ -1,8 +1,7 @@
 package server
 
 import (
-	"database/sql"
-
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/modules/admin/enterprise"
 	thirdparties "github.com/cloud-tech-develop/aura-back/modules/admin/third-parties"
 	"github.com/cloud-tech-develop/aura-back/modules/admin/users"
@@ -20,7 +19,7 @@ import (
 // Server holds the router and shared dependencies.
 type Server struct {
 	router    *gin.Engine
-	db        *sql.DB
+	db        *db.DB
 	tenantMgr *tenant.Manager
 }
 
@@ -38,13 +37,13 @@ func corsMiddleware() gin.HandlerFunc {
 }
 
 // NewServer creates and configures the Gin router with global middleware.
-func NewServer(db *sql.DB, tenantMgr *tenant.Manager) *Server {
+func NewServer(database *db.DB, tenantMgr *tenant.Manager) *Server {
 	r := gin.Default()
 	r.Use(corsMiddleware())
 
 	return &Server{
 		router:    r,
-		db:        db,
+		db:        database,
 		tenantMgr: tenantMgr,
 	}
 }
@@ -67,7 +66,7 @@ func (s *Server) RegisterModules(
 	})
 
 	// Auth
-	s.router.POST("/login", tenant.Login(s.db))
+	s.router.POST("/login", tenant.Login(s.db.Wrap(s.db.DB)))
 
 	// Static Files
 	s.router.Static("/static", "./static")

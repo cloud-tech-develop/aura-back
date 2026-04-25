@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	"github.com/cloud-tech-develop/aura-back/shared/errors"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
@@ -143,7 +144,7 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-func Login(db *sql.DB) gin.HandlerFunc {
+func Login(q db.Querier) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			Email    vo.Email `json:"email" binding:"required"`
@@ -177,7 +178,7 @@ func Login(db *sql.DB) gin.HandlerFunc {
 			AND u.deleted_at IS NULL 
 			AND e.deleted_at IS NULL`
 
-		err := db.QueryRowContext(c.Request.Context(), query, email).Scan(
+		err := q.QueryRowContext(c.Request.Context(), query, email).Scan(
 			&user.ID, &user.PasswordHash, &user.EnterpriseID, &user.TenantID, &user.Slug, &user.EntStatus, &user.UserActive,
 		)
 
@@ -208,7 +209,7 @@ func Login(db *sql.DB) gin.HandlerFunc {
 		// 2. Fetch roles from public schema and get the highest privilege level (minimum level number)
 		roles := []string{}
 		roleLevel := 100 // Default high level (no privilege)
-		roleRows, err := db.QueryContext(c.Request.Context(), `
+		roleRows, err := q.QueryContext(c.Request.Context(), `
 			SELECT r.name, r.level 
 			FROM public.roles r
 			JOIN public.user_roles ur ON ur.role_id = r.id
@@ -238,7 +239,7 @@ func Login(db *sql.DB) gin.HandlerFunc {
 			FROM %q.third_parties tp
 			WHERE tp.user_id = $1 AND tp.deleted_at IS NULL
 			LIMIT 1`, user.Slug)
-		_ = db.QueryRowContext(c.Request.Context(), tpQuery, user.ID).Scan(
+		_ = q.QueryRowContext(c.Request.Context(), tpQuery, user.ID).Scan(
 			&thirdParty.FirstName, &thirdParty.LastName,
 		)
 

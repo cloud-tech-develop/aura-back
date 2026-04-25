@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 )
 
@@ -26,86 +27,28 @@ func SetSQLiteMode(sqlite bool) {
 	isSQLite = sqlite
 }
 
-// adaptQueryForSQLite adapts a PostgreSQL query to SQLite-compatible syntax
-func adaptQueryForSQLite(query string) string {
-	newQuery := query
+// AdaptQuery adapts a PostgreSQL query to SQLite-compatible syntax if in SQLite mode
+func AdaptQuery(query string) string {
+	if !isSQLite {
+		return query
+	}
+	newQuery := db.AdaptQuery(query, "sqlite")
 
-	// Replace ILIKE with LIKE
-	newQuery = strings.ReplaceAll(newQuery, "ILIKE", "LIKE")
-
-	// Replace NOW() with CURRENT_TIMESTAMP (SQLite compatible)
-	newQuery = strings.ReplaceAll(newQuery, "NOW()", "CURRENT_TIMESTAMP")
-
-	// Also replace datetime('now') with CURRENT_TIMESTAMP if already converted
-	newQuery = strings.ReplaceAll(newQuery, "datetime('now')", "CURRENT_TIMESTAMP")
-
-	// Replace BIGSERIAL PRIMARY KEY with INTEGER PRIMARY KEY AUTOINCREMENT
-	newQuery = strings.ReplaceAll(newQuery, "BIGSERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
-
-	// Replace BIGSERIAL alone with INTEGER
-	newQuery = strings.ReplaceAll(newQuery, "BIGSERIAL", "INTEGER")
-
-	// Replace SERIAL PRIMARY KEY with INTEGER PRIMARY KEY AUTOINCREMENT
-	newQuery = strings.ReplaceAll(newQuery, "SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
-
-	// Replace SERIAL alone with INTEGER
-	newQuery = strings.ReplaceAll(newQuery, "SERIAL", "INTEGER")
-
-	// Replace TIMESTAMPTZ with TEXT
-	newQuery = strings.ReplaceAll(newQuery, "TIMESTAMPTZ", "TEXT")
-
-	// Replace BOOLEAN with INTEGER
-	newQuery = strings.ReplaceAll(newQuery, "BOOLEAN", "INTEGER")
-
-	// Replace RETURNING clause (SQLite doesn't support it well)
-	newQuery = strings.ReplaceAll(newQuery, "RETURNING id", "")
-	newQuery = strings.ReplaceAll(newQuery, "RETURNING id,", "")
 	newQuery = strings.ReplaceAll(newQuery, "RETURNING ", "")
-
-	// Replace public. prefix (schema) with nothing
-	newQuery = strings.ReplaceAll(newQuery, "public.", "")
-
-	// Replace COMMENT ON COLUMN (SQLite doesn't support it)
 	newQuery = strings.ReplaceAll(newQuery, "COMMENT ON COLUMN", "-- COMMENT ON COLUMN")
 	newQuery = strings.ReplaceAll(newQuery, "COMMENT ON ", "-- COMMENT ON ")
-
-	// Replace ON CONFLICT (slug) DO UPDATE SET with OR REPLACE
 	newQuery = strings.ReplaceAll(newQuery, "ON CONFLICT (slug) DO UPDATE SET", "OR REPLACE")
-
-	// Remove CHECK constraints (SQLite doesn't support them properly)
-	newQuery = removeCheckConstraints(newQuery)
-
-	// Replace REFERENCES with nothing (foreign keys need special handling in SQLite)
-	newQuery = removeReferences(newQuery)
-
-	// Replace ADD COLUMN IF NOT EXISTS with just ADD COLUMN (SQLite doesn't support IF NOT EXISTS for columns)
 	newQuery = strings.ReplaceAll(newQuery, "ADD COLUMN IF NOT EXISTS", "ADD COLUMN")
 
-	// Remove CREATE OR REPLACE FUNCTION blocks (SQLite doesn't support plpgsql)
+	newQuery = removeCheckConstraints(newQuery)
+	newQuery = removeReferences(newQuery)
 	newQuery = removeFunctionDefinitions(newQuery)
-
-	// Remove CREATE TRIGGER blocks (SQLite triggers work differently)
 	newQuery = removeTriggerDefinitions(newQuery)
-
-	// Remove DROP TRIGGER statements (SQLite handles them differently)
-	newQuery = removeDropTriggers(newQuery)
-
-	// Convert $1, $2 placeholders to ?
-	for i := 100; i >= 1; i-- {
-		placeholder := fmt.Sprintf("$%d", i)
-		if !strings.Contains(newQuery, placeholder) {
-			continue
-		}
-		newQuery = strings.ReplaceAll(newQuery, placeholder, "?")
-	}
-
-	// Remove DROP TRIGGER statements (SQLite handles them differently)
 	newQuery = removeDropTriggers(newQuery)
 
 	return newQuery
 }
 
-// removeCheckConstraints removes CHECK constraints from the query (SQLite doesn't support them properly)
 func removeCheckConstraints(query string) string {
 	// Remove CHECK (...) patterns
 	result := query
@@ -534,7 +477,7 @@ func (m *Manager) RunMigrations(schema, subPath string) error {
 		created_at TIMESTAMPTZ DEFAULT NOW()
 	)`
 	if isSQLite {
-		schemaMigrationsTable = adaptQueryForSQLite(schemaMigrationsTable)
+		schemaMigrationsTable = AdaptQuery(schemaMigrationsTable)
 	}
 	_, _ = conn.ExecContext(context.Background(), schemaMigrationsTable)
 
@@ -552,7 +495,7 @@ func (m *Manager) RunMigrations(schema, subPath string) error {
 	var version int64
 	versionQuery := "SELECT COALESCE(MAX(version), 0) FROM schema_migrations"
 	if isSQLite {
-		versionQuery = adaptQueryForSQLite(versionQuery)
+		versionQuery = AdaptQuery(versionQuery)
 	}
 	err = conn.QueryRowContext(context.Background(), versionQuery).Scan(&version)
 	if err != nil && err != sql.ErrNoRows {
@@ -589,7 +532,7 @@ func (m *Manager) RunMigrations(schema, subPath string) error {
 
 		sql := string(content)
 		if isSQLite {
-			sql = adaptQueryForSQLite(sql)
+			sql = AdaptQuery(sql)
 		}
 
 		if _, err := conn.ExecContext(context.Background(), sql); err != nil {
@@ -598,7 +541,7 @@ func (m *Manager) RunMigrations(schema, subPath string) error {
 
 		insertVersion := "INSERT INTO schema_migrations (version, dirty) VALUES ($1, false)"
 		if isSQLite {
-			insertVersion = adaptQueryForSQLite(insertVersion)
+			insertVersion = AdaptQuery(insertVersion)
 		}
 		_, err = conn.ExecContext(context.Background(), insertVersion, fileVersion)
 		if err != nil {

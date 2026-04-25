@@ -205,15 +205,25 @@ func (h *Handler) Page(c *gin.Context) {
 // List handles GET /products
 // Returns a list of products with optional filters
 func (h *Handler) List(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
-		response.BadRequest(c, "tenant not found")
-		return
+	tenantSlug, hasSlug := tenant.SlugFromContext(c)
+	if !hasSlug || tenantSlug == "" {
+		tenantSlug = c.Query("slug")
 	}
 
 	enterpriseID := c.GetInt64("enterprise_id")
 	if enterpriseID == 0 {
-		response.BadRequest(c, "enterprise_id not found")
+		if idStr := c.Query("enterprise_id"); idStr != "" {
+			var err error
+			enterpriseID, err = strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				response.BadRequest(c, "enterprise_id inválido")
+				return
+			}
+		}
+	}
+
+	if tenantSlug == "" && enterpriseID == 0 && !hasSlug {
+		response.BadRequest(c, "slug o enterprise_id es requerido")
 		return
 	}
 

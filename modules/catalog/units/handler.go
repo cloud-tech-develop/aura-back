@@ -68,18 +68,33 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
-		response.BadRequest(c, "tenant no encontrado")
-		return
+	// Try to get slug from context (authenticated)
+	tenantSlug, hasSlug := tenant.SlugFromContext(c)
+	
+	// If not in context, try to get from query param (public access for offline sync)
+	if !hasSlug || tenantSlug == "" {
+		tenantSlug = c.Query("slug")
 	}
-
+	
 	enterpriseID := c.GetInt64("enterprise_id")
 	if enterpriseID == 0 {
-		response.BadRequest(c, "enterprise_id not found")
+		// Try from query param
+		if idStr := c.Query("enterprise_id"); idStr != "" {
+			var err error
+			enterpriseID, err = strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				response.BadRequest(c, "enterprise_id inválido")
+				return
+			}
+		}
+	}
+	
+	// If no slug and no enterprise_id, require auth
+	if tenantSlug == "" && enterpriseID == 0 && !hasSlug {
+		response.BadRequest(c, "slug o enterprise_id es requerido")
 		return
 	}
-
+	
 	list, err := h.svc.List(c.Request.Context(), tenantSlug, enterpriseID)
 	if err != nil {
 		response.BadRequest(c, err.Error())

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
 	"strings"
 
 	_ "github.com/lib/pq"
@@ -26,6 +27,18 @@ func New(driver, dsn string) (*DB, error) {
 		return nil, fmt.Errorf("conectar db (%s): %w", driver, err)
 	}
 	return &DB{DB: conn, DSN: dsn, Driver: driver}, nil
+}
+
+func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	return db.DB.QueryContext(ctx, AdaptQuery(query, db.Driver), args...)
+}
+
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	return db.DB.QueryRowContext(ctx, AdaptQuery(query, db.Driver), args...)
+}
+
+func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	return db.DB.ExecContext(ctx, AdaptQuery(query, db.Driver), args...)
 }
 
 // Querier interface matches the one used in modules
@@ -73,10 +86,10 @@ func (s *schemaQuerier) QueryContext(ctx context.Context, query string, args ...
 	var err error
 
 	if s.schema == "" {
-		rows, err = s.q.QueryContext(ctx, adaptQuery(query, s.driver), args...)
+		rows, err = s.q.QueryContext(ctx, AdaptQuery(query, s.driver), args...)
 	} else {
 		err = s.execWithSchema(ctx, func() error {
-			rows, err = s.q.QueryContext(ctx, adaptQuery(query, s.driver), args...)
+			rows, err = s.q.QueryContext(ctx, AdaptQuery(query, s.driver), args...)
 			return err
 		})
 	}
@@ -85,7 +98,7 @@ func (s *schemaQuerier) QueryContext(ctx context.Context, query string, args ...
 
 func (s *schemaQuerier) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
 	if s.schema == "" {
-		return s.q.QueryRowContext(ctx, adaptQuery(query, s.driver), args...)
+		return s.q.QueryRowContext(ctx, AdaptQuery(query, s.driver), args...)
 	}
 	// For schema queries, we need to use a connection with the schema set
 	conn, err := s.db.Conn(ctx)
@@ -98,7 +111,7 @@ func (s *schemaQuerier) QueryRowContext(ctx context.Context, query string, args 
 		return &sql.Row{}
 	}
 
-	return conn.QueryRowContext(ctx, adaptQuery(query, s.driver), args...)
+	return conn.QueryRowContext(ctx, AdaptQuery(query, s.driver), args...)
 }
 
 func (s *schemaQuerier) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
@@ -106,10 +119,10 @@ func (s *schemaQuerier) ExecContext(ctx context.Context, query string, args ...i
 	var err error
 
 	if s.schema == "" {
-		result, err = s.q.ExecContext(ctx, adaptQuery(query, s.driver), args...)
+		result, err = s.q.ExecContext(ctx, AdaptQuery(query, s.driver), args...)
 	} else {
 		err = s.execWithSchema(ctx, func() error {
-			result, err = s.q.ExecContext(ctx, adaptQuery(query, s.driver), args...)
+			result, err = s.q.ExecContext(ctx, AdaptQuery(query, s.driver), args...)
 			return err
 		})
 	}
@@ -122,30 +135,33 @@ type wrappedQuerier struct {
 }
 
 func (w *wrappedQuerier) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	return w.q.QueryContext(ctx, adaptQuery(query, w.driver), args...)
+	return w.q.QueryContext(ctx, AdaptQuery(query, w.driver), args...)
 }
 
 func (w *wrappedQuerier) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
-	return w.q.QueryRowContext(ctx, adaptQuery(query, w.driver), args...)
+	return w.q.QueryRowContext(ctx, AdaptQuery(query, w.driver), args...)
 }
 
 func (w *wrappedQuerier) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	return w.q.ExecContext(ctx, adaptQuery(query, w.driver), args...)
+	return w.q.ExecContext(ctx, AdaptQuery(query, w.driver), args...)
 }
 
-func adaptQuery(query string, driver string) string {
+// AdaptQuery adapts a PostgreSQL query to SQLite-compatible syntax if the driver is "sqlite"
+func AdaptQuery(query string, driver string) string {
 	if driver != "sqlite" {
 		return query
 	}
 	newQuery := query
 	// Replace ILIKE with LIKE if SQLite (basic support)
 	newQuery = strings.ReplaceAll(newQuery, "ILIKE", "LIKE")
-	// Replace NOW() with datetime('now') if SQLite
-	newQuery = strings.ReplaceAll(newQuery, "NOW()", "datetime('now')")
+	// Replace NOW() with CURRENT_TIMESTAMP if SQLite
+	newQuery = strings.ReplaceAll(newQuery, "NOW()", "CURRENT_TIMESTAMP")
 	// Replace BIGSERIAL with INTEGER AUTOINCREMENT for SQLite
-	newQuery = strings.ReplaceAll(newQuery, "BIGSERIAL", "INTEGER AUTOINCREMENT")
+	newQuery = strings.ReplaceAll(newQuery, "BIGSERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
+	newQuery = strings.ReplaceAll(newQuery, "BIGSERIAL", "INTEGER")
 	// Replace SERIAL with INTEGER AUTOINCREMENT for SQLite
-	newQuery = strings.ReplaceAll(newQuery, "SERIAL", "INTEGER AUTOINCREMENT")
+	newQuery = strings.ReplaceAll(newQuery, "SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
+	newQuery = strings.ReplaceAll(newQuery, "SERIAL", "INTEGER")
 	// Replace TIMESTAMPTZ with TEXT for SQLite (basic support)
 	newQuery = strings.ReplaceAll(newQuery, "TIMESTAMPTZ", "TEXT")
 	// Replace BOOLEAN with INTEGER for SQLite (0/1)
@@ -154,7 +170,12 @@ func adaptQuery(query string, driver string) string {
 	newQuery = strings.ReplaceAll(newQuery, "RETURNING id", "")
 	newQuery = strings.ReplaceAll(newQuery, "RETURNING id,", "")
 	// Replace public. table references with nothing (use table directly in SQLite)
-	newQuery = strings.ReplaceAll(newQuery, "public.", "")
+	rePublic := regexp.MustCompile(`\bpublic\.`)
+	newQuery = rePublic.ReplaceAllString(newQuery, "")
+
+	// Replace "slug". prefix with nothing (for tenant schemas in SQLite)
+	reSchema := regexp.MustCompile(`"[^"]+"\.(?P<table>\w+)`)
+	newQuery = reSchema.ReplaceAllString(newQuery, "$1")
 
 	for i := 100; i >= 1; i-- {
 		placeholder := fmt.Sprintf("$%d", i)

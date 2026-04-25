@@ -1,44 +1,51 @@
 package offline
 
 import (
+	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/events"
 )
 
 // Events
 const (
-	EventEnterpriseSynced = "offline.enterprise_synced"
-	EventPlanSynced       = "offline.plan_synced"
-	UserSynced            = "offline.user_synced"
-	EventUserRoleSynced   = "offline.user_role_synced"
+	EventEnterpriseSynced   = "offline.enterprise_synced"
+	EventPlanSynced         = "offline.plan_synced"
+	UserSynced              = "offline.user_synced"
+	EventUserRoleSynced     = "offline.user_role_synced"
+	EventThirdPartySynced   = "offline.third_party_synced"
+	EventCategorySynced     = "offline.category_synced"
+	EventBrandSynced        = "offline.brand_synced"
+	EventUnitSynced         = "offline.unit_synced"
+	EventProductSynced      = "offline.product_synced"
+	EventPresentationSynced = "offline.presentation_synced"
 )
 
 // EventPayload represents the sync event payload
 type EventPayload struct {
-	Table   string      `json:"table"`
-	Count   int         `json:"count"`
-	Slug    string      `json:"slug"`
-	Success bool       `json:"success"`
-	Error   string      `json:"error,omitempty"`
+	Table   string `json:"table"`
+	Count   int    `json:"count"`
+	Slug    string `json:"slug"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
 }
 
 // service implements Service
 type service struct {
-	repo    Repository
-	http    *http.Client
+	repo     Repository
+	http     *http.Client
 	eventBus events.EventBus
 }
 
-func NewService(db *sql.DB, eventBus events.EventBus) Service {
+func NewService(database *db.DB, eventBus events.EventBus) Service {
 	return &service{
-		repo: NewRepository(db),
+		repo: NewRepository(database),
 		http: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -46,58 +53,42 @@ func NewService(db *sql.DB, eventBus events.EventBus) Service {
 	}
 }
 
-// SyncAllBySlug fetches enterprise by slug from production,
-// saves it to SQLite, then synchronizes plans, users, and user_roles in parallel goroutines
-func (s *service) SyncAllBySlug(ctx context.Context, prodURL, token, slug string) (*SyncResult, error) {
+// SyncTenantBySlug sincroniza los datos del tenant desde producción
+func (s *service) SyncTenantBySlug(ctx context.Context, prodURL, token, slug string) (*SyncResult, error) {
 	result := &SyncResult{}
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var asyncErrors []string
 
-	// 1. Fetch and sync enterprise first
 	enterprise, err := s.fetchEnterpriseBySlug(ctx, prodURL, token, slug)
 	if err != nil {
 		return nil, fmt.Errorf("fetch enterprise: %w", err)
 	}
-
 	if enterprise == nil {
 		return nil, fmt.Errorf("empresa no encontrada: %s", slug)
 	}
 
+	// Save enterprise locally
 	if err := s.repo.UpsertEnterprise(ctx, enterprise); err != nil {
-		mu.Lock()
-		asyncErrors = append(asyncErrors, fmt.Sprintf("enterprise %s: %v", enterprise.Name, err))
-		mu.Unlock()
-	} else {
-		result.Enterprises++
-		// Publish event
-		s.publishEvent(EventEnterpriseSynced, 1, slug, true, "")
+		return nil, fmt.Errorf("save enterprise locally: %w", err)
 	}
+	result.Enterprises = 1
 
-	// 2. Schedule parallel sync for plans, users, user_roles using enterprise ID
 	enterpriseID := enterprise.ID
+
 	syncConfigs := []struct {
-		name    string
+		name   string
 		worker func() error
 	}{
-		{
-			"plans",
-			func() error {
-				return s.syncPlans(ctx, prodURL, token, enterpriseID, result)
-			},
-		},
-		{
-			"users",
-			func() error {
-				return s.syncUsers(ctx, prodURL, token, enterpriseID, result)
-			},
-		},
-		{
-			"user_roles",
-			func() error {
-				return s.syncUserRoles(ctx, prodURL, token, enterpriseID, result)
-			},
-		},
+		{"plans", func() error { return s.syncPlans(ctx, prodURL, token, enterpriseID, result, &mu) }},
+		{"users", func() error { return s.syncUsers(ctx, prodURL, token, enterpriseID, result, &mu) }},
+		{"user_roles", func() error { return s.syncUserRoles(ctx, prodURL, token, enterpriseID, result, &mu) }},
+		{"third_parties", func() error { return s.syncThirdParties(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
+		{"categories", func() error { return s.syncCategories(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
+		{"brands", func() error { return s.syncBrands(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
+		{"units", func() error { return s.syncUnits(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
+		{"products", func() error { return s.syncProducts(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
+		{"presentations", func() error { return s.syncPresentations(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
 	}
 
 	for _, cfg := range syncConfigs {
@@ -114,7 +105,9 @@ func (s *service) SyncAllBySlug(ctx context.Context, prodURL, token, slug string
 
 	wg.Wait()
 
+	mu.Lock()
 	result.Errors = asyncErrors
+	mu.Unlock()
 	return result, nil
 }
 
@@ -156,15 +149,11 @@ func (s *service) fetchEnterpriseBySlug(ctx context.Context, prodURL, token, slu
 	return &apiResult.Data, nil
 }
 
-// syncPlans fetches and saves plans for the given enterprise
-func (s *service) syncPlans(ctx context.Context, prodURL, token string, enterpriseID int64, result *SyncResult) error {
+// ─── Tenant Sync Methods ─────────────────────────────────────────────────────
+
+func (s *service) syncPlans(ctx context.Context, prodURL, token string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
 	url := fmt.Sprintf("%s/plans?enterprise_id=%d", prodURL, enterpriseID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
@@ -179,42 +168,31 @@ func (s *service) syncPlans(ctx context.Context, prodURL, token string, enterpri
 		return fmt.Errorf("status: %d", resp.StatusCode)
 	}
 
-	var apiResult struct {
-		Data struct {
-			Data []Plan `json:"data"`
-		} `json:"data"`
+	var apiResp struct {
+		Data []Plan `json:"data"`
 	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&apiResult); err != nil {
-		return err
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return fmt.Errorf("decode plans: %w", err)
 	}
 
 	count := 0
-	for _, plan := range apiResult.Data.Data {
-		plan.EnterpriseID = enterpriseID
-		if err := s.repo.UpsertPlan(ctx, &plan); err != nil {
+	for i := range apiResp.Data {
+		apiResp.Data[i].EnterpriseID = enterpriseID
+		if err := s.repo.UpsertPlan(ctx, &apiResp.Data[i]); err != nil {
 			continue
 		}
 		count++
 	}
 
+	mu.Lock()
 	result.Plans = count
-	if count > 0 {
-		s.publishEvent(EventPlanSynced, count, "", true, "")
-	}
-
+	mu.Unlock()
 	return nil
 }
 
-// syncUsers fetches and saves users for the given enterprise
-func (s *service) syncUsers(ctx context.Context, prodURL, token string, enterpriseID int64, result *SyncResult) error {
-	url := fmt.Sprintf("%s/users?enterprise_id=%d", prodURL, enterpriseID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-
+func (s *service) syncUsers(ctx context.Context, prodURL, token string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
+	url := fmt.Sprintf("%s/users-sync?enterprise_id=%d", prodURL, enterpriseID)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
@@ -229,42 +207,40 @@ func (s *service) syncUsers(ctx context.Context, prodURL, token string, enterpri
 		return fmt.Errorf("status: %d", resp.StatusCode)
 	}
 
-	var apiResult struct {
-		Data struct {
-			Data []User `json:"data"`
-		} `json:"data"`
+	var apiResp struct {
+		Data []UserWithPassword `json:"data"`
 	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&apiResult); err != nil {
-		return err
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return fmt.Errorf("decode users: %w", err)
 	}
 
 	count := 0
-	for _, user := range apiResult.Data.Data {
-		user.EnterpriseID = enterpriseID
-		if err := s.repo.UpsertUser(ctx, &user); err != nil {
+	for i := range apiResp.Data {
+		u := &User{
+			ID:           apiResp.Data[i].ID,
+			EnterpriseID: enterpriseID,
+			Name:         apiResp.Data[i].Name,
+			Email:        apiResp.Data[i].Email,
+			Active:       apiResp.Data[i].Active,
+			PasswordHash: apiResp.Data[i].PasswordHash,
+			CreatedAt:    apiResp.Data[i].CreatedAt,
+			UpdatedAt:    apiResp.Data[i].UpdatedAt,
+		}
+		if err := s.repo.UpsertUser(ctx, u); err != nil {
 			continue
 		}
 		count++
 	}
 
+	mu.Lock()
 	result.Users = count
-	if count > 0 {
-		s.publishEvent(UserSynced, count, "", true, "")
-	}
-
+	mu.Unlock()
 	return nil
 }
 
-// syncUserRoles fetches and saves user_roles for the given enterprise
-func (s *service) syncUserRoles(ctx context.Context, prodURL, token string, enterpriseID int64, result *SyncResult) error {
+func (s *service) syncUserRoles(ctx context.Context, prodURL, token string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
 	url := fmt.Sprintf("%s/user-roles?enterprise_id=%d", prodURL, enterpriseID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
@@ -279,29 +255,321 @@ func (s *service) syncUserRoles(ctx context.Context, prodURL, token string, ente
 		return fmt.Errorf("status: %d", resp.StatusCode)
 	}
 
-	var apiResult struct {
-		Data struct {
-			Data []UserRole `json:"data"`
-		} `json:"data"`
+	var apiResp struct {
+		Data []UserRole `json:"data"`
 	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&apiResult); err != nil {
-		return err
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return fmt.Errorf("decode user_roles: %w", err)
 	}
 
 	count := 0
-	for _, ur := range apiResult.Data.Data {
-		if err := s.repo.UpsertUserRole(ctx, &ur); err != nil {
+	for i := range apiResp.Data {
+		if err := s.repo.UpsertUserRole(ctx, &apiResp.Data[i]); err != nil {
 			continue
 		}
 		count++
 	}
 
+	mu.Lock()
 	result.UserRoles = count
-	if count > 0 {
-		s.publishEvent(EventUserRoleSynced, count, "", true, "")
+	mu.Unlock()
+	return nil
+}
+
+func (s *service) syncThirdParties(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
+	url := fmt.Sprintf("%s/admin/third-parties?slug=%s&enterprise_id=%d&limit=1000", prodURL, slug, enterpriseID)
+
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status: %d", resp.StatusCode)
+	}
+
+	// Decode using wrapper format: {"data": [...], "success": true}
+	var apiResp struct {
+		Data []ThirdParty `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return fmt.Errorf("decode third_parties: %w", err)
+	}
+
+	count := 0
+	for i := range apiResp.Data {
+		apiResp.Data[i].EnterpriseID = enterpriseID
+		if err := s.repo.UpsertThirdParty(ctx, &apiResp.Data[i]); err != nil {
+			continue
+		}
+		count++
+	}
+
+	mu.Lock()
+	result.ThirdParties = count
+	mu.Unlock()
+	if count > 0 {
+		s.publishEvent(EventThirdPartySynced, count, slug, true, "")
+	}
+	return nil
+}
+
+func (s *service) syncCategories(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
+	url := fmt.Sprintf("%s/catalog/categories/page?slug=%s&enterprise_id=%d", prodURL, slug, enterpriseID)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"limit": 1000,
+		"page":  1,
+	})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status: %d", resp.StatusCode)
+	}
+
+	var apiResp struct {
+		Data struct {
+			Items []Category `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return fmt.Errorf("decode categories: %w", err)
+	}
+
+	count := 0
+	for i := range apiResp.Data.Items {
+		apiResp.Data.Items[i].EnterpriseID = enterpriseID
+		if err := s.repo.UpsertCategory(ctx, &apiResp.Data.Items[i]); err != nil {
+			continue
+		}
+		count++
+	}
+
+	mu.Lock()
+	result.Categories = count
+	mu.Unlock()
+	if count > 0 {
+		s.publishEvent(EventCategorySynced, count, slug, true, "")
+	}
+	return nil
+}
+
+func (s *service) syncBrands(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
+	url := fmt.Sprintf("%s/catalog/brands/page?slug=%s&enterprise_id=%d", prodURL, slug, enterpriseID)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"limit": 1000,
+		"page":  1,
+	})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status: %d", resp.StatusCode)
+	}
+
+	var apiResp struct {
+		Data struct {
+			Items []Brand `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return fmt.Errorf("decode brands: %w", err)
+	}
+
+	count := 0
+	for i := range apiResp.Data.Items {
+		apiResp.Data.Items[i].EnterpriseID = enterpriseID
+		if err := s.repo.UpsertBrand(ctx, &apiResp.Data.Items[i]); err != nil {
+			continue
+		}
+		count++
+	}
+
+	mu.Lock()
+	result.Brands = count
+	mu.Unlock()
+	if count > 0 {
+		s.publishEvent(EventBrandSynced, count, slug, true, "")
+	}
+	return nil
+}
+
+func (s *service) syncUnits(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
+	url := fmt.Sprintf("%s/catalog/units/page?slug=%s&enterprise_id=%d", prodURL, slug, enterpriseID)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"limit": 1000,
+		"page":  1,
+	})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status: %d", resp.StatusCode)
+	}
+
+	var apiResp struct {
+		Data struct {
+			Items []Unit `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return fmt.Errorf("decode units: %w", err)
+	}
+
+	count := 0
+	for i := range apiResp.Data.Items {
+		apiResp.Data.Items[i].EnterpriseID = enterpriseID
+		if err := s.repo.UpsertUnit(ctx, &apiResp.Data.Items[i]); err != nil {
+			continue
+		}
+		count++
+	}
+
+	mu.Lock()
+	result.Units = count
+	mu.Unlock()
+	if count > 0 {
+		s.publishEvent(EventUnitSynced, count, slug, true, "")
+	}
+	return nil
+}
+
+func (s *service) syncProducts(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
+	url := fmt.Sprintf("%s/catalog/products/page?slug=%s&enterprise_id=%d", prodURL, slug, enterpriseID)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"limit": 1000,
+		"page":  1,
+	})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status: %d", resp.StatusCode)
+	}
+
+	var apiResp struct {
+		Data struct {
+			Items []Product `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return fmt.Errorf("decode products: %w", err)
+	}
+
+	count := 0
+	for i := range apiResp.Data.Items {
+		apiResp.Data.Items[i].EnterpriseID = enterpriseID
+		if err := s.repo.UpsertProduct(ctx, &apiResp.Data.Items[i]); err != nil {
+			continue
+		}
+		count++
+	}
+
+	mu.Lock()
+	result.Products = count
+	mu.Unlock()
+	if count > 0 {
+		s.publishEvent(EventProductSynced, count, slug, true, "")
+	}
+	return nil
+}
+
+func (s *service) syncPresentations(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
+	url := fmt.Sprintf("%s/presentations/page?slug=%s&enterprise_id=%d", prodURL, slug, enterpriseID)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"limit": 1000,
+		"page":  1,
+	})
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status: %d", resp.StatusCode)
+	}
+
+	var apiResp struct {
+		Data struct {
+			Items []Presentation `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return fmt.Errorf("decode presentations: %w", err)
+	}
+
+	count := 0
+	for i := range apiResp.Data.Items {
+		apiResp.Data.Items[i].EnterpriseID = enterpriseID
+		if err := s.repo.UpsertPresentation(ctx, &apiResp.Data.Items[i]); err != nil {
+			continue
+		}
+		count++
+	}
+
+	mu.Lock()
+	result.Presentations = count
+	mu.Unlock()
+	if count > 0 {
+		s.publishEvent(EventPresentationSynced, count, slug, true, "")
+	}
 	return nil
 }
 
@@ -328,4 +596,9 @@ func (s *service) publishEvent(eventName string, count int, slug string, success
 // GetLocalEnterprises returns all enterprises stored locally
 func (s *service) GetLocalEnterprises(ctx context.Context) ([]Enterprise, error) {
 	return s.repo.ListEnterprises(ctx)
+}
+
+// SyncAllBySlug synchronizes all tenant data from production
+func (s *service) SyncAllBySlug(ctx context.Context, prodURL, token, slug string) (*SyncResult, error) {
+	return s.SyncTenantBySlug(ctx, prodURL, token, slug)
 }

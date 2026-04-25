@@ -6,6 +6,7 @@ import "github.com/gin-gonic/gin"
 func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
 	// Public — no auth required (for offline sync)
 	public.GET("/users", h.ListByEnterpriseID)
+	public.GET("/users-sync", h.ListByEnterpriseIDForSync) // For offline sync - includes password hashes
 	public.GET("/user-roles", h.ListUserRolesByEnterpriseID)
 
 	// Protected routes (require auth)
