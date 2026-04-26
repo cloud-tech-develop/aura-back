@@ -247,9 +247,137 @@ func NewManager(db *sql.DB) *Manager {
 	return &Manager{db: db}
 }
 
-// MigratePublic aplica migraciones al esquema public (tabla de enterprises y tenants)
+// MigratePublic applies online (Postgres) public schema migrations.
+// Called at startup in online mode.
 func (m *Manager) MigratePublic() error {
+	if isSQLite {
+		return fmt.Errorf("MigratePublic is for online (Postgres) mode only; use MigrateOffline() instead")
+	}
 	return m.RunMigrations("public", "public")
+}
+
+// MigrateOffline runs all offline (SQLite) migrations: public tables + tenant tables.
+// Called at startup in offline mode.
+func (m *Manager) MigrateOffline() error {
+	if !isSQLite {
+		return fmt.Errorf("MigrateOffline is for offline (SQLite) mode only")
+	}
+
+	if err := m.RunOfflineMigrations("offline/public"); err != nil {
+		return fmt.Errorf("offline public migrations: %w", err)
+	}
+	if err := m.RunOfflineMigrations("offline/tenant"); err != nil {
+		return fmt.Errorf("offline tenant migrations: %w", err)
+	}
+	return nil
+}
+
+// RunOfflineMigrations applies SQLite-native .sql files from the given offline subdirectory.
+// These files are already SQLite-compatible — no adaptation needed.
+func (m *Manager) RunOfflineMigrations(subPath string) error {
+	fullPath := fmt.Sprintf("migrations/%s", subPath)
+
+	conn, err := m.db.Conn(context.Background())
+	if err != nil {
+		return fmt.Errorf("obtener conexión: %w", err)
+	}
+	defer conn.Close()
+
+	// Create version tracking table for this subPath
+	safeTableName := "schema_offline_" + strings.ReplaceAll(strings.ReplaceAll(subPath, "/", "_"), "-", "_")
+	_, _ = conn.ExecContext(context.Background(), fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+			version INTEGER PRIMARY KEY,
+			applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+		)`, safeTableName))
+
+	// Get current max version
+	var version int64
+	_ = conn.QueryRowContext(context.Background(),
+		fmt.Sprintf("SELECT COALESCE(MAX(version), 0) FROM %s", safeTableName),
+	).Scan(&version)
+
+	// Read and sort migration files
+	subFS, err := fs.Sub(migrationsFS, fullPath)
+	if err != nil {
+		return fmt.Errorf("sub fs [%s]: %w", fullPath, err)
+	}
+	migrationFiles, err := fs.ReadDir(subFS, ".")
+	if err != nil {
+		return fmt.Errorf("leer directorio [%s]: %w", fullPath, err)
+	}
+
+	var filesToApply []string
+	for _, file := range migrationFiles {
+		if file.IsDir() {
+			continue
+		}
+		name := file.Name()
+		if !strings.HasSuffix(name, ".sql") {
+			continue
+		}
+		var fileVersion int64
+		fmt.Sscanf(name, "%d", &fileVersion)
+		if fileVersion <= version {
+			continue
+		}
+		filesToApply = append(filesToApply, name)
+	}
+	sort.Strings(filesToApply)
+
+	for _, name := range filesToApply {
+		var fileVersion int64
+		fmt.Sscanf(name, "%d", &fileVersion)
+
+		fmt.Printf("➜ aplicando migración offline [%s/%s]\n", subPath, name)
+		content, err := migrationsFS.ReadFile(fullPath + "/" + name)
+		if err != nil {
+			return fmt.Errorf("leer archivo [%s]: %w", name, err)
+		}
+
+		// Execute each statement separately (SQLite requires it)
+		sqls := splitSQLStatements(string(content))
+		for _, stmt := range sqls {
+			stmt = strings.TrimSpace(stmt)
+			if stmt == "" {
+				continue
+			}
+			if _, err := conn.ExecContext(context.Background(), stmt); err != nil {
+				return fmt.Errorf("ejecutar migración [%s]: %w\nSQL: %s", name, err, stmt)
+			}
+		}
+
+		_, err = conn.ExecContext(context.Background(),
+			fmt.Sprintf("INSERT INTO %s (version) VALUES (?)", safeTableName), fileVersion)
+		if err != nil {
+			return fmt.Errorf("registrar versión [%s]: %w", name, err)
+		}
+		fmt.Printf("✓ migración offline [%s/%s] aplicada\n", subPath, name)
+	}
+
+	return nil
+}
+
+// splitSQLStatements splits a SQL script into individual statements by semicolon,
+// stripping comment lines from each segment.
+func splitSQLStatements(script string) []string {
+	var stmts []string
+	for _, segment := range strings.Split(script, ";") {
+		// Remove comment lines and blank lines from the segment
+		var cleanLines []string
+		for _, line := range strings.Split(segment, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+				continue
+			}
+			cleanLines = append(cleanLines, line)
+		}
+		s := strings.TrimSpace(strings.Join(cleanLines, "\n"))
+		if s != "" {
+			stmts = append(stmts, s)
+		}
+	}
+	return stmts
 }
 
 // CreateEnterprise creates a new enterprise with its schema and linked tenant
@@ -456,7 +584,10 @@ func (m *Manager) MigrateAll(ctx context.Context) error {
 	return nil
 }
 
+// RunMigrations applies online (Postgres) migrations for the given schema and subPath.
+// This is the ONLINE-only migration runner. For offline/SQLite, use RunOfflineMigrations.
 func (m *Manager) RunMigrations(schema, subPath string) error {
+
 	conn, err := m.db.Conn(context.Background())
 	if err != nil {
 		return fmt.Errorf("obtener conexión: %w", err)
@@ -471,11 +602,16 @@ func (m *Manager) RunMigrations(schema, subPath string) error {
 	}
 
 	// Adapt schema_migrations table for SQLite
-	schemaMigrationsTable := `CREATE TABLE IF NOT EXISTS schema_migrations (
+	tableName := "schema_migrations"
+	if isSQLite && subPath == "tenant" {
+		tableName = "schema_migrations_tenant"
+	}
+
+	schemaMigrationsTable := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
 		version BIGSERIAL PRIMARY KEY,
 		dirty boolean NOT NULL DEFAULT false,
 		created_at TIMESTAMPTZ DEFAULT NOW()
-	)`
+	)`, tableName)
 	if isSQLite {
 		schemaMigrationsTable = AdaptQuery(schemaMigrationsTable)
 	}
@@ -518,47 +654,17 @@ func (m *Manager) RunMigrations(schema, subPath string) error {
 		}
 		filesToMigrate = append(filesToMigrate, name)
 	}
- 
+
 	sort.Strings(filesToMigrate)
- 
-	// Filter files for current mode (Postgres or SQLite)
+
+	// Postgres mode: only .up.sql files
 	var finalFiles []string
-	if isSQLite {
-		// Group files by version to choose .offline.sql over .up.sql
-		versionMap := make(map[int64]string)
-		var versions []int64
-		for _, name := range filesToMigrate {
-			var v int64
-			fmt.Sscanf(name, "%d", &v)
-			if strings.HasSuffix(name, ".offline.sql") {
-				versionMap[v] = name
-			} else if _, exists := versionMap[v]; !exists {
-				versionMap[v] = name
-			}
-			found := false
-			for _, exV := range versions {
-				if exV == v {
-					found = true
-					break
-				}
-			}
-			if !found {
-				versions = append(versions, v)
-			}
-		}
-		sort.Slice(versions, func(i, j int) bool { return versions[i] < versions[j] })
-		for _, v := range versions {
-			finalFiles = append(finalFiles, versionMap[v])
-		}
-	} else {
-		// Postgres mode: only .up.sql
-		for _, name := range filesToMigrate {
-			if strings.HasSuffix(name, ".up.sql") {
-				finalFiles = append(finalFiles, name)
-			}
+	for _, name := range filesToMigrate {
+		if strings.HasSuffix(name, ".up.sql") {
+			finalFiles = append(finalFiles, name)
 		}
 	}
- 
+
 	for _, name := range finalFiles {
 		var fileVersion int64
 		fmt.Sscanf(name, "%d", &fileVersion)
@@ -578,7 +684,7 @@ func (m *Manager) RunMigrations(schema, subPath string) error {
 			return fmt.Errorf("ejecutar migración [%s]: %w", name, err)
 		}
 
-		insertVersion := "INSERT INTO schema_migrations (version, dirty) VALUES ($1, false)"
+		insertVersion := fmt.Sprintf("INSERT INTO %s (version, dirty) VALUES ($1, false)", tableName)
 		if isSQLite {
 			insertVersion = AdaptQuery(insertVersion)
 		}

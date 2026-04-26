@@ -74,14 +74,15 @@ func (s *service) SyncTenantBySlug(ctx context.Context, prodURL, token, slug str
 		return nil, fmt.Errorf("empresa no encontrada: %s", slug)
 	}
 
-	// Run migrations before saving data
+	// Run tenant offline migrations before saving data
+	// (public tables are already applied at startup via MigrateOffline)
 	if s.tenantMgr != nil {
-		s.logger.Logf("[offline.Service] Running tenant migrations for slug: %s", slug)
-		if err := s.tenantMgr.RunMigrations(slug, "tenant"); err != nil {
-			s.logger.Logf("[offline.Service] warn: RunMigrations failed: %v", err)
-			// We continue because some tables might already exist
+		s.logger.Logf("[offline.Service] Running tenant offline migrations")
+		if err := s.tenantMgr.RunOfflineMigrations("offline/tenant"); err != nil {
+			s.logger.Logf("[offline.Service] warn: RunOfflineMigrations failed: %v", err)
+			// Continue - tables might already exist
 		} else {
-			s.logger.Logf("[offline.Service] Migrations completed for slug: %s", slug)
+			s.logger.Logf("[offline.Service] Tenant offline migrations completed")
 		}
 	}
 
@@ -100,12 +101,16 @@ func (s *service) SyncTenantBySlug(ctx context.Context, prodURL, token, slug str
 		{"plans", func() error { return s.syncPlans(ctx, prodURL, token, enterpriseID, result, &mu) }},
 		{"users", func() error { return s.syncUsers(ctx, prodURL, token, enterpriseID, result, &mu) }},
 		{"user_roles", func() error { return s.syncUserRoles(ctx, prodURL, token, enterpriseID, result, &mu) }},
-		{"third_parties", func() error { return s.syncThirdParties(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
+		{"third_parties", func() error {
+			return s.syncThirdParties(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu)
+		}},
 		{"categories", func() error { return s.syncCategories(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
 		{"brands", func() error { return s.syncBrands(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
 		{"units", func() error { return s.syncUnits(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
 		{"products", func() error { return s.syncProducts(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
-		{"presentations", func() error { return s.syncPresentations(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
+		{"presentations", func() error {
+			return s.syncPresentations(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu)
+		}},
 	}
 
 	for _, cfg := range syncConfigs {

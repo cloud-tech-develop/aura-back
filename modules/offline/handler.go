@@ -92,8 +92,6 @@ func (h *Handler) SyncTenant(c *gin.Context) {
 		return
 	}
 
-	println("slug ", slug)
-
 	prodURL := os.Getenv("URL_PROD")
 	if prodURL == "" {
 		prodURL = "http://localhost:8081"

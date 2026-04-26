@@ -63,14 +63,19 @@ func main() {
 	}
 	defer eventBus.Stop()
 
-	// Tenant Manager & Public Migrations
+	// Tenant Manager & Migrations
 	tenantMgr := tenant.NewManager(database.DB)
-	if err := tenantMgr.MigratePublic(); err != nil {
-		log.Fatal("MigratePublic:", err)
-	}
-
-	// Migrate existing tenants in background (PostgreSQL only)
-	if driver != "sqlite" {
+	if driver == "sqlite" {
+		// Offline mode: runs both public and tenant offline migrations from offline/ folder
+		if err := tenantMgr.MigrateOffline(); err != nil {
+			log.Fatal("MigrateOffline:", err)
+		}
+	} else {
+		// Online mode: run only public (Postgres) migrations
+		if err := tenantMgr.MigratePublic(); err != nil {
+			log.Fatal("MigratePublic:", err)
+		}
+		// Migrate existing tenant schemas in background
 		go func() {
 			log.Println("Migrating existing tenants...")
 			if err := tenantMgr.MigrateAll(context.Background()); err != nil {
@@ -79,8 +84,6 @@ func main() {
 			}
 			log.Println("All tenants migrated successfully")
 		}()
-	} else {
-		log.Println("Skipping MigrateAll in SQLite mode")
 	}
 
 	// Modules
