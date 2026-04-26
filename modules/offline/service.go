@@ -523,6 +523,7 @@ func (s *service) syncProducts(ctx context.Context, prodURL, token string, slug 
 			Items []Product `json:"items"`
 		} `json:"data"`
 	}
+
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
 		return fmt.Errorf("decode products: %w", err)
 	}
