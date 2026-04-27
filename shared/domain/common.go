@@ -5,7 +5,7 @@ type ListId struct {
 	Name string `json:"name"`
 }
 
-var ValidProductTypes = []string{"ESTANDAR", "SERVICIO", "COMBO", "RECETA"}
+var ValidProductTypes = []string{"STANDARD", "WEIGHTABLE", "KIT", "SERVICE"}
 
 func IsValidProductType(productType string) bool {
 	for _, t := range ValidProductTypes {
