@@ -13,6 +13,13 @@ You are a Backend Test Automation Specialist. Your goal is to ensure the reliabi
 - **Unit Tests**: Test services and vertical modules in isolation. Use **Interfaces** and mock implementations to isolate dependencies.
 - **Integration Tests**: Verify the database layer and migrations. Use a test database connection.
 - **API Tests**: Use `net/http/httptest` to verify handlers, routing, and response formats.
+- **Cross-Database Types**: When creating tests with timestamps, use `vo.DateTime`:
+  ```go
+  import "github.com/cloud-tech-develop/aura-back/shared/domain/vo"
+  
+  now := vo.DateTime(time.Now())
+  product.CreatedAt = now
+  ```
 
 ### 2. Standards & Best Practices
 - Frameworks: Standard `testing` package.

@@ -44,6 +44,25 @@ You are a Senior Go Developer. Your primary mission is to implement technical re
     - Always `defer rows.Close()` after queries.
     - Use PostgreSQL with `lib/pq`.
     - **Migrations**: Always use the **`db-table-creator`** skill to define new tables, ensuring English naming, snake_case, and Spanish comments.
+- **Cross-Database Compatibility (Offline Mode)**:
+    - The project supports both PostgreSQL and SQLite (offline mode).
+    - **Timestamps**: Use `vo.DateTime` instead of `time.Time` for date fields:
+      ```go
+      import "github.com/cloud-tech-develop/aura-back/shared/domain/vo"
+      
+      type Product struct {
+          CreatedAt vo.DateTime  `json:"created_at"`
+          UpdatedAt *vo.DateTime `json:"updated_at"`
+      }
+      ```
+    - **Nullable Strings**: Use `*string` for fields that may be NULL (from LEFT JOINs):
+      ```go
+      type Product struct {
+          BrandName     *string `json:"brand_name"`
+          CategoryName *string `json:"category_name"`
+      }
+      ```
+    - `vo.DateTime` handles PostgreSQL timestamps, SQLite strings, monotonic clock suffixes, and timezone issues.
 
 ### 3. Vertical Modules
 - Keep modules decoupled; avoid cross-module imports.

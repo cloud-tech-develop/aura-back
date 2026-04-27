@@ -261,3 +261,54 @@ All page endpoints must return:
    - For brands: no additional filter (just active by default)
 3. **Module interfaces**: Use `domain.PageResult` as return type in Repository and Service interfaces
 4. **Validation**: In service, validate that `first >= 1` and `rows >= 1`, defaulting to 1 and 10 respectively
+
+## Cross-Database Types (vo package)
+
+When working with both PostgreSQL and SQLite (offline mode), use the types in `shared/domain/vo/`:
+
+### vo.DateTime
+
+For fields that store timestamps, use `vo.DateTime` instead of `time.Time`:
+
+```go
+import "github.com/cloud-tech-develop/aura-back/shared/domain/vo"
+
+type Product struct {
+    CreatedAt vo.DateTime  `json:"created_at"`
+    UpdatedAt *vo.DateTime `json:"updated_at"`
+}
+```
+
+`vo.DateTime` handles:
+- PostgreSQL timestamps (`time.Time`)
+- SQLite string timestamps with various formats
+- Monotonic clock suffixes (`m=+8.005836901`)
+- Timezone duplication issues
+
+### Nullable String Fields
+
+For fields that can be NULL (from LEFT JOINs), use `*string` instead of `string`:
+
+```go
+type Product struct {
+    BrandName     *string `json:"brand_name"`
+    CategoryName *string `json:"category_name"`
+    UnitName     *string `json:"unit_name"`
+}
+```
+
+## Tenant Context Functions
+
+In `tenant/middleware.go`, use these functions to get authenticated user data:
+
+```go
+// Get tenant slug from context or JWT token
+slug, ok := tenant.SlugFromContext(c)
+
+// Get enterprise ID from context or JWT token
+enterpriseID, ok := tenant.EnterpriseIDFromContext(c)
+
+// Get all token claims
+claims, ok := tenant.ClaimsFromContext(c)
+// claims.UserID, claims.EnterpriseID, claims.Slug, claims.Email, claims.Roles, etc.
+```
