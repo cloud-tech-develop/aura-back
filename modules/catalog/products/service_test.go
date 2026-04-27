@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -351,7 +352,7 @@ func TestService_GetByID_Success(t *testing.T) {
 	mockRepo := new(MockRepository)
 	svc := &service{repo: mockRepo}
 
-	now := time.Now()
+	now := vo.DateTime(time.Now())
 	expectedProduct := &Product{
 		ID:           1,
 		SKU:          "sk-u1",

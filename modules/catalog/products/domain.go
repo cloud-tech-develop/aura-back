@@ -2,9 +2,9 @@ package products
 
 import (
 	"context"
-	"time"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	"github.com/cloud-tech-develop/aura-back/shared/events"
 )
 
@@ -29,11 +29,11 @@ type Product struct {
 	Name               string                `json:"name" binding:"required"`
 	Description        string                `json:"description"`
 	CategoryID         *int64                `json:"category_id"`
-	CategoryName       string                `json:"category_name"`
+	CategoryName       *string              `json:"category_name"`
 	BrandID            *int64                `json:"brand_id"`
-	BrandName          string                `json:"brand_name"`
+	BrandName          *string              `json:"brand_name"`
 	UnitID             int64                 `json:"unit_measure_id" binding:"required"`
-	UnitName           string                `json:"unit_name"`
+	UnitName           *string              `json:"unit_name"`
 	ProductType        string                `json:"product_type"`
 	Active             bool                  `json:"active"`
 	VisibleInPOS       bool                  `json:"visible_in_pos"`
@@ -52,9 +52,9 @@ type Product struct {
 	AllowNegativeStock bool                  `json:"allow_negative_stock"`
 	ImageURL           string                `json:"image_url"`
 	EnterpriseID       int64                 `json:"enterprise_id"`
-	CreatedAt          time.Time             `json:"created_at"`
-	UpdatedAt          *time.Time            `json:"updated_at"`
-	DeletedAt          *time.Time            `json:"deleted_at"`
+	CreatedAt          vo.DateTime           `json:"created_at"`
+	UpdatedAt          *vo.DateTime          `json:"updated_at"`
+	DeletedAt          *vo.DateTime          `json:"deleted_at"`
 	Presentations      []PresentationRequest `json:"presentations"`
 }
 

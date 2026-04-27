@@ -174,26 +174,26 @@ func (r *repository) GetByBarcode(ctx context.Context, tenantSlug string, barcod
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Product, error) {
 	// Prevents lib/pq connection state corruption when client cancels request
 	ctx = context.WithoutCancel(ctx)
- 
+
 	tenant := r.db.SchemaPrefix(tenantSlug)
 	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL AND active = true`, enterpriseID)
- 
+
 	// Apply search filter
 	if filters.Search != "" {
 		safeSearch := strings.ReplaceAll(filters.Search, "'", "''")
 		baseWhere += fmt.Sprintf(" AND (name ILIKE '%%%s%%' OR sku ILIKE '%%%s%%' OR barcode ILIKE '%%%s%%')", safeSearch, safeSearch, safeSearch)
 	}
- 
+
 	// Apply category filter
 	if filters.CategoryID != nil {
 		baseWhere += fmt.Sprintf(" AND category_id = %d", *filters.CategoryID)
 	}
- 
+
 	// Apply brand filter
 	if filters.BrandID != nil {
 		baseWhere += fmt.Sprintf(" AND brand_id = %d", *filters.BrandID)
 	}
- 
+
 	offset := (filters.Page - 1) * filters.Limit
 	query := fmt.Sprintf(`
 		SELECT 
@@ -238,11 +238,11 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	// Prevents lib/pq connection state corruption when client cancels request
 	ctx = context.WithoutCancel(ctx)
- 
+
 	tenant := r.db.SchemaPrefix(tenantSlug)
 	// Build base WHERE clause
 	baseWhere := fmt.Sprintf(`p.enterprise_id = %d AND p.deleted_at IS NULL`, enterpriseID)
- 
+
 	// Apply filters from params
 	if params != nil {
 		if categoryID, ok := params["category_id"]; ok && categoryID != nil {
@@ -276,17 +276,17 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 			}
 		}
 	}
- 
+
 	// Apply search filter
 	searchCond := ""
 	if search != "" {
 		safeSearch := strings.ReplaceAll(search, "'", "''")
 		searchCond = fmt.Sprintf(" AND (p.name ILIKE '%%%s%%' OR p.sku ILIKE '%%%s%%' OR p.barcode ILIKE '%%%s%%')", safeSearch, safeSearch, safeSearch)
 	}
- 
+
 	// COUNT query
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %sproduct AS p WHERE `+baseWhere+searchCond, tenant)
- 
+
 	var total int64
 	if err := r.db.QueryRowContext(ctx, countQuery).Scan(&total); err != nil {
 		return domain.PageResult{}, fmt.Errorf("failed to count products: %w", err)
@@ -330,10 +330,11 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 		LEFT JOIN %scategory c ON p.category_id = c.id
 		LEFT JOIN %sbrand b ON p.brand_id = b.id
 		LEFT JOIN %sunit u ON p.unit_id = u.id
-		WHERE `+baseWhere+searchCond+` ORDER BY %s %s LIMIT %d OFFSET %d`,
+		WHERE `+baseWhere+searchCond+` ORDER BY p.%s %s LIMIT %d OFFSET %d`,
 		tenant, tenant, tenant, tenant, sort, order, limit, offset)
 
 	resultRows, err := r.db.QueryContext(ctx, selectQuery)
+
 	if err != nil {
 		return domain.PageResult{}, fmt.Errorf("failed to page products: %w", err)
 	}

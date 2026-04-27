@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -71,7 +72,7 @@ func TestIsValidProductType(t *testing.T) {
 
 // TestProductToEventPayload tests product event payload conversion
 func TestProductToEventPayload(t *testing.T) {
-	now := time.Now()
+	now := vo.DateTime(time.Now())
 	product := &Product{
 		ID:           1,
 		SKU:          "sk-u1",
@@ -181,7 +182,7 @@ func TestProductFieldsComplete(t *testing.T) {
 	p.AllowNegativeStock = true
 	p.ImageURL = "http://example.com/image.jpg"
 	p.EnterpriseID = 1
-	p.CreatedAt = time.Now()
+	p.CreatedAt = vo.DateTime(time.Now())
 
 	assert.Equal(t, int64(1), p.ID)
 	assert.Equal(t, "sk-u1", p.SKU)
