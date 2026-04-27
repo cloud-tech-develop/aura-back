@@ -6,6 +6,5 @@ import "github.com/gin-gonic/gin"
 func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
 	// Offline sync endpoints (protected - requires token with slug in JWT)
 	protected.GET("/offline/ping", h.Ping)
-	protected.GET("/offline/sync-tenant", h.SyncTenant)
 	protected.GET("/offline/enterprises", h.ListEnterprises)
 }

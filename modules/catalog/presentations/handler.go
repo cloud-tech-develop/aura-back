@@ -22,15 +22,12 @@ func NewHandler(svc Service) *Handler {
 // Create handles POST /products/:id/presentations
 // Creates multiple presentations for a product
 func (h *Handler) Create(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
-		response.BadRequest(c, "tenant not found")
-		return
-	}
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
 
-	enterpriseID := c.GetInt64("enterprise_id")
-	if enterpriseID == 0 {
-		response.BadRequest(c, "enterprise_id not found")
+	if tenantSlug == "" || enterpriseID == 0 {
+		response.BadRequest(c, "tenant not found")
 		return
 	}
 
@@ -66,15 +63,12 @@ func (h *Handler) Create(c *gin.Context) {
 // Creates or updates presentations for a product based on ID presence
 // Accepts direct array of presentations
 func (h *Handler) UpsertArray(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
-		response.BadRequest(c, "tenant not found")
-		return
-	}
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
 
-	enterpriseID := c.GetInt64("enterprise_id")
-	if enterpriseID == 0 {
-		response.BadRequest(c, "enterprise_id not found")
+	if tenantSlug == "" || enterpriseID == 0 {
+		response.BadRequest(c, "tenant not found")
 		return
 	}
 
@@ -108,8 +102,11 @@ func (h *Handler) UpsertArray(c *gin.Context) {
 // Page handles POST /presentations/page
 // Returns a paginated list of presentations
 func (h *Handler) Page(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
+
+	if tenantSlug == "" || enterpriseID == 0 {
 		response.BadRequest(c, "tenant not found")
 		return
 	}
@@ -144,12 +141,6 @@ func (h *Handler) Page(c *gin.Context) {
 		req.Params = make(map[string]any)
 	}
 
-	enterpriseID := c.GetInt64("enterprise_id")
-	if enterpriseID == 0 {
-		response.BadRequest(c, "enterprise_id not found")
-		return
-	}
-
 	result, err := h.svc.Page(c.Request.Context(), tenantSlug, enterpriseID, req.Page, req.Limit, req.Search, req.Sort, req.Order, req.Params)
 	if err != nil {
 		response.BadRequest(c, err.Error())
@@ -162,15 +153,12 @@ func (h *Handler) Page(c *gin.Context) {
 // List handles GET /presentations
 // Returns a list of presentations, optionally filtered by product_id
 func (h *Handler) List(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
-		response.BadRequest(c, "tenant not found")
-		return
-	}
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
 
-	enterpriseID := c.GetInt64("enterprise_id")
-	if enterpriseID == 0 {
-		response.BadRequest(c, "enterprise_id not found")
+	if tenantSlug == "" || enterpriseID == 0 {
+		response.BadRequest(c, "tenant not found")
 		return
 	}
 
@@ -204,8 +192,10 @@ func (h *Handler) List(c *gin.Context) {
 // GetByProductID handles GET /products/:id/presentations
 // Returns all presentations for a specific product
 func (h *Handler) GetByProductID(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+
+	if tenantSlug == "" {
 		response.BadRequest(c, "tenant not found")
 		return
 	}
@@ -228,8 +218,10 @@ func (h *Handler) GetByProductID(c *gin.Context) {
 // GetByID handles GET /presentations/:id
 // Returns a single presentation by ID
 func (h *Handler) GetByID(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+
+	if tenantSlug == "" {
 		response.BadRequest(c, "tenant not found")
 		return
 	}
@@ -256,8 +248,10 @@ func (h *Handler) GetByID(c *gin.Context) {
 // Update handles PUT /presentations/:id
 // Updates an existing presentation
 func (h *Handler) Update(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+
+	if tenantSlug == "" {
 		response.BadRequest(c, "tenant not found")
 		return
 	}
@@ -307,8 +301,10 @@ func (h *Handler) Update(c *gin.Context) {
 // Delete handles DELETE /presentations/:id
 // Performs a soft delete of a presentation
 func (h *Handler) Delete(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+
+	if tenantSlug == "" {
 		response.BadRequest(c, "tenant not found")
 		return
 	}

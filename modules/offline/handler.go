@@ -57,7 +57,7 @@ func (h *Handler) Ping(c *gin.Context) {
 
 	result, err := h.svc.SyncAllBySlug(c.Request.Context(), prodURL, token, slug)
 	if err != nil {
-		response.BadRequest(c, "Error al sincronizar: "+err.Error())
+		response.OK(c, "Error al sincronizar: "+err.Error())
 		return
 	}
 
@@ -109,7 +109,7 @@ func (h *Handler) SyncTenant(c *gin.Context) {
 
 	result, err := h.svc.SyncTenantBySlug(c.Request.Context(), prodURL, token, slug)
 	if err != nil {
-		response.BadRequest(c, "Error al sincronizar tenant: "+err.Error())
+		response.OK(c, "Error al sincronizar tenant: "+err.Error())
 		return
 	}
 

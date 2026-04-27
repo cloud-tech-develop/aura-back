@@ -18,15 +18,12 @@ func NewHandler(svc Service) *Handler {
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
-		response.BadRequest(c, "tenant no encontrado")
-		return
-	}
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
 
-	enterpriseID := c.GetInt64("enterprise_id")
-	if enterpriseID == 0 {
-		response.BadRequest(c, "enterprise_id not found")
+	if tenantSlug == "" || enterpriseID == 0 {
+		response.BadRequest(c, "tenant no encontrado")
 		return
 	}
 
@@ -61,25 +58,12 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	tenantSlug, hasSlug := tenant.SlugFromContext(c)
-	if !hasSlug || tenantSlug == "" {
-		tenantSlug = c.Query("slug")
-	}
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
 
-	enterpriseID := c.GetInt64("enterprise_id")
-	if enterpriseID == 0 {
-		if idStr := c.Query("enterprise_id"); idStr != "" {
-			var err error
-			enterpriseID, err = strconv.ParseInt(idStr, 10, 64)
-			if err != nil {
-				response.BadRequest(c, "enterprise_id inválido")
-				return
-			}
-		}
-	}
-
-	if tenantSlug == "" && enterpriseID == 0 && !hasSlug {
-		response.BadRequest(c, "slug o enterprise_id es requerido")
+	if tenantSlug == "" || enterpriseID == 0 {
+		response.BadRequest(c, "tenant no encontrado")
 		return
 	}
 
@@ -93,8 +77,11 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Page(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
+
+	if tenantSlug == "" || enterpriseID == 0 {
 		response.BadRequest(c, "tenant no encontrado")
 		return
 	}
@@ -129,7 +116,6 @@ func (h *Handler) Page(c *gin.Context) {
 		req.Params = make(map[string]any)
 	}
 
-	enterpriseID := c.GetInt64("enterprise_id")
 	if enterpriseID == 0 {
 		response.BadRequest(c, "enterprise_id not found")
 		return
@@ -145,8 +131,11 @@ func (h *Handler) Page(c *gin.Context) {
 }
 
 func (h *Handler) GetByID(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
+
+	if tenantSlug == "" || enterpriseID == 0 {
 		response.BadRequest(c, "tenant no encontrado")
 		return
 	}
@@ -171,8 +160,10 @@ func (h *Handler) GetByID(c *gin.Context) {
 }
 
 func (h *Handler) Update(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+
+	if tenantSlug == "" {
 		response.BadRequest(c, "tenant no encontrado")
 		return
 	}
@@ -215,8 +206,10 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+
+	if tenantSlug == "" {
 		response.BadRequest(c, "tenant no encontrado")
 		return
 	}

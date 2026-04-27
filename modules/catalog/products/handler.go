@@ -23,15 +23,11 @@ func NewHandler(svc Service) *Handler {
 // Create handles POST /products
 // Creates a new product in the catalog
 func (h *Handler) Create(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
+	if tenantSlug == "" || enterpriseID == 0 {
 		response.BadRequest(c, "tenant not found")
-		return
-	}
-
-	enterpriseID := c.GetInt64("enterprise_id")
-	if enterpriseID == 0 {
-		response.BadRequest(c, "enterprise_id not found")
 		return
 	}
 
@@ -151,8 +147,10 @@ func (h *Handler) Create(c *gin.Context) {
 // Page handles POST /products/page
 // Returns a paginated list of products
 func (h *Handler) Page(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
+	if tenantSlug == "" || enterpriseID == 0 {
 		response.BadRequest(c, "tenant not found")
 		return
 	}
@@ -187,12 +185,6 @@ func (h *Handler) Page(c *gin.Context) {
 		req.Params = make(map[string]any)
 	}
 
-	enterpriseID := c.GetInt64("enterprise_id")
-	if enterpriseID == 0 {
-		response.BadRequest(c, "enterprise_id not found")
-		return
-	}
-
 	result, err := h.svc.Page(c.Request.Context(), tenantSlug, enterpriseID, req.Page, req.Limit, req.Search, req.Sort, req.Order, req.Params)
 	if err != nil {
 		response.BadRequest(c, err.Error())
@@ -205,25 +197,11 @@ func (h *Handler) Page(c *gin.Context) {
 // List handles GET /products
 // Returns a list of products with optional filters
 func (h *Handler) List(c *gin.Context) {
-	tenantSlug, hasSlug := tenant.SlugFromContext(c)
-	if !hasSlug || tenantSlug == "" {
-		tenantSlug = c.Query("slug")
-	}
-
-	enterpriseID := c.GetInt64("enterprise_id")
-	if enterpriseID == 0 {
-		if idStr := c.Query("enterprise_id"); idStr != "" {
-			var err error
-			enterpriseID, err = strconv.ParseInt(idStr, 10, 64)
-			if err != nil {
-				response.BadRequest(c, "enterprise_id inválido")
-				return
-			}
-		}
-	}
-
-	if tenantSlug == "" && enterpriseID == 0 && !hasSlug {
-		response.BadRequest(c, "slug o enterprise_id es requerido")
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
+	if tenantSlug == "" || enterpriseID == 0 {
+		response.BadRequest(c, "tenant not found")
 		return
 	}
 
@@ -263,8 +241,9 @@ func (h *Handler) List(c *gin.Context) {
 // GetByID handles GET /products/:id
 // Returns a single product by ID
 func (h *Handler) GetByID(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	if tenantSlug == "" {
 		response.BadRequest(c, "tenant not found")
 		return
 	}
@@ -291,8 +270,9 @@ func (h *Handler) GetByID(c *gin.Context) {
 // GetBySKU handles GET /catalog/products/exist/:sku
 // Checks if a product exists by SKU
 func (h *Handler) GetBySKU(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	if tenantSlug == "" {
 		response.BadRequest(c, "tenant not found")
 		return
 	}
@@ -337,8 +317,9 @@ func (h *Handler) GetBySKU(c *gin.Context) {
 // Update handles PUT /products/:id
 // Updates an existing product
 func (h *Handler) Update(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	if tenantSlug == "" {
 		response.BadRequest(c, "tenant not found")
 		return
 	}
@@ -491,8 +472,9 @@ func (h *Handler) Update(c *gin.Context) {
 // Delete handles DELETE /products/:id
 // Performs a soft delete of a product
 func (h *Handler) Delete(c *gin.Context) {
-	tenantSlug, ok := tenant.SlugFromContext(c)
-	if !ok {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	if tenantSlug == "" {
 		response.BadRequest(c, "tenant not found")
 		return
 	}

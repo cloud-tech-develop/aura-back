@@ -57,8 +57,11 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]UnitList, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
- 
+
 	tenant := r.db.SchemaPrefix(tenantSlug)
+
+	fmt.Println(tenant, tenantSlug, enterpriseID)
+
 	query := fmt.Sprintf(`
 		SELECT id, name, abbreviation
 		FROM %sunit WHERE enterprise_id = $1 AND deleted_at IS NULL
@@ -84,13 +87,13 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
- 
+
 	tenant := r.db.SchemaPrefix(tenantSlug)
 	// Build base WHERE clause
 	baseWhere := `enterprise_id = $1 AND deleted_at IS NULL`
 	args := []interface{}{enterpriseID}
 	argPos := 2
- 
+
 	// COUNT query
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %sunit WHERE `+baseWhere, tenant)
 	if search != "" {
