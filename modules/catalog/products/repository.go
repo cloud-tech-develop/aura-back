@@ -504,11 +504,7 @@ func (r *repository) Create(ctx context.Context, tenantSlug string, p *Product) 
 			fmt.Println("Error al crear producto offline", err.Error())
 			return fmt.Errorf("failed to create product offline: %w", err)
 		}
-		p, err = r.GetBySKU(ctx, tenantSlug, p.SKU, p.EnterpriseID)
-		if err != nil {
-			return fmt.Errorf("failed to get product by sku offline: %w", err)
-		}
-		fmt.Println("Producto creado offline", p.ID)
+		fmt.Println("Producto creado offline", p.Name)
 		return nil
 	} else {
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 )
 
 // querier defines the database query interface
@@ -33,21 +34,67 @@ func NewRepository(db *db.DB) Repository {
 // Create inserts a new presentation into the database
 func (r *repository) Create(ctx context.Context, tenantSlug string, enterpriseID int64, p *Presentation) error {
 	tenant := r.db.SchemaPrefix(tenantSlug)
-	query := fmt.Sprintf(`
-		INSERT INTO %spresentation (
-			product_id, name, factor, barcode, cost_price, sale_price,
-			default_purchase, default_sale, enterprise_id
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id, created_at`, tenant)
 
-	err := r.db.QueryRowContext(ctx, query,
-		p.ProductID, p.Name, p.Factor, p.Barcode,
-		p.CostPrice, p.SalePrice, p.DefaultPurchase, p.DefaultSale, enterpriseID,
-	).Scan(&p.ID, &p.CreatedAt)
-	if err != nil {
-		return fmt.Errorf("failed to create presentation: %w", err)
+	now := vo.Now()
+	p.CreatedAt = now
+	p.UpdatedAt = &now
+
+	cols := []string{
+		"product_id", "name", "factor", "barcode", "cost_price", "sale_price",
+		"default_purchase", "default_sale", "enterprise_id", "created_at", "updated_at", "deleted_at",
 	}
-	return nil
+	args := presentationArgs(p, enterpriseID, r.isOffline)
+
+	var query string
+	placeholders := make([]string, len(cols))
+	for i := range cols {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+	}
+
+	if r.isOffline {
+		if p.ID > 0 {
+			cols = append(cols, "id")
+			placeholders = append(placeholders, fmt.Sprintf("$%d", len(cols)))
+		}
+		query = fmt.Sprintf(
+			"INSERT INTO %spresentation (%s) VALUES (%s)",
+			tenant,
+			strings.Join(cols, ", "),
+			strings.Join(placeholders, ", "),
+		)
+		_, err := r.db.ExecContext(ctx, query, args...)
+		if err != nil {
+			return fmt.Errorf("failed to create presentation offline: %w", err)
+		}
+		return nil
+	} else {
+		query = fmt.Sprintf(
+			"INSERT INTO %spresentation (%s) VALUES (%s) RETURNING id",
+			tenant,
+			strings.Join(cols, ", "),
+			strings.Join(placeholders, ", "),
+		)
+		err := r.db.QueryRowContext(ctx, query, args...).Scan(&p.ID)
+		if err != nil {
+			return fmt.Errorf("failed to create presentation production: %w", err)
+		}
+		return nil
+	}
+}
+
+// presentationArgs returns the slice of arguments for INSERT queries.
+// withID=true prepends p.ID as the first argument (used by SQLite always,
+// and by Postgres when syncing an offline record that already has an ID).
+func presentationArgs(p *Presentation, enterpriseID int64, withID bool) []any {
+	base := []any{
+		p.ProductID, p.Name, p.Factor, p.Barcode,
+		p.CostPrice, p.SalePrice, p.DefaultPurchase, p.DefaultSale,
+		enterpriseID, p.CreatedAt, p.UpdatedAt, nil,
+	}
+	if withID && p.ID > 0 {
+		return append(base, p.ID)
+	}
+	return base
 }
 
 // CreateMany inserts multiple presentations into the database

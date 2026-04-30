@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"testing"
-	"time"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -146,7 +146,7 @@ func TestService_GetByID_Success(t *testing.T) {
 	mockRepo := new(MockRepository)
 	svc := &service{repo: mockRepo}
 
-	now := time.Now()
+	now := vo.Now()
 	expectedBrand := &Brand{
 		ID:           1,
 		Name:         "Marca Test",
@@ -227,7 +227,7 @@ func TestService_Update_Valid(t *testing.T) {
 		Description:  "Descripción original",
 		Active:       true,
 		EnterpriseID: 1,
-		CreatedAt:    time.Now(),
+		CreatedAt:    vo.Now(),
 	}
 
 	updatedBrand := &Brand{
@@ -258,7 +258,7 @@ func TestService_Update_Active(t *testing.T) {
 		Description:  "Era activa",
 		Active:       true,
 		EnterpriseID: 1,
-		CreatedAt:    time.Now(),
+		CreatedAt:    vo.Now(),
 	}
 
 	// Actualizar para desactivar la marca
@@ -315,7 +315,7 @@ func TestService_Page_DefaultPagination(t *testing.T) {
 	mockRepo := new(MockRepository)
 	svc := &service{repo: mockRepo}
 
-	now := time.Now()
+	now := vo.Now()
 	expectedResult := domain.PageResult{
 		Items:      []Brand{{ID: 1, Name: "Marca Test", Description: "Desc", Active: true, EnterpriseID: 1, CreatedAt: now}},
 		Total:      1,

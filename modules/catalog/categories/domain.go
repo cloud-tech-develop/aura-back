@@ -2,26 +2,26 @@ package categories
 
 import (
 	"context"
-	"time"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 )
 
 // Category entity
 type Category struct {
-	ID             int64      `json:"id"`
-	Name           string     `json:"name"`
-	Description    *string    `json:"description,omitempty"`
-	DefaultTaxRate float64    `json:"default_tax_rate"`
-	Active         bool       `json:"active"`
-	ParentID       *int64     `json:"parent_id,omitempty"`
-	EnterpriseID   int64      `json:"enterprise_id"`
-	GlobalID       string     `json:"global_id"`
-	SyncStatus     string     `json:"sync_status"`
-	LastSyncedAt   *time.Time `json:"last_synced_at,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      *time.Time `json:"updated_at,omitempty"`
-	DeletedAt      *time.Time `json:"deleted_at,omitempty"`
+	ID             int64        `json:"id"`
+	Name           string       `json:"name"`
+	Description    *string      `json:"description,omitempty"`
+	DefaultTaxRate float64      `json:"default_tax_rate"`
+	Active         bool         `json:"active"`
+	ParentID       *int64       `json:"parent_id,omitempty"`
+	EnterpriseID   int64        `json:"enterprise_id"`
+	GlobalID       string       `json:"global_id"`
+	SyncStatus     string       `json:"sync_status"`
+	LastSyncedAt   *vo.DateTime `json:"last_synced_at,omitempty"`
+	CreatedAt      vo.DateTime  `json:"created_at"`
+	UpdatedAt      *vo.DateTime `json:"updated_at,omitempty"`
+	DeletedAt      *vo.DateTime `json:"deleted_at,omitempty"`
 }
 
 // CategoryListItem entity for List endpoint (only id and name)

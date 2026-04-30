@@ -4,22 +4,23 @@ import (
 	"context"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 )
 
 // Unit entity
 type Unit struct {
-	ID            int64   `json:"id"`
-	Name          string  `json:"name"`
-	Abbreviation  string  `json:"abbreviation"`
-	Active        bool    `json:"active"`
-	AllowDecimals bool    `json:"allow_decimals"`
-	EnterpriseID  int64   `json:"enterprise_id"`
-	GlobalID      string  `json:"global_id"`
-	SyncStatus    string  `json:"sync_status"`
-	LastSyncedAt  *string `json:"last_synced_at,omitempty"`
-	CreatedAt     string  `json:"created_at"`
-	UpdatedAt     *string `json:"updated_at,omitempty"`
-	DeletedAt     *string `json:"deleted_at,omitempty"`
+	ID            int64        `json:"id"`
+	Name          string       `json:"name"`
+	Abbreviation  string       `json:"abbreviation"`
+	Active        bool         `json:"active"`
+	AllowDecimals bool         `json:"allow_decimals"`
+	EnterpriseID  int64        `json:"enterprise_id"`
+	GlobalID      string       `json:"global_id"`
+	SyncStatus    string       `json:"sync_status"`
+	LastSyncedAt  *vo.DateTime `json:"last_synced_at,omitempty"`
+	CreatedAt     vo.DateTime  `json:"created_at"`
+	UpdatedAt     *vo.DateTime `json:"updated_at,omitempty"`
+	DeletedAt     *vo.DateTime `json:"deleted_at,omitempty"`
 }
 
 type UnitList struct {

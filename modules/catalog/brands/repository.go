@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 )
 
 type querier = db.Querier
@@ -25,17 +27,66 @@ func NewRepository(db querier) Repository {
 
 func (r *repository) Create(ctx context.Context, tenantSlug string, b *Brand) error {
 	tenant := r.db.SchemaPrefix(tenantSlug)
-	query := fmt.Sprintf(`
-		INSERT INTO %sbrand (name, description, active, enterprise_id)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, created_at`, tenant)
 
-	err := r.db.QueryRowContext(ctx, query, b.Name, b.Description, b.Active, b.EnterpriseID).
-		Scan(&b.ID, &b.CreatedAt)
-	if err != nil {
-		return fmt.Errorf("failed to create brand: %w", err)
+	now := vo.Now()
+	b.CreatedAt = now
+	b.UpdatedAt = &now
+
+	cols := []string{
+		"name", "description", "active", "enterprise_id",
+		"created_at", "updated_at", "deleted_at",
 	}
-	return nil
+	args := brandArgs(b, r.isOffline)
+
+	var query string
+	placeholders := make([]string, len(cols))
+	for i := range cols {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+	}
+
+	if r.isOffline {
+		if b.ID > 0 {
+			cols = append(cols, "id")
+			placeholders = append(placeholders, fmt.Sprintf("$%d", len(cols)))
+		}
+		query = fmt.Sprintf(
+			"INSERT INTO %sbrand (%s) VALUES (%s)",
+			tenant,
+			strings.Join(cols, ", "),
+			strings.Join(placeholders, ", "),
+		)
+		_, err := r.db.ExecContext(ctx, query, args...)
+		if err != nil {
+			return fmt.Errorf("failed to create brand offline: %w", err)
+		}
+		return nil
+	} else {
+		query = fmt.Sprintf(
+			"INSERT INTO %sbrand (%s) VALUES (%s) RETURNING id",
+			tenant,
+			strings.Join(cols, ", "),
+			strings.Join(placeholders, ", "),
+		)
+		err := r.db.QueryRowContext(ctx, query, args...).Scan(&b.ID)
+		if err != nil {
+			return fmt.Errorf("failed to create brand production: %w", err)
+		}
+		return nil
+	}
+}
+
+// brandArgs returns the slice of arguments for INSERT queries.
+// withID=true prepends b.ID as the first argument (used by SQLite always,
+// and by Postgres when syncing an offline record that already has an ID).
+func brandArgs(b *Brand, withID bool) []any {
+	base := []any{
+		b.Name, b.Description, b.Active, b.EnterpriseID,
+		b.CreatedAt, b.UpdatedAt, nil,
+	}
+	if withID && b.ID > 0 {
+		return append(base, b.ID)
+	}
+	return base
 }
 
 func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (*Brand, error) {
@@ -61,7 +112,7 @@ func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (
 func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]BrandList, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
- 
+
 	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, name 
@@ -113,13 +164,13 @@ func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) er
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
- 
+
 	tenant := r.db.SchemaPrefix(tenantSlug)
 	// Build base WHERE clause
 	baseWhere := `enterprise_id = $1 AND deleted_at IS NULL`
 	args := []interface{}{enterpriseID}
 	argPos := 2
- 
+
 	// COUNT query
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %sbrand WHERE `+baseWhere, tenant)
 	if search != "" {

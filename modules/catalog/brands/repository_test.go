@@ -8,7 +8,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
- 
+
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 )
 
@@ -27,7 +27,7 @@ func TestRepository_Create_WithActive(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	brand := &Brand{
@@ -58,7 +58,7 @@ func TestRepository_Create_WithInactive(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	brand := &Brand{
@@ -87,7 +87,7 @@ func TestRepository_Create_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	brand := &Brand{
@@ -116,7 +116,7 @@ func TestRepository_GetByID_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -143,7 +143,7 @@ func TestRepository_GetByID_NotFound(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	mock.ExpectQuery(`SELECT .* FROM "test_tenant".brand WHERE id`).
@@ -161,7 +161,7 @@ func TestRepository_List_FilterActive(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	rows := sqlmock.NewRows([]string{"id", "name"}).
@@ -183,7 +183,7 @@ func TestRepository_List_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	rows := sqlmock.NewRows([]string{"id", "name"}).
@@ -206,7 +206,7 @@ func TestRepository_List_Empty(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	rows := sqlmock.NewRows([]string{"id", "name"})
@@ -226,7 +226,7 @@ func TestRepository_Update_Active(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	brand := &Brand{
@@ -251,7 +251,7 @@ func TestRepository_Update_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	brand := &Brand{
@@ -275,7 +275,7 @@ func TestRepository_Delete_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	mock.ExpectExec(`UPDATE "test_tenant".brand SET deleted_at`).
@@ -292,7 +292,7 @@ func TestRepository_Page_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -332,7 +332,7 @@ func TestRepository_Page_WithSearch(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -364,7 +364,7 @@ func TestRepository_Page_Empty(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	// COUNT query vacío
@@ -395,7 +395,7 @@ func TestRepository_Page_InvalidSort(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -427,7 +427,7 @@ func TestRepository_Page_VerifyActiveField(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	createdAt := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)

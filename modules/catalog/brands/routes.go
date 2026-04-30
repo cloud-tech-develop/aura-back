@@ -5,7 +5,7 @@ import "github.com/gin-gonic/gin"
 func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
 	// Public for offline sync
 	public.GET("/catalog/brands", h.List)
-	
+
 	// Protected routes
 	protected.POST("/catalog/brands", h.Create)
 	protected.GET("/catalog/brands/:id", h.GetByID)

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -128,7 +129,7 @@ func TestService_GetByID_Success(t *testing.T) {
 		Active:        true,
 		AllowDecimals: true,
 		EnterpriseID:  1,
-		CreatedAt:     "2024-01-01T00:00:00Z",
+		CreatedAt:     vo.Now(),
 	}
 
 	mockRepo.On("GetByID", mock.Anything, "test_tenant", int64(1)).Return(expectedUnit, nil).Once()
@@ -202,7 +203,7 @@ func TestService_Update_Valid(t *testing.T) {
 		Active:        true,
 		AllowDecimals: true,
 		EnterpriseID:  1,
-		CreatedAt:     "2024-01-01T00:00:00Z",
+		CreatedAt:     vo.Now(),
 	}
 
 	updatedUnit := &Unit{

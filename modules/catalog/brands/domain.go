@@ -2,24 +2,24 @@ package brands
 
 import (
 	"context"
-	"time"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 )
 
 // Brand entity
 type Brand struct {
-	ID           int64      `json:"id"`
-	Name         string     `json:"name"`
-	Description  string     `json:"description"`
-	Active       bool       `json:"active"`
-	EnterpriseID int64      `json:"enterprise_id"`
-	GlobalID     string     `json:"global_id"`
-	SyncStatus   string     `json:"sync_status"`
-	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
-	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
+	ID           int64        `json:"id"`
+	Name         string       `json:"name"`
+	Description  string       `json:"description"`
+	Active       bool         `json:"active"`
+	EnterpriseID int64        `json:"enterprise_id"`
+	GlobalID     string       `json:"global_id"`
+	SyncStatus   string       `json:"sync_status"`
+	LastSyncedAt *vo.DateTime `json:"last_synced_at,omitempty"`
+	CreatedAt    vo.DateTime  `json:"created_at"`
+	UpdatedAt    *vo.DateTime `json:"updated_at,omitempty"`
+	DeletedAt    *vo.DateTime `json:"deleted_at,omitempty"`
 }
 
 type BrandList struct {

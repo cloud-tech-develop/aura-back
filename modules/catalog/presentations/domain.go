@@ -2,28 +2,28 @@ package presentations
 
 import (
 	"context"
-	"time"
 
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 	"github.com/cloud-tech-develop/aura-back/shared/events"
 )
 
 // Presentation entity
 // Represents a product presentation/variant (kilo, libra, unidad, etc.)
 type Presentation struct {
-	ID              int64      `json:"id"`
-	ProductID       int64      `json:"product_id"`       // Product foreign key
-	Name            string     `json:"name"`             // Presentation name (Kilo, Libra, etc.)
-	Factor          float64    `json:"factor"`           // Conversion factor to base unit
-	Barcode         string     `json:"barcode"`          // Barcode for this presentation (optional)
-	CostPrice       float64    `json:"cost_price"`       // Cost price for this presentation
-	SalePrice       float64    `json:"sale_price"`       // Sale price for this presentation
-	DefaultPurchase bool       `json:"default_purchase"` // Default for purchase orders
-	DefaultSale     bool       `json:"default_sale"`     // Default for sales/POS
-	EnterpriseID    int64      `json:"enterprise_id"`    // Enterprise foreign key
-	CreatedAt       time.Time  `json:"created_at"`       // Creation timestamp
-	UpdatedAt       *time.Time `json:"updated_at"`       // Last update timestamp
-	DeletedAt       *time.Time `json:"deleted_at"`       // Soft delete timestamp
+	ID              int64        `json:"id"`
+	ProductID       int64        `json:"product_id"`       // Product foreign key
+	Name            string       `json:"name"`             // Presentation name (Kilo, Libra, etc.)
+	Factor          float64      `json:"factor"`           // Conversion factor to base unit
+	Barcode         string       `json:"barcode"`          // Barcode for this presentation (optional)
+	CostPrice       float64      `json:"cost_price"`       // Cost price for this presentation
+	SalePrice       float64      `json:"sale_price"`       // Sale price for this presentation
+	DefaultPurchase bool         `json:"default_purchase"` // Default for purchase orders
+	DefaultSale     bool         `json:"default_sale"`     // Default for sales/POS
+	EnterpriseID    int64        `json:"enterprise_id"`    // Enterprise foreign key
+	CreatedAt       vo.DateTime  `json:"created_at"`       // Creation timestamp
+	UpdatedAt       *vo.DateTime `json:"updated_at"`       // Last update timestamp
+	DeletedAt       *vo.DateTime `json:"deleted_at"`       // Soft delete timestamp
 }
 
 // PresentationWithProductInfo contains presentation data with product info for Page response

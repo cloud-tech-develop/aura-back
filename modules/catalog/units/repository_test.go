@@ -7,7 +7,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
- 
+
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 )
 
@@ -16,7 +16,7 @@ func TestRepository_Create_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	unit := &Unit{
@@ -46,7 +46,7 @@ func TestRepository_Create_DuplicateName(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	unit := &Unit{
@@ -83,7 +83,7 @@ func TestRepository_GetByID_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	rows := sqlmock.NewRows([]string{
@@ -108,7 +108,7 @@ func TestRepository_GetByID_NotFound(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	mock.ExpectQuery(`(?s)SELECT .* FROM "test_tenant".unit WHERE id`).
@@ -125,7 +125,7 @@ func TestRepository_List_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	rows := sqlmock.NewRows([]string{"id", "name", "abbreviation"}).
@@ -148,7 +148,7 @@ func TestRepository_List_Empty(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	rows := sqlmock.NewRows([]string{"id", "name", "abbreviation"})
@@ -168,7 +168,7 @@ func TestRepository_Update_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	unit := &Unit{
@@ -193,7 +193,7 @@ func TestRepository_Delete_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	mock.ExpectExec(`(?s)UPDATE "test_tenant".unit SET deleted_at.*`).
@@ -210,7 +210,7 @@ func TestRepository_Page_Success(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	// COUNT query
@@ -247,7 +247,7 @@ func TestRepository_Page_WithSearch(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	// COUNT query con búsqueda - args: enterprise_id (1), search (kg%)
@@ -277,7 +277,7 @@ func TestRepository_Page_Empty(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	// COUNT query vacío
@@ -308,7 +308,7 @@ func TestRepository_Page_InvalidSort(t *testing.T) {
 	conn, mock, err := sqlmock.New()
 	assert.NoError(t, err)
 	defer conn.Close()
- 
+
 	repo := &repository{db: db.NewMock(conn)}
 
 	// COUNT query

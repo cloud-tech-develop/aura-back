@@ -3,9 +3,11 @@ package units
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 )
 
 type querier = db.Querier
@@ -24,17 +26,66 @@ func NewRepository(db querier) Repository {
 
 func (r *repository) Create(ctx context.Context, tenantSlug string, u *Unit) error {
 	tenant := r.db.SchemaPrefix(tenantSlug)
-	query := fmt.Sprintf(`
-		INSERT INTO %sunit (name, abbreviation, active, allow_decimals, enterprise_id)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at`, tenant)
 
-	err := r.db.QueryRowContext(ctx, query, u.Name, u.Abbreviation, u.Active, u.AllowDecimals, u.EnterpriseID).
-		Scan(&u.ID, &u.CreatedAt)
-	if err != nil {
-		return fmt.Errorf("failed to create unit: %w", err)
+	now := vo.Now()
+	u.CreatedAt = now
+	u.UpdatedAt = &now
+
+	cols := []string{
+		"name", "abbreviation", "active", "allow_decimals", "enterprise_id",
+		"created_at", "updated_at", "deleted_at",
 	}
-	return nil
+	args := unitArgs(u, r.isOffline)
+
+	var query string
+	placeholders := make([]string, len(cols))
+	for i := range cols {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+	}
+
+	if r.isOffline {
+		if u.ID > 0 {
+			cols = append(cols, "id")
+			placeholders = append(placeholders, fmt.Sprintf("$%d", len(cols)))
+		}
+		query = fmt.Sprintf(
+			"INSERT INTO %sunit (%s) VALUES (%s)",
+			tenant,
+			strings.Join(cols, ", "),
+			strings.Join(placeholders, ", "),
+		)
+		_, err := r.db.ExecContext(ctx, query, args...)
+		if err != nil {
+			return fmt.Errorf("failed to create unit offline: %w", err)
+		}
+		return nil
+	} else {
+		query = fmt.Sprintf(
+			"INSERT INTO %sunit (%s) VALUES (%s) RETURNING id",
+			tenant,
+			strings.Join(cols, ", "),
+			strings.Join(placeholders, ", "),
+		)
+		err := r.db.QueryRowContext(ctx, query, args...).Scan(&u.ID)
+		if err != nil {
+			return fmt.Errorf("failed to create unit production: %w", err)
+		}
+		return nil
+	}
+}
+
+// unitArgs returns the slice of arguments for INSERT queries.
+// withID=true prepends u.ID as the first argument (used by SQLite always,
+// and by Postgres when syncing an offline record that already has an ID).
+func unitArgs(u *Unit, withID bool) []any {
+	base := []any{
+		u.Name, u.Abbreviation, u.Active, u.AllowDecimals, u.EnterpriseID,
+		u.CreatedAt, u.UpdatedAt, nil,
+	}
+	if withID && u.ID > 0 {
+		return append(base, u.ID)
+	}
+	return base
 }
 
 func (r *repository) GetByID(ctx context.Context, tenantSlug string, id int64) (*Unit, error) {
