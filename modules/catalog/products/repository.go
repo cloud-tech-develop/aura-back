@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
+	"github.com/cloud-tech-develop/aura-back/shared/domain/vo"
 )
 
 // querier defines the database query interface
@@ -31,35 +32,77 @@ func NewRepository(db *db.DB) Repository {
 	}
 }
 
-// Create inserts a new product into the database
-func (r *repository) Create(ctx context.Context, tenantSlug string, p *Product) error {
+func (r *repository) Exists(ctx context.Context, tenantSlug string, id *int64) (bool, error) {
+	if id == nil || *id == 0 {
+		return false, nil
+	}
 	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
-		INSERT INTO %sproduct (
-			sku, barcode, name, description, category_id, brand_id, unit_id,
-			product_type, active, visible_in_pos,
-			cost_price, sale_price, price_2, price_3,
-			iva_percentage, consumption_tax_value,
-			current_stock, min_stock, max_stock,
-			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
-			image_url, enterprise_id
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
-		RETURNING id, created_at`, tenant)
+		SELECT EXISTS(
+			SELECT 1
+			FROM %sproduct
+			WHERE id = $1 AND deleted_at IS NULL
+		)`, tenant)
 
-	err := r.db.QueryRowContext(ctx, query,
-		p.SKU, p.Barcode, p.Name, p.Description,
-		p.CategoryID, p.BrandID, p.UnitID,
-		p.ProductType, p.Active, p.VisibleInPOS,
-		p.CostPrice, p.SalePrice, p.Price2, p.Price3,
-		p.IVAPercentage, p.ConsumptionTax,
-		p.CurrentStock, p.MinStock, p.MaxStock,
-		p.ManagesInventory, p.ManagesBatches, p.ManagesSerial, p.AllowNegativeStock,
-		p.ImageURL, p.EnterpriseID,
-	).Scan(&p.ID, &p.CreatedAt)
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&exists)
 	if err != nil {
-		return fmt.Errorf("failed to create product: %w", err)
+		return false, fmt.Errorf("failed to check product existence: %w", err)
 	}
-	return nil
+	return exists, nil
+}
+
+// // Create inserts a new product into the database and retrieves the generated ID
+// func (r *repository) Create(ctx context.Context, tenantSlug string, p *Product) error {
+// 	tenant := r.db.SchemaPrefix(tenantSlug)
+
+// 	now := vo.Now()
+// 	p.CreatedAt = now
+// 	p.UpdatedAt = &now
+
+// 	cols := []string{
+// 		"sku", "barcode", "name", "description", "category_id", "brand_id", "unit_id",
+// 		"product_type", "active", "visible_in_pos",
+// 		"cost_price", "sale_price", "price_2", "price_3",
+// 		"iva_percentage", "consumption_tax_value",
+// 		"current_stock", "min_stock", "max_stock",
+// 		"manages_inventory", "manages_batches", "manages_serial", "allow_negative_stock",
+// 		"image_url", "enterprise_id", "created_at", "updated_at", "deleted_at",
+// 	}
+// 	args := productArgs(p, false)
+
+// 	if p.ID != 0 {
+// 		cols = append([]string{"id"}, cols...)
+// 		args = productArgs(p, true)
+// 	}
+
+// 	placeholders := make([]string, len(cols))
+// 	for i := range cols {
+// 		placeholders[i] = fmt.Sprintf("$%d", i+1)
+// 	}
+
+// 	query := fmt.Sprintf(
+// 		"INSERT INTO %sproduct (%s) VALUES (%s) RETURNING id",
+// 		tenant,
+// 		strings.Join(cols, ", "),
+// 		strings.Join(placeholders, ", "),
+// 	)
+
+// 	return nil
+// }
+
+func (r *repository) Upsert(ctx context.Context, tenantSlug string, p *Product) error {
+	exists, err := r.Exists(ctx, tenantSlug, &p.ID)
+	fmt.Println("exists:", exists, err)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return r.Update(ctx, tenantSlug, p)
+	}
+
+	fmt.Println("Create product")
+	return r.Create(ctx, tenantSlug, p)
 }
 
 // GetByID retrieves a product by its ID
@@ -294,7 +337,6 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 
 	// Validate sort column
 	validSorts := map[string]string{
-		"id":            "id",
 		"name":          "name",
 		"sku":           "sku",
 		"barcode":       "barcode",
@@ -306,7 +348,7 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	if sortCol, ok := validSorts[sort]; ok {
 		sort = sortCol
 	} else {
-		sort = "id"
+		sort = "p.id"
 	}
 	if order != "asc" && order != "desc" {
 		order = "asc"
@@ -330,7 +372,7 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 		LEFT JOIN %scategory c ON p.category_id = c.id
 		LEFT JOIN %sbrand b ON p.brand_id = b.id
 		LEFT JOIN %sunit u ON p.unit_id = u.id
-		WHERE `+baseWhere+searchCond+` ORDER BY p.%s %s LIMIT %d OFFSET %d`,
+		WHERE `+baseWhere+searchCond+` ORDER BY %s %s LIMIT %d OFFSET %d`,
 		tenant, tenant, tenant, tenant, sort, order, limit, offset)
 
 	resultRows, err := r.db.QueryContext(ctx, selectQuery)
@@ -417,4 +459,91 @@ func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) er
 		return fmt.Errorf("failed to delete product: %w", err)
 	}
 	return nil
+}
+
+// Create inserts a new product into the database and retrieves the generated ID
+func (r *repository) Create(ctx context.Context, tenantSlug string, p *Product) error {
+	tenant := r.db.SchemaPrefix(tenantSlug)
+
+	now := vo.Now()
+	p.CreatedAt = now
+	p.UpdatedAt = &now
+
+	cols := []string{
+		"sku", "barcode", "name", "description", "category_id", "brand_id", "unit_id",
+		"product_type", "active", "visible_in_pos",
+		"cost_price", "sale_price", "price_2", "price_3",
+		"iva_percentage", "consumption_tax_value",
+		"current_stock", "min_stock", "max_stock",
+		"manages_inventory", "manages_batches", "manages_serial", "allow_negative_stock",
+		"image_url", "enterprise_id", "created_at", "updated_at", "deleted_at",
+	}
+	args := productArgs(p, r.isOffline)
+
+	var query string
+	placeholders := make([]string, len(cols))
+	for i := range cols {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+	}
+
+	fmt.Println("Producto a crear offline", p)
+
+	if r.isOffline {
+		if p.ID > 0 {
+			cols = append(cols, "id")
+			placeholders = append(placeholders, fmt.Sprintf("$%d", len(cols)))
+		}
+		query = fmt.Sprintf(
+			"INSERT INTO %sproduct (%s) VALUES (%s)",
+			tenant,
+			strings.Join(cols, ", "),
+			strings.Join(placeholders, ", "),
+		)
+		_, err := r.db.ExecContext(ctx, query, args...)
+		if err != nil {
+			fmt.Println("Error al crear producto offline", err.Error())
+			return fmt.Errorf("failed to create product offline: %w", err)
+		}
+		p, err = r.GetBySKU(ctx, tenantSlug, p.SKU, p.EnterpriseID)
+		if err != nil {
+			return fmt.Errorf("failed to get product by sku offline: %w", err)
+		}
+		fmt.Println("Producto creado offline", p.ID)
+		return nil
+	} else {
+
+		query = fmt.Sprintf(
+			"INSERT INTO %sproduct (%s) VALUES (%s) RETURNING id",
+			tenant,
+			strings.Join(cols, ", "),
+			strings.Join(placeholders, ", "),
+		)
+
+		err := r.db.QueryRowContext(ctx, query, args...).Scan(&p.ID)
+		if err != nil {
+			return fmt.Errorf("failed to create product production: %w", err)
+		}
+		return nil
+	}
+
+}
+
+// productArgs returns the slice of arguments for INSERT queries.
+// withID=true prepends p.ID as the first argument (used by SQLite always,
+// and by Postgres when syncing an offline record that already has an ID).
+func productArgs(p *Product, withID bool) []any {
+	base := []any{
+		p.SKU, p.Barcode, p.Name, p.Description,
+		p.CategoryID, p.BrandID, p.UnitID,
+		p.ProductType, p.Active, p.VisibleInPOS,
+		p.CostPrice, p.SalePrice, p.Price2, p.Price3,
+		p.IVAPercentage, p.ConsumptionTax,
+		p.CurrentStock, p.MinStock, p.MaxStock,
+		p.ManagesInventory, p.ManagesBatches, p.ManagesSerial, p.AllowNegativeStock,
+		p.ImageURL, p.EnterpriseID, p.CreatedAt, p.UpdatedAt, nil,
+	}
+	if withID && p.ID > 0 {
+		return append(base, p.ID)
+	}
+	return base
 }

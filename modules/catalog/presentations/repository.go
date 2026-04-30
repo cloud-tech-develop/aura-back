@@ -119,29 +119,22 @@ func (r *repository) GetByProductID(ctx context.Context, tenantSlug string, prod
 }
 
 // List retrieves a list of presentations with filters
-func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Presentation, error) {
+func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, ProductID int64) ([]Presentation, error) {
 	ctx = context.WithoutCancel(ctx)
- 
+
 	tenant := r.db.SchemaPrefix(tenantSlug)
 	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL`, enterpriseID)
- 
-	if filters.ProductID != nil {
-		baseWhere += fmt.Sprintf(" AND product_id = %d", *filters.ProductID)
+
+	if ProductID > 0 {
+		baseWhere += fmt.Sprintf(" AND product_id = %d", ProductID)
 	}
- 
-	if filters.Search != "" {
-		safeSearch := strings.ReplaceAll(filters.Search, "'", "''")
-		baseWhere += fmt.Sprintf(" AND name ILIKE '%%%s%%'", safeSearch)
-	}
- 
-	offset := (filters.Page - 1) * filters.Limit
+
 	query := fmt.Sprintf(`
 		SELECT 
 			id, product_id, name, factor, barcode, cost_price, sale_price,
 			default_purchase, default_sale, enterprise_id,
 			created_at, updated_at, deleted_at
-		FROM %spresentation WHERE `+baseWhere+` ORDER BY name LIMIT %d OFFSET %d`,
-		tenant, filters.Limit, offset)
+		FROM %spresentation WHERE `+baseWhere+` ORDER BY name`, tenant)
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -167,10 +160,10 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 // Page retrieves a paginated list of presentations
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	ctx = context.WithoutCancel(ctx)
- 
+
 	tenant := r.db.SchemaPrefix(tenantSlug)
 	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL`, enterpriseID)
- 
+
 	// Apply filters from params
 	if params != nil {
 		if productID, ok := params["product_id"]; ok && productID != nil {
@@ -184,14 +177,14 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 			baseWhere += fmt.Sprintf(" AND product_id = %d", pID)
 		}
 	}
- 
+
 	// Apply search filter
 	searchCond := ""
 	if search != "" {
 		safeSearch := strings.ReplaceAll(search, "'", "''")
 		searchCond = fmt.Sprintf(" AND name ILIKE '%%%s%%'", safeSearch)
 	}
- 
+
 	// COUNT query
 	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %spresentation WHERE `+baseWhere+searchCond, tenant)
 

@@ -27,6 +27,15 @@ func NewService(db *db.DB, eventBus events.EventBus, presSvc presentations.Servi
 	return &service{repo: NewRepository(db), presentationSvc: presSvc, eventBus: eventBus}
 }
 
+// Upsert upserts a product
+// Validates business rules before persisting
+func (s *service) Upsert(ctx context.Context, tenantSlug string, p Product) error {
+	if err := s.repo.Upsert(ctx, tenantSlug, &p); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Create creates a new product in the catalog
 // Validates business rules before persisting
 func (s *service) Create(ctx context.Context, tenantSlug string, p *Product) error {
@@ -82,19 +91,6 @@ func (s *service) Create(ctx context.Context, tenantSlug string, p *Product) err
 	}
 	logger.Logf("[Product Service] Price validation passed: cost=%v, sale=%v", p.CostPrice, p.SalePrice)
 
-	// Check SKU uniqueness within enterprise
-	logger.Logf("[Product Service] Checking if SKU %s already exists for enterprise %d", p.SKU, p.EnterpriseID)
-	_, err := s.repo.GetBySKU(ctx, tenantSlug, p.SKU, p.EnterpriseID)
-	if err == nil {
-		logger.Logf("[Product Service] SKU %s already exists", p.SKU)
-		return fmt.Errorf("sku %s already exists", p.SKU)
-	}
-	if err != sql.ErrNoRows {
-		logger.Logf("[Product Service] Error checking SKU: %v", err)
-		return fmt.Errorf("error checking sku: %w", err)
-	}
-	logger.Log("[Product Service] SKU uniqueness check passed")
-
 	// Check barcode uniqueness if provided
 	if p.Barcode != "" {
 		logger.Logf("[Product Service] Checking if barcode %s already exists for enterprise %d", p.Barcode, p.EnterpriseID)
@@ -112,12 +108,19 @@ func (s *service) Create(ctx context.Context, tenantSlug string, p *Product) err
 
 	// Create product in repository
 	logger.Logf("[Product Service] Creating product in repository for tenant %s", tenantSlug)
-	err = s.repo.Create(ctx, tenantSlug, p)
+	err := s.repo.Create(ctx, tenantSlug, p)
 	if err != nil {
 		logger.Logf("[Product Service] Repository create failed: %v", err)
 		return err
 	}
 	logger.Logf("[Product Service] Product created successfully with ID: %d", p.ID)
+
+	if p.ID == 0 && len(p.Presentations) > 0 {
+		prod, _ := s.repo.GetBySKU(ctx, tenantSlug, p.SKU, p.EnterpriseID)
+		if prod != nil {
+			p.ID = prod.ID
+		}
+	}
 
 	// Create presentations if provided
 	if len(p.Presentations) > 0 {

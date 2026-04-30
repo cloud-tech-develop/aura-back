@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -36,8 +37,8 @@ func (m *MockRepository) UpsertUnit(ctx context.Context, u *Unit) error {
 	return args.Error(0)
 }
 
-func (m *MockRepository) UpsertProduct(ctx context.Context, p *Product) error {
-	args := m.Called(ctx, p)
+func (m *MockRepository) UpsertProduct(ctx context.Context, tenantSlug string, p *products.Product) error {
+	args := m.Called(ctx, tenantSlug, p)
 	return args.Error(0)
 }
 
@@ -111,11 +112,11 @@ func TestService_SyncCategories_WrapperFormat(t *testing.T) {
 // TestDomain_CategoryFields tests Category entity fields
 func TestDomain_CategoryFields(t *testing.T) {
 	category := Category{
-		ID:             1,
-		Name:           "Test Category",
-		Description:    "Test Description",
-		Active:        true,
-		EnterpriseID:  1,
+		ID:           1,
+		Name:         "Test Category",
+		Description:  "Test Description",
+		Active:       true,
+		EnterpriseID: 1,
 	}
 
 	assert.Equal(t, int64(1), category.ID)
@@ -127,12 +128,12 @@ func TestDomain_CategoryFields(t *testing.T) {
 // TestDomain_ThirdPartyFields tests ThirdParty entity fields
 func TestDomain_ThirdPartyFields(t *testing.T) {
 	tp := ThirdParty{
-		ID:                1,
-		FirstName:         "John",
-		LastName:          "Doe",
-		DocumentNumber:    "12345678",
-		DocumentType:     "CC",
-		EnterpriseID:     1,
+		ID:             1,
+		FirstName:      "John",
+		LastName:       "Doe",
+		DocumentNumber: "12345678",
+		DocumentType:   "CC",
+		EnterpriseID:   1,
 	}
 
 	assert.Equal(t, int64(1), tp.ID)
@@ -144,13 +145,13 @@ func TestDomain_ThirdPartyFields(t *testing.T) {
 // TestDomain_SyncResult tests SyncResult structure
 func TestDomain_SyncResult(t *testing.T) {
 	result := SyncResult{
-		Enterprises:    1,
+		Enterprises:  1,
 		Categories:   2,
-		Brands:      3,
-		Units:       4,
-		Products:    5,
+		Brands:       3,
+		Units:        4,
+		Products:     5,
 		ThirdParties: 6,
-		Errors:     []string{},
+		Errors:       []string{},
 	}
 
 	assert.Equal(t, 1, result.Enterprises)
@@ -166,8 +167,8 @@ func TestDomain_SyncResult(t *testing.T) {
 func TestSyncResult_WithErrors(t *testing.T) {
 	result := SyncResult{
 		Categories: 0,
-		Brands:   0,
-		Errors:   []string{"categories: status: 400"},
+		Brands:     0,
+		Errors:     []string{"categories: status: 400"},
 	}
 
 	assert.Equal(t, 0, result.Categories)

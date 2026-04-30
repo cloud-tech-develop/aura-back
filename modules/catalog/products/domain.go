@@ -29,11 +29,11 @@ type Product struct {
 	Name               string                `json:"name" binding:"required"`
 	Description        string                `json:"description"`
 	CategoryID         *int64                `json:"category_id"`
-	CategoryName       *string              `json:"category_name"`
+	CategoryName       *string               `json:"category_name"`
 	BrandID            *int64                `json:"brand_id"`
-	BrandName          *string              `json:"brand_name"`
+	BrandName          *string               `json:"brand_name"`
 	UnitID             int64                 `json:"unit_measure_id" binding:"required"`
-	UnitName           *string              `json:"unit_name"`
+	UnitName           *string               `json:"unit_name"`
 	ProductType        string                `json:"product_type"`
 	Active             bool                  `json:"active"`
 	VisibleInPOS       bool                  `json:"visible_in_pos"`
@@ -83,6 +83,7 @@ type ListFilters struct {
 // Repository interface
 // Defines the data access layer for products
 type Repository interface {
+	Upsert(ctx context.Context, tenantSlug string, p *Product) error
 	Create(ctx context.Context, tenantSlug string, p *Product) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Product, error)
 	GetBySKU(ctx context.Context, tenantSlug string, sku string, enterpriseID int64) (*Product, error)
@@ -96,6 +97,7 @@ type Repository interface {
 // Service interface
 // Defines the business logic layer for products
 type Service interface {
+	Upsert(ctx context.Context, tenantSlug string, p Product) error
 	Create(ctx context.Context, tenantSlug string, p *Product) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Product, error)
 	GetBySKU(ctx context.Context, tenantSlug string, sku string, enterpriseID int64) (*Product, error)

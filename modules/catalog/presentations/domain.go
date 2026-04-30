@@ -73,7 +73,7 @@ type Repository interface {
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Presentation, error)
 	GetByProductID(ctx context.Context, tenantSlug string, productID int64) ([]Presentation, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
-	List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Presentation, error)
+	List(ctx context.Context, tenantSlug string, enterpriseID int64, ProductID int64) ([]Presentation, error)
 	Update(ctx context.Context, tenantSlug string, p *Presentation) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
 }
@@ -86,7 +86,7 @@ type Service interface {
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Presentation, error)
 	GetByProductID(ctx context.Context, tenantSlug string, productID int64) ([]Presentation, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
-	List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Presentation, error)
+	List(ctx context.Context, tenantSlug string, enterpriseID int64, ProductID int64) ([]Presentation, error)
 	Update(ctx context.Context, tenantSlug string, id int64, p *Presentation) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
 }

@@ -261,14 +261,8 @@ func (s *service) Page(ctx context.Context, tenantSlug string, enterpriseID int6
 }
 
 // List retrieves a list of presentations with filters
-func (s *service) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Presentation, error) {
-	if filters.Page < 1 {
-		filters.Page = 1
-	}
-	if filters.Limit < 1 {
-		filters.Limit = 10
-	}
-	return s.repo.List(ctx, tenantSlug, enterpriseID, filters)
+func (s *service) List(ctx context.Context, tenantSlug string, enterpriseID int64, productID int64) ([]Presentation, error) {
+	return s.repo.List(ctx, tenantSlug, enterpriseID, productID)
 }
 
 // Update updates an existing presentation

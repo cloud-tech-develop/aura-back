@@ -3,6 +3,8 @@ package offline
 import (
 	"context"
 	"time"
+
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 )
 
 // ─── Entities ───────────────────────────────────────────────────────────────────
@@ -139,37 +141,37 @@ type Unit struct {
 }
 
 // Product represents a product
-type Product struct {
-	ID                 int64      `json:"id"`
-	SKU                string     `json:"sku"`
-	Barcode            string     `json:"barcode"`
-	Name               string     `json:"name"`
-	Description        string     `json:"description"`
-	CategoryID         *int64     `json:"category_id"`
-	BrandID            *int64     `json:"brand_id"`
-	UnitID             int64      `json:"unit_id"`
-	ProductType        string     `json:"product_type"`
-	Active             bool       `json:"active"`
-	VisibleInPOS       bool       `json:"visible_in_pos"`
-	CostPrice          float64    `json:"cost_price"`
-	SalePrice          float64    `json:"sale_price"`
-	Price2             *float64   `json:"price_2"`
-	Price3             *float64   `json:"price_3"`
-	IVAPercentage      float64    `json:"iva_percentage"`
-	ConsumptionTax     float64    `json:"consumption_tax_value"`
-	CurrentStock       int        `json:"current_stock"`
-	MinStock           int        `json:"min_stock"`
-	MaxStock           int        `json:"max_stock"`
-	ManagesInventory   bool       `json:"manages_inventory"`
-	ManagesBatches     bool       `json:"manages_batches"`
-	ManagesSerial      bool       `json:"manages_serial"`
-	AllowNegativeStock bool       `json:"allow_negative_stock"`
-	ImageURL           string     `json:"image_url"`
-	EnterpriseID       int64      `json:"enterprise_id"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
-	DeletedAt          *time.Time `json:"deleted_at,omitempty"`
-}
+// type Product struct {
+// 	ID                 int64      `json:"id"`
+// 	SKU                string     `json:"sku"`
+// 	Barcode            string     `json:"barcode"`
+// 	Name               string     `json:"name"`
+// 	Description        string     `json:"description"`
+// 	CategoryID         *int64     `json:"category_id"`
+// 	BrandID            *int64     `json:"brand_id"`
+// 	UnitID             int64      `json:"unit_id"`
+// 	ProductType        string     `json:"product_type"`
+// 	Active             bool       `json:"active"`
+// 	VisibleInPOS       bool       `json:"visible_in_pos"`
+// 	CostPrice          float64    `json:"cost_price"`
+// 	SalePrice          float64    `json:"sale_price"`
+// 	Price2             *float64   `json:"price_2"`
+// 	Price3             *float64   `json:"price_3"`
+// 	IVAPercentage      float64    `json:"iva_percentage"`
+// 	ConsumptionTax     float64    `json:"consumption_tax_value"`
+// 	CurrentStock       int        `json:"current_stock"`
+// 	MinStock           int        `json:"min_stock"`
+// 	MaxStock           int        `json:"max_stock"`
+// 	ManagesInventory   bool       `json:"manages_inventory"`
+// 	ManagesBatches     bool       `json:"manages_batches"`
+// 	ManagesSerial      bool       `json:"manages_serial"`
+// 	AllowNegativeStock bool       `json:"allow_negative_stock"`
+// 	ImageURL           string     `json:"image_url"`
+// 	EnterpriseID       int64      `json:"enterprise_id"`
+// 	CreatedAt          time.Time  `json:"created_at"`
+// 	UpdatedAt          time.Time  `json:"updated_at"`
+// 	DeletedAt          *time.Time `json:"deleted_at,omitempty"`
+// }
 
 // Presentation represents a product presentation
 type Presentation struct {
@@ -219,7 +221,7 @@ type Repository interface {
 	UpsertCategory(ctx context.Context, c *Category) error
 	UpsertBrand(ctx context.Context, b *Brand) error
 	UpsertUnit(ctx context.Context, u *Unit) error
-	UpsertProduct(ctx context.Context, p *Product) error
+	UpsertProduct(ctx context.Context, tenantSlug string, p *products.Product) error
 	UpsertPresentation(ctx context.Context, pr *Presentation) error
 }
 

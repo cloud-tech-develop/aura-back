@@ -4,19 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"time"
- 
+
 	"github.com/cloud-tech-develop/aura-back/internal/db"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 )
 
 type repository struct {
-	db        *db.DB
-	isOffline bool
+	db         *db.DB
+	isOffline  bool
+	productSvc products.Service
 }
 
-func NewRepository(database *db.DB) Repository {
+func NewRepository(database *db.DB, productSvc products.Service) Repository {
 	return &repository{
-		db:        database,
-		isOffline: database.IsSQLite(),
+		db:         database,
+		isOffline:  database.IsSQLite(),
+		productSvc: productSvc,
 	}
 }
 
@@ -182,7 +185,7 @@ func (r *repository) UpsertUserRole(ctx context.Context, ur *UserRole) error {
 		return err
 	}
 
-if exists {
+	if exists {
 		_, err = r.db.ExecContext(ctx,
 			`UPDATE user_roles SET user_id = ?, role_id = ? WHERE id = ?`,
 			ur.UserID, ur.RoleID, ur.ID,
@@ -341,80 +344,8 @@ func (r *repository) UpsertUnit(ctx context.Context, u *Unit) error {
 
 // ─── Tenant Operations: Product ─────────────────────────────────────────────────────
 
-func (r *repository) UpsertProduct(ctx context.Context, p *Product) error {
-	var exists bool
-	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM product WHERE id = ?)", p.ID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-
-	active := 0
-	if p.Active {
-		active = 1
-	}
-	visibleInPOS := 0
-	if p.VisibleInPOS {
-		visibleInPOS = 1
-	}
-	managesInventory := 0
-	if p.ManagesInventory {
-		managesInventory = 1
-	}
-	managesBatches := 0
-	if p.ManagesBatches {
-		managesBatches = 1
-	}
-	managesSerial := 0
-	if p.ManagesSerial {
-		managesSerial = 1
-	}
-	allowNegativeStock := 0
-	if p.AllowNegativeStock {
-		allowNegativeStock = 1
-	}
-
-	categoryID := 0
-	if p.CategoryID != nil {
-		categoryID = int(*p.CategoryID)
-	}
-	brandID := 0
-	if p.BrandID != nil {
-		brandID = int(*p.BrandID)
-	}
-
-	if exists {
-		_, err = r.db.ExecContext(ctx,
-			`UPDATE product SET 
-			 sku = ?, barcode = ?, name = ?, description = ?, category_id = ?, brand_id = ?, unit_id = ?, 
-			 product_type = ?, active = ?, visible_in_pos = ?, cost_price = ?, sale_price = ?, 
-			 price_2 = ?, price_3 = ?, iva_percentage = ?, consumption_tax_value = ?, 
-			 current_stock = ?, min_stock = ?, max_stock = ?, manages_inventory = ?, manages_batches = ?, 
-			 manages_serial = ?, allow_negative_stock = ?, image_url = ?, updated_at = ?
-			 WHERE id = ?`,
-			p.SKU, p.Barcode, p.Name, p.Description, categoryID, brandID, p.UnitID,
-			p.ProductType, active, visibleInPOS, p.CostPrice, p.SalePrice, p.Price2, p.Price3,
-			p.IVAPercentage, p.ConsumptionTax,
-			p.CurrentStock, p.MinStock, p.MaxStock, managesInventory, managesBatches,
-			managesSerial, allowNegativeStock, p.ImageURL, time.Now(), p.ID,
-		)
-	} else {
-		p.CreatedAt = time.Now()
-		p.UpdatedAt = time.Now()
-		_, err = r.db.ExecContext(ctx,
-			`INSERT INTO product 
-			 (id, sku, barcode, name, description, category_id, brand_id, unit_id, product_type, active, visible_in_pos, 
-			  cost_price, sale_price, price_2, price_3, iva_percentage, consumption_tax_value, 
-			  current_stock, min_stock, max_stock, manages_inventory, manages_batches, manages_serial, 
-			  allow_negative_stock, image_url, enterprise_id, created_at, updated_at, deleted_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			p.ID, p.SKU, p.Barcode, p.Name, p.Description, categoryID, brandID, p.UnitID,
-			p.ProductType, active, visibleInPOS, p.CostPrice, p.SalePrice, p.Price2, p.Price3,
-			p.IVAPercentage, p.ConsumptionTax, p.CurrentStock, p.MinStock, p.MaxStock,
-			managesInventory, managesBatches, managesSerial, allowNegativeStock, p.ImageURL,
-			p.EnterpriseID, p.CreatedAt, p.UpdatedAt, nil,
-		)
-	}
-	return err
+func (r *repository) UpsertProduct(ctx context.Context, tenantSlug string, p *products.Product) error {
+	return r.productSvc.Upsert(ctx, tenantSlug, *p)
 }
 
 // ─── Tenant Operations: Presentation ─────────────────────────────────────────────────────

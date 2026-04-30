@@ -5,9 +5,9 @@ import (
 )
 
 func Register(protected gin.IRouter, h *Handler) {
-	protected.GET("/presentations", h.List)
-	protected.GET("/presentations/:id", h.GetByID)
-	protected.POST("/presentations/page", h.Page)
-	protected.PUT("/presentations/:id", h.Update)
-	protected.DELETE("/presentations/:id", h.Delete)
+	protected.GET("/catalog/presentations", h.List)
+	protected.GET("/catalog/presentations/:id", h.GetByID)
+	protected.POST("/catalog/presentations/page", h.Page)
+	protected.PUT("/catalog/presentations/:id", h.Update)
+	protected.DELETE("/catalog/presentations/:id", h.Delete)
 }

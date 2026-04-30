@@ -167,40 +167,21 @@ func (h *Handler) List(c *gin.Context) {
 	tenantSlug := claims.Slug
 	enterpriseID := claims.EnterpriseID
 
-	// Fallback: get from query params (for offline sync)
-	if tenantSlug == "" || enterpriseID == 0 {
-		if c.Query("slug") != "" {
-			tenantSlug = c.Query("slug")
-			if eid, err := strconv.ParseInt(c.Query("enterprise_id"), 10, 64); err == nil {
-				enterpriseID = eid
-			}
-		}
-	}
-
 	if tenantSlug == "" || enterpriseID == 0 {
 		response.BadRequest(c, "tenant not found")
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	search := c.Query("search")
-
-	var productID *int64
+	var productID int64
 	if pidStr := c.Query("product_id"); pidStr != "" {
 		if id, err := strconv.ParseInt(pidStr, 10, 64); err == nil {
-			productID = &id
+			productID = id
 		}
+	} else {
+		productID = 0
 	}
 
-	filters := ListFilters{
-		Page:      page,
-		Limit:     limit,
-		Search:    search,
-		ProductID: productID,
-	}
-
-	list, err := h.svc.List(c.Request.Context(), tenantSlug, enterpriseID, filters)
+	list, err := h.svc.List(c.Request.Context(), tenantSlug, enterpriseID, productID)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return

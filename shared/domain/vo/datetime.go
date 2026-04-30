@@ -17,6 +17,11 @@ func Now() DateTime {
 	return DateTime(time.Now())
 }
 
+// NewDateTime returns a new DateTime from a time.Time
+func NewDateTime(t time.Time) DateTime {
+	return DateTime(t)
+}
+
 // ParseDateTime parses a string into DateTime
 func ParseDateTime(s string) (DateTime, error) {
 	if s == "" {
