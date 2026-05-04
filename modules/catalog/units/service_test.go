@@ -51,6 +51,16 @@ func (m *MockRepository) Delete(ctx context.Context, tenantSlug string, id int64
 	return args.Error(0)
 }
 
+func (m *MockRepository) ListAll(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Unit, error) {
+	args := m.Called(ctx, tenantSlug, enterpriseID)
+	return args.Get(0).([]Unit), args.Error(1)
+}
+
+func (m *MockRepository) Upsert(ctx context.Context, tenantSlug string, u *Unit) error {
+	args := m.Called(ctx, tenantSlug, u)
+	return args.Error(0)
+}
+
 // ─── Tests del Service ─────────────────────────────────────────────────────────
 
 func TestService_Create_ValidInput(t *testing.T) {

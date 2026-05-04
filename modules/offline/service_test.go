@@ -7,7 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/products"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -22,17 +26,17 @@ func (m *MockRepository) UpsertThirdParty(ctx context.Context, tp *ThirdParty) e
 	return args.Error(0)
 }
 
-func (m *MockRepository) UpsertCategory(ctx context.Context, c *Category) error {
+func (m *MockRepository) UpsertCategory(ctx context.Context, c *categories.Category) error {
 	args := m.Called(ctx, c)
 	return args.Error(0)
 }
 
-func (m *MockRepository) UpsertBrand(ctx context.Context, b *Brand) error {
+func (m *MockRepository) UpsertBrand(ctx context.Context, b *brands.Brand) error {
 	args := m.Called(ctx, b)
 	return args.Error(0)
 }
 
-func (m *MockRepository) UpsertUnit(ctx context.Context, u *Unit) error {
+func (m *MockRepository) UpsertUnit(ctx context.Context, u *units.Unit) error {
 	args := m.Called(ctx, u)
 	return args.Error(0)
 }
@@ -42,7 +46,7 @@ func (m *MockRepository) UpsertProduct(ctx context.Context, tenantSlug string, p
 	return args.Error(0)
 }
 
-func (m *MockRepository) UpsertPresentation(ctx context.Context, p *Presentation) error {
+func (m *MockRepository) UpsertPresentation(ctx context.Context, p *presentations.Presentation) error {
 	args := m.Called(ctx, p)
 	return args.Error(0)
 }
@@ -86,7 +90,7 @@ func TestService_SyncCategories_WrapperFormat(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		response := map[string]interface{}{
-			"data": []Category{
+			"data": []categories.Category{
 				{ID: 1, Name: "Category 1", EnterpriseID: 0},
 				{ID: 2, Name: "Category 2", EnterpriseID: 0},
 			},
@@ -99,7 +103,7 @@ func TestService_SyncCategories_WrapperFormat(t *testing.T) {
 
 	// Create mock repository
 	mockRepo := new(MockRepository)
-	mockRepo.On("UpsertCategory", mock.Anything, mock.AnythingOfType("*offline.Category")).Return(nil).Times(2)
+	mockRepo.On("UpsertCategory", mock.Anything, mock.AnythingOfType("*categories.Category")).Return(nil).Times(2)
 
 	// Note: We can't easily test the service because it requires full initialization
 	// This test just documents the expected behavior
@@ -111,10 +115,11 @@ func TestService_SyncCategories_WrapperFormat(t *testing.T) {
 
 // TestDomain_CategoryFields tests Category entity fields
 func TestDomain_CategoryFields(t *testing.T) {
-	category := Category{
+	desc := "Test Description"
+	category := categories.Category{
 		ID:           1,
 		Name:         "Test Category",
-		Description:  "Test Description",
+		Description:  &desc,
 		Active:       true,
 		EnterpriseID: 1,
 	}

@@ -67,6 +67,11 @@ func (m *MockRepository) Delete(ctx context.Context, tenantSlug string, id int64
 	return args.Error(0)
 }
 
+func (m *MockRepository) Upsert(ctx context.Context, tenantSlug string, p *Product) error {
+	args := m.Called(ctx, tenantSlug, p)
+	return args.Error(0)
+}
+
 // ─── Service Tests ───────────────────────────────────────────────────────────
 
 // TestService_Create_ValidInput tests successful product creation with valid input
@@ -75,18 +80,16 @@ func TestService_Create_ValidInput(t *testing.T) {
 	svc := &service{repo: mockRepo}
 
 	product := &Product{
-		SKU:          "sk-u1",
-		Name:         "Producto test",
-		Barcode:      "1123255241",
-		UnitID:       6,
-		ProductType:  "ESTANDAR",
-		CostPrice:    17000,
-		SalePrice:    18558,
+		SKU:         "sk-u1",
+		Name:        "Producto test",
+		Barcode:     "1123255241",
+		UnitID:      6,
+		ProductType: "STANDARD",
+		CostPrice:   17000,
+		SalePrice:   18558,
 		EnterpriseID: 1,
 	}
 
-	// Expect repository GetBySKU (to check uniqueness) to return ErrNoRows (no existing product)
-	mockRepo.On("GetBySKU", mock.Anything, "test_tenant", "sk-u1", int64(1)).Return(nil, sql.ErrNoRows).Once()
 	// Expect repository GetByBarcode to return ErrNoRows
 	mockRepo.On("GetByBarcode", mock.Anything, "test_tenant", "1123255241", int64(1)).Return(nil, sql.ErrNoRows).Once()
 	// Expect repository Create to be called
@@ -97,8 +100,8 @@ func TestService_Create_ValidInput(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "sk-u1", product.SKU)
 	assert.Equal(t, "Producto test", product.Name)
-	assert.Equal(t, "ESTANDAR", product.ProductType)
-	assert.True(t, product.Active) // Should be set to true by default
+	assert.Equal(t, "STANDARD", product.ProductType)
+	assert.True(t, product.Active)
 	mockRepo.AssertExpectations(t)
 }
 
@@ -176,7 +179,6 @@ func TestService_Create_InvalidProductType(t *testing.T) {
 	mockRepo.AssertNotCalled(t, "Create")
 }
 
-// TestService_Create_DefaultProductType tests that ESTANDAR is set as default when not specified
 func TestService_Create_DefaultProductType(t *testing.T) {
 	mockRepo := new(MockRepository)
 	svc := &service{repo: mockRepo}
@@ -188,46 +190,16 @@ func TestService_Create_DefaultProductType(t *testing.T) {
 		EnterpriseID: 1,
 	}
 
-	// Expect GetBySKU to return ErrNoRows (product doesn't exist)
-	mockRepo.On("GetBySKU", mock.Anything, "test_tenant", "sk-u1", int64(1)).Return(nil, sql.ErrNoRows).Once()
-	// Expect repository Create
+	// Expect repository Create with STANDARD type (default)
 	mockRepo.On("Create", mock.Anything, "test_tenant", mock.MatchedBy(func(p *Product) bool {
-		return p.ProductType == "ESTANDAR"
+		return p.ProductType == "STANDARD"
 	})).Return(nil).Once()
 
 	err := svc.Create(context.Background(), "test_tenant", product)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "ESTANDAR", product.ProductType)
+	assert.Equal(t, "STANDARD", product.ProductType)
 	mockRepo.AssertExpectations(t)
-}
-
-// TestService_Create_DuplicateSKU tests error when SKU already exists
-func TestService_Create_DuplicateSKU(t *testing.T) {
-	mockRepo := new(MockRepository)
-	svc := &service{repo: mockRepo}
-
-	existingProduct := &Product{
-		ID:           1,
-		SKU:          "sk-u1",
-		EnterpriseID: 1,
-	}
-
-	product := &Product{
-		SKU:          "sk-u1",
-		Name:         "Producto duplicado",
-		UnitID:       6,
-		EnterpriseID: 1,
-	}
-
-	// Expect GetBySKU to return existing product
-	mockRepo.On("GetBySKU", mock.Anything, "test_tenant", "sk-u1", int64(1)).Return(existingProduct, nil).Once()
-
-	err := svc.Create(context.Background(), "test_tenant", product)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "already exists")
-	mockRepo.AssertNotCalled(t, "Create")
 }
 
 // TestService_Create_ValidBarcode tests barcode validation when provided
@@ -243,7 +215,6 @@ func TestService_Create_ValidBarcode(t *testing.T) {
 		EnterpriseID: 1,
 	}
 
-	mockRepo.On("GetBySKU", mock.Anything, "test_tenant", "sk-u1", int64(1)).Return(nil, sql.ErrNoRows).Once()
 	mockRepo.On("GetByBarcode", mock.Anything, "test_tenant", "1123255241", int64(1)).Return(nil, sql.ErrNoRows).Once()
 	mockRepo.On("Create", mock.Anything, "test_tenant", mock.AnythingOfType("*products.Product")).Return(nil).Once()
 
@@ -273,8 +244,6 @@ func TestService_Create_DuplicateBarcode(t *testing.T) {
 		EnterpriseID: 1,
 	}
 
-	// SKU check passes (no duplicate)
-	mockRepo.On("GetBySKU", mock.Anything, "test_tenant", "sk-u2", int64(1)).Return(nil, sql.ErrNoRows).Once()
 	// Barcode check returns existing product
 	mockRepo.On("GetByBarcode", mock.Anything, "test_tenant", "1123255241", int64(1)).Return(existingProduct, nil).Once()
 
@@ -299,7 +268,6 @@ func TestService_Create_ValidPricing(t *testing.T) {
 		EnterpriseID: 1,
 	}
 
-	mockRepo.On("GetBySKU", mock.Anything, "test_tenant", "sk-u1", int64(1)).Return(nil, sql.ErrNoRows).Once()
 	mockRepo.On("Create", mock.Anything, "test_tenant", mock.AnythingOfType("*products.Product")).Return(nil).Once()
 
 	err := svc.Create(context.Background(), "test_tenant", product)
@@ -357,7 +325,7 @@ func TestService_GetByID_Success(t *testing.T) {
 		ID:           1,
 		SKU:          "sk-u1",
 		Name:         "Producto test",
-		ProductType:  "ESTANDAR",
+		ProductType:  "STANDARD",
 		Active:       true,
 		EnterpriseID: 1,
 		CreatedAt:    now,
@@ -416,7 +384,7 @@ func TestService_Update_InvalidProductType(t *testing.T) {
 		ID:           1,
 		SKU:          "sk-u1",
 		Name:         "Producto existente",
-		ProductType:  "ESTANDAR",
+		ProductType:  "STANDARD",
 		EnterpriseID: 1,
 	}
 
@@ -529,16 +497,16 @@ func TestIsValidProductType_ValidTypes(t *testing.T) {
 	tests := []struct {
 		name        string
 		productType string
-		want        bool
+		want       bool
 	}{
-		{"ESTANDAR is valid", "ESTANDAR", true},
-		{"SERVICIO is valid", "SERVICIO", true},
-		{"COMBO is valid", "COMBO", true},
-		{"RECETA is valid", "RECETA", true},
-		{"LOWERCASE ESTANDAR", "estandar", false},
+		{"STANDARD is valid", "STANDARD", true},
+		{"WEIGHTABLE is valid", "WEIGHTABLE", true},
+		{"KIT is valid", "KIT", true},
+		{"SERVICE is valid", "SERVICE", true},
+		{"LOWERCASE STANDARD", "standard", false},
 		{"empty string", "", false},
 		{"invalid type", "INVALIDO", false},
-		{"different case", "Estandar", false},
+		{"different case", "Standard", false},
 	}
 
 	for _, tt := range tests {
