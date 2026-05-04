@@ -253,3 +253,14 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 		TotalPages: totalPages,
 	}, nil
 }
+
+func (r *repository) Upsert(ctx context.Context, tenantSlug string, b *Brand) error {
+	now := vo.Now()
+	b.UpdatedAt = &now
+
+	exist, _ := r.GetByID(ctx, tenantSlug, b.ID)
+	if exist != nil {
+		return r.Update(ctx, tenantSlug, b)
+	}
+	return r.Create(ctx, tenantSlug, b)
+}

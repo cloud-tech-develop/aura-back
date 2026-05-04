@@ -135,7 +135,16 @@ func main() {
 	// Offline module (only in offline mode)
 	var offlineHandler *offline.Handler
 	if driver == "sqlite" {
-		offlineSvc := offline.NewService(database, eventBus, tenantMgr, productSvc)
+		offlineSvc := offline.NewService(
+			database,
+			eventBus,
+			tenantMgr,
+			productSvc,
+			presSvc,
+			categorySvc,
+			brandSvc,
+			unitSvc,
+		)
 		offlineHandler = offline.NewHandler(offlineSvc)
 	}
 

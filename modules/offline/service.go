@@ -1,7 +1,6 @@
 package offline
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,8 +9,11 @@ import (
 	"time"
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
-	"github.com/cloud-tech-develop/aura-back/modules/catalog/products"
+	catalogBrands "github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
+	catalogCategories "github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
+	catalogPresentations "github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	catalogProducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
+	catalogUnits "github.com/cloud-tech-develop/aura-back/modules/catalog/units"
 	"github.com/cloud-tech-develop/aura-back/shared/events"
 	"github.com/cloud-tech-develop/aura-back/shared/logging"
 	"github.com/cloud-tech-develop/aura-back/tenant"
@@ -42,24 +44,48 @@ type EventPayload struct {
 
 // service implements Service
 type service struct {
-	repo       Repository
-	http       *http.Client
-	eventBus   events.EventBus
-	tenantMgr  *tenant.Manager
-	logger     *logging.LoggerHandler
-	productSvc catalogProducts.Service
+	repo            Repository
+	http            *http.Client
+	eventBus        events.EventBus
+	tenantMgr       *tenant.Manager
+	logger          *logging.LoggerHandler
+	productSvc      catalogProducts.Service
+	presentationSvc catalogPresentations.Service
+	categorySvc     catalogCategories.Service
+	brandSvc        catalogBrands.Service
+	unitSvc         catalogUnits.Service
 }
 
-func NewService(database *db.DB, eventBus events.EventBus, tenantMgr *tenant.Manager, productSvc catalogProducts.Service) Service {
+func NewService(
+	database *db.DB,
+	eventBus events.EventBus,
+	tenantMgr *tenant.Manager,
+	productSvc catalogProducts.Service,
+	presentationSvc catalogPresentations.Service,
+	categorySvc catalogCategories.Service,
+	brandSvc catalogBrands.Service,
+	unitSvc catalogUnits.Service,
+) Service {
 	return &service{
-		repo: NewRepository(database, productSvc),
+		repo: NewRepository(
+			database,
+			productSvc,
+			presentationSvc,
+			categorySvc,
+			brandSvc,
+			unitSvc,
+		),
 		http: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		eventBus:   eventBus,
-		tenantMgr:  tenantMgr,
-		logger:     logging.NewLoggerHandler("logs"),
-		productSvc: productSvc,
+		eventBus:        eventBus,
+		tenantMgr:       tenantMgr,
+		logger:          logging.NewLoggerHandler("logs"),
+		productSvc:      productSvc,
+		presentationSvc: presentationSvc,
+		categorySvc:     categorySvc,
+		brandSvc:        brandSvc,
+		unitSvc:         unitSvc,
 	}
 }
 
@@ -350,13 +376,9 @@ func (s *service) syncThirdParties(ctx context.Context, prodURL, token string, s
 }
 
 func (s *service) syncCategories(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
-	url := fmt.Sprintf("%s/catalog/categories/page?slug=%s&enterprise_id=%d", prodURL, slug, enterpriseID)
+	url := prodURL + "/catalog/categories"
 
-	body, _ := json.Marshal(map[string]interface{}{
-		"limit": 1000,
-		"page":  1,
-	})
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -373,18 +395,18 @@ func (s *service) syncCategories(ctx context.Context, prodURL, token string, slu
 	}
 
 	var apiResp struct {
-		Data struct {
-			Items []Category `json:"items"`
-		} `json:"data"`
+		Data []catalogCategories.Category `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
 		return fmt.Errorf("decode categories: %w", err)
 	}
 
+	fmt.Println("Total categories: ", len(apiResp.Data))
+
 	count := 0
-	for i := range apiResp.Data.Items {
-		apiResp.Data.Items[i].EnterpriseID = enterpriseID
-		if err := s.repo.UpsertCategory(ctx, &apiResp.Data.Items[i]); err != nil {
+	for i := range apiResp.Data {
+		apiResp.Data[i].EnterpriseID = enterpriseID
+		if err := s.categorySvc.Create(ctx, slug, &apiResp.Data[i]); err != nil {
 			continue
 		}
 		count++
@@ -400,13 +422,9 @@ func (s *service) syncCategories(ctx context.Context, prodURL, token string, slu
 }
 
 func (s *service) syncBrands(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
-	url := fmt.Sprintf("%s/catalog/brands/page?slug=%s&enterprise_id=%d", prodURL, slug, enterpriseID)
+	url := prodURL + "/catalog/brands"
 
-	body, _ := json.Marshal(map[string]interface{}{
-		"limit": 1000,
-		"page":  1,
-	})
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -423,18 +441,18 @@ func (s *service) syncBrands(ctx context.Context, prodURL, token string, slug st
 	}
 
 	var apiResp struct {
-		Data struct {
-			Items []Brand `json:"items"`
-		} `json:"data"`
+		Data []catalogBrands.Brand `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
 		return fmt.Errorf("decode brands: %w", err)
 	}
 
+	fmt.Println("Total Brands: ", len(apiResp.Data))
+
 	count := 0
-	for i := range apiResp.Data.Items {
-		apiResp.Data.Items[i].EnterpriseID = enterpriseID
-		if err := s.repo.UpsertBrand(ctx, &apiResp.Data.Items[i]); err != nil {
+	for i := range apiResp.Data {
+		apiResp.Data[i].EnterpriseID = enterpriseID
+		if err := s.brandSvc.Upsert(ctx, slug, &apiResp.Data[i]); err != nil {
 			continue
 		}
 		count++
@@ -450,13 +468,9 @@ func (s *service) syncBrands(ctx context.Context, prodURL, token string, slug st
 }
 
 func (s *service) syncUnits(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
-	url := fmt.Sprintf("%s/catalog/units/page?slug=%s&enterprise_id=%d", prodURL, slug, enterpriseID)
+	url := prodURL + "/catalog/units"
 
-	body, _ := json.Marshal(map[string]interface{}{
-		"limit": 1000,
-		"page":  1,
-	})
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -473,18 +487,18 @@ func (s *service) syncUnits(ctx context.Context, prodURL, token string, slug str
 	}
 
 	var apiResp struct {
-		Data struct {
-			Items []Unit `json:"items"`
-		} `json:"data"`
+		Data []catalogUnits.Unit `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
 		return fmt.Errorf("decode units: %w", err)
 	}
 
+	fmt.Println("Total Units: ", len(apiResp.Data))
+
 	count := 0
-	for i := range apiResp.Data.Items {
-		apiResp.Data.Items[i].EnterpriseID = enterpriseID
-		if err := s.repo.UpsertUnit(ctx, &apiResp.Data.Items[i]); err != nil {
+	for i := range apiResp.Data {
+		apiResp.Data[i].EnterpriseID = enterpriseID
+		if err := s.unitSvc.Upsert(ctx, slug, &apiResp.Data[i]); err != nil {
 			continue
 		}
 		count++
@@ -518,7 +532,7 @@ func (s *service) syncProducts(ctx context.Context, prodURL, token string, slug 
 	}
 
 	var apiResp struct {
-		Data []products.Product `json:"data"`
+		Data []catalogProducts.Product `json:"data"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
@@ -527,7 +541,6 @@ func (s *service) syncProducts(ctx context.Context, prodURL, token string, slug 
 
 	count := 0
 	for _, p := range apiResp.Data {
-		fmt.Println("product: ", p.Name, p.ID)
 		if err := s.productSvc.Upsert(ctx, slug, p); err != nil {
 			continue
 		}
@@ -563,23 +576,33 @@ func (s *service) syncPresentations(ctx context.Context, prodURL, token string, 
 	}
 
 	var apiResp struct {
-		Data []Presentation `json:"data"`
+		Data []catalogPresentations.Presentation `json:"data"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
 		return fmt.Errorf("decode presentations: %w", err)
 	}
 
-	fmt.Println("presentations:", apiResp.Data)
+	fmt.Println("Total presentations: ", len(apiResp.Data))
 
-	count := 0
-	for i := range apiResp.Data {
-		apiResp.Data[i].EnterpriseID = enterpriseID
-		if err := s.repo.UpsertPresentation(ctx, &apiResp.Data[i]); err != nil {
-			continue
+	item := apiResp.Data[0]
+	presentations := make([]catalogPresentations.PresentationRequest, len(apiResp.Data))
+	for i, p := range apiResp.Data {
+		presentations[i] = catalogPresentations.PresentationRequest{
+			Name:            p.Name,
+			Factor:          p.Factor,
+			Barcode:         p.Barcode,
+			CostPrice:       p.CostPrice,
+			SalePrice:       p.SalePrice,
+			DefaultPurchase: p.DefaultPurchase,
+			DefaultSale:     p.DefaultSale,
 		}
-		count++
 	}
+	count := 0
+	if err := s.presentationSvc.Upsert(ctx, slug, item.EnterpriseID, item.ProductID, presentations); err != nil {
+		return err
+	}
+	count = len(presentations)
 
 	mu.Lock()
 	result.Presentations = count

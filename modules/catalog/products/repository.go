@@ -486,8 +486,6 @@ func (r *repository) Create(ctx context.Context, tenantSlug string, p *Product) 
 		placeholders[i] = fmt.Sprintf("$%d", i+1)
 	}
 
-	fmt.Println("Producto a crear offline", p)
-
 	if r.isOffline {
 		if p.ID > 0 {
 			cols = append(cols, "id")
@@ -504,7 +502,6 @@ func (r *repository) Create(ctx context.Context, tenantSlug string, p *Product) 
 			fmt.Println("Error al crear producto offline", err.Error())
 			return fmt.Errorf("failed to create product offline: %w", err)
 		}
-		fmt.Println("Producto creado offline", p.Name)
 		return nil
 	} else {
 

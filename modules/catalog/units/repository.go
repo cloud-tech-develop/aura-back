@@ -24,6 +24,18 @@ func NewRepository(db querier) Repository {
 	}
 }
 
+func (r *repository) Upsert(ctx context.Context, tenantSlug string, u *Unit) error {
+	now := vo.Now()
+	u.UpdatedAt = &now
+
+	exist, _ := r.GetByID(ctx, tenantSlug, u.ID)
+	if exist != nil {
+		return r.Update(ctx, tenantSlug, u)
+	}
+
+	return r.Create(ctx, tenantSlug, u)
+}
+
 func (r *repository) Create(ctx context.Context, tenantSlug string, u *Unit) error {
 	tenant := r.db.SchemaPrefix(tenantSlug)
 

@@ -22,8 +22,23 @@ func New(driver, dsn string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("abrir db (%s): %w", driver, err)
 	}
- 
+  
+	// Configure SQLite connection pool to avoid database locked errors
+	if driver == "sqlite" {
+		// Set a busy timeout to wait for the database to become available
+		// This helps with concurrent access patterns
+		conn.SetMaxOpenConns(1) // SQLite works better with single connection
+		conn.SetMaxIdleConns(1)
+		
+		// Execute PRAGMA to set busy timeout (5 seconds)
+		if _, err := conn.Exec("PRAGMA busy_timeout = 5000"); err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("configurar sqlite busy_timeout: %w", err)
+		}
+	}
+
 	if err := conn.Ping(); err != nil {
+		conn.Close()
 		return nil, fmt.Errorf("conectar db (%s): %w", driver, err)
 	}
 	return &DB{DB: conn, DSN: dsn, Driver: driver}, nil

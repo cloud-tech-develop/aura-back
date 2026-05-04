@@ -113,13 +113,18 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
 
+	conditionActive := "true"
+	if r.isOffline {
+		conditionActive = "1"
+	}
+
 	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, name
-		FROM %scategory WHERE enterprise_id = %d AND deleted_at IS NULL AND active = true
-		ORDER BY name`, tenant, enterpriseID)
+		FROM %scategory WHERE enterprise_id = $1 AND deleted_at IS NULL AND active = %s
+		ORDER BY name`, tenant, conditionActive)
 
-	rows, err := r.db.QueryContext(ctx, query)
+	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list categories: %w", err)
 	}
@@ -252,4 +257,16 @@ func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) er
 		return fmt.Errorf("failed to delete category: %w", err)
 	}
 	return nil
+}
+
+func (r *repository) Upsert(ctx context.Context, tenantSlug string, c *Category) error {
+
+	now := vo.Now()
+	c.UpdatedAt = &now
+
+	exist, _ := r.GetByID(ctx, tenantSlug, c.ID)
+	if exist != nil {
+		return r.Update(ctx, tenantSlug, c)
+	}
+	return r.Create(ctx, tenantSlug, c)
 }

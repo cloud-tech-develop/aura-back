@@ -61,18 +61,8 @@ func (h *Handler) List(c *gin.Context) {
 	tenantSlug := claims.Slug
 	enterpriseID := claims.EnterpriseID
 
-	// Fallback: get from query params (for offline sync)
 	if tenantSlug == "" || enterpriseID == 0 {
-		if c.Query("slug") != "" {
-			tenantSlug = c.Query("slug")
-			if eid, err := strconv.ParseInt(c.Query("enterprise_id"), 10, 64); err == nil {
-				enterpriseID = eid
-			}
-		}
-	}
-
-	if tenantSlug == "" && enterpriseID == 0 {
-		response.BadRequest(c, "slug o enterprise_id es requerido")
+		response.BadRequest(c, "tenant no encontrado")
 		return
 	}
 

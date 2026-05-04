@@ -55,3 +55,7 @@ func (s *service) Update(ctx context.Context, tenantSlug string, id int64, b *Br
 func (s *service) Delete(ctx context.Context, tenantSlug string, id int64) error {
 	return s.repo.Delete(ctx, tenantSlug, id)
 }
+
+func (s *service) Upsert(ctx context.Context, tenantSlug string, b *Brand) error {
+	return s.repo.Upsert(ctx, tenantSlug, b)
+}

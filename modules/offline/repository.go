@@ -6,20 +6,39 @@ import (
 	"time"
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/products"
+	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
 )
 
 type repository struct {
-	db         *db.DB
-	isOffline  bool
-	productSvc products.Service
+	db              *db.DB
+	isOffline       bool
+	productSvc      products.Service
+	presentationSvc presentations.Service
+	categorySvc     categories.Service
+	brandSvc        brands.Service
+	unitSvc         units.Service
 }
 
-func NewRepository(database *db.DB, productSvc products.Service) Repository {
+func NewRepository(
+	database *db.DB,
+	productSvc products.Service,
+	presentationSvc presentations.Service,
+	categorySvc categories.Service,
+	brandSvc brands.Service,
+	unitSvc units.Service,
+) Repository {
 	return &repository{
-		db:         database,
-		isOffline:  database.IsSQLite(),
-		productSvc: productSvc,
+		db:              database,
+		isOffline:       database.IsSQLite(),
+		productSvc:      productSvc,
+		presentationSvc: presentationSvc,
+		categorySvc:     categorySvc,
+		brandSvc:        brandSvc,
+		unitSvc:         unitSvc,
 	}
 }
 
@@ -238,154 +257,8 @@ func (r *repository) UpsertThirdParty(ctx context.Context, tp *ThirdParty) error
 	return err
 }
 
-// ─── Tenant Operations: Category ─────────────────────────────────────────────────────
-
-func (r *repository) UpsertCategory(ctx context.Context, c *Category) error {
-	var exists bool
-	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM category WHERE id = ?)", c.ID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-
-	active := 0
-	if c.Active {
-		active = 1
-	}
-	parentID := 0
-	if c.ParentID != nil {
-		parentID = int(*c.ParentID)
-	}
-
-	if exists {
-		_, err = r.db.ExecContext(ctx,
-			`UPDATE category SET name = ?, description = ?, parent_id = ?, default_tax_rate = ?, active = ?, enterprise_id = ?, updated_at = ?
-			 WHERE id = ?`,
-			c.Name, c.Description, parentID, c.DefaultTaxRate, active, c.EnterpriseID, time.Now(), c.ID,
-		)
-	} else {
-		c.CreatedAt = time.Now()
-		c.UpdatedAt = time.Now()
-		_, err = r.db.ExecContext(ctx,
-			`INSERT INTO category (id, name, description, parent_id, default_tax_rate, active, enterprise_id, created_at, updated_at, deleted_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			c.ID, c.Name, c.Description, parentID, c.DefaultTaxRate, active, c.EnterpriseID, c.CreatedAt, c.UpdatedAt, nil,
-		)
-	}
-	return err
-}
-
-// ─── Tenant Operations: Brand ─────────────────────────────────────────────────────
-
-func (r *repository) UpsertBrand(ctx context.Context, b *Brand) error {
-	var exists bool
-	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM brand WHERE id = ?)", b.ID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-
-	active := 0
-	if b.Active {
-		active = 1
-	}
-
-	if exists {
-		_, err = r.db.ExecContext(ctx,
-			`UPDATE brand SET name = ?, description = ?, active = ?, enterprise_id = ?, updated_at = ?
-			 WHERE id = ?`,
-			b.Name, b.Description, active, b.EnterpriseID, time.Now(), b.ID,
-		)
-	} else {
-		b.CreatedAt = time.Now()
-		b.UpdatedAt = time.Now()
-		_, err = r.db.ExecContext(ctx,
-			`INSERT INTO brand (id, name, description, active, enterprise_id, created_at, updated_at, deleted_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			b.ID, b.Name, b.Description, active, b.EnterpriseID, b.CreatedAt, b.UpdatedAt, nil,
-		)
-	}
-	return err
-}
-
-// ─── Tenant Operations: Unit ─────────────────────────────────────────────────────
-
-func (r *repository) UpsertUnit(ctx context.Context, u *Unit) error {
-	var exists bool
-	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM unit WHERE id = ?)", u.ID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-
-	active := 0
-	if u.Active {
-		active = 1
-	}
-	allowDecimals := 0
-	if u.AllowDecimals {
-		allowDecimals = 1
-	}
-
-	if exists {
-		_, err = r.db.ExecContext(ctx,
-			`UPDATE unit SET name = ?, abbreviation = ?, active = ?, allow_decimals = ?, enterprise_id = ?, updated_at = ?
-			 WHERE id = ?`,
-			u.Name, u.Abbreviation, active, allowDecimals, u.EnterpriseID, time.Now(), u.ID,
-		)
-	} else {
-		u.CreatedAt = time.Now()
-		u.UpdatedAt = time.Now()
-		_, err = r.db.ExecContext(ctx,
-			`INSERT INTO unit (id, name, abbreviation, active, allow_decimals, enterprise_id, created_at, updated_at, deleted_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			u.ID, u.Name, u.Abbreviation, active, allowDecimals, u.EnterpriseID, u.CreatedAt, u.UpdatedAt, nil,
-		)
-	}
-	return err
-}
-
 // ─── Tenant Operations: Product ─────────────────────────────────────────────────────
 
 func (r *repository) UpsertProduct(ctx context.Context, tenantSlug string, p *products.Product) error {
 	return r.productSvc.Upsert(ctx, tenantSlug, *p)
-}
-
-// ─── Tenant Operations: Presentation ─────────────────────────────────────────────────────
-
-func (r *repository) UpsertPresentation(ctx context.Context, pr *Presentation) error {
-	var exists bool
-	err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM presentation WHERE id = ?)", pr.ID).Scan(&exists)
-	if err != nil {
-		return err
-	}
-
-	defaultPurchase := 0
-	if pr.DefaultPurchase {
-		defaultPurchase = 1
-	}
-	defaultSale := 0
-	if pr.DefaultSale {
-		defaultSale = 1
-	}
-
-	if exists {
-		_, err = r.db.ExecContext(ctx,
-			`UPDATE presentation SET 
-			 product_id = ?, name = ?, factor = ?, barcode = ?, cost_price = ?, sale_price = ?, 
-			 default_purchase = ?, default_sale = ?, updated_at = ?
-			 WHERE id = ?`,
-			pr.ProductID, pr.Name, pr.Factor, pr.Barcode, pr.CostPrice, pr.SalePrice,
-			defaultPurchase, defaultSale, time.Now(), pr.ID,
-		)
-	} else {
-		pr.CreatedAt = time.Now()
-		pr.UpdatedAt = time.Now()
-		_, err = r.db.ExecContext(ctx,
-			`INSERT INTO presentation 
-			 (id, product_id, name, factor, barcode, cost_price, sale_price, default_purchase, default_sale, 
-			  enterprise_id, created_at, updated_at, deleted_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			pr.ID, pr.ProductID, pr.Name, pr.Factor, pr.Barcode, pr.CostPrice, pr.SalePrice,
-			defaultPurchase, defaultSale, pr.EnterpriseID, pr.CreatedAt, pr.UpdatedAt, nil,
-		)
-	}
-	return err
 }

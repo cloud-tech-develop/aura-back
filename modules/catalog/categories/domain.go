@@ -38,6 +38,7 @@ type Repository interface {
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
 	Update(ctx context.Context, tenantSlug string, c *Category) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
+	Upsert(ctx context.Context, tenantSlug string, c *Category) error
 }
 
 // Service interface
@@ -48,4 +49,5 @@ type Service interface {
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
 	Update(ctx context.Context, tenantSlug string, id int64, c *Category) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
+	Upsert(ctx context.Context, tenantSlug string, c *Category) error
 }
