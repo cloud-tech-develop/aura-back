@@ -27,6 +27,10 @@ func (s *service) GetByID(ctx context.Context, tenantSlug string, id int64) (*Br
 	return s.repo.GetByID(ctx, tenantSlug, id)
 }
 
+func (s *service) ListAll(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Brand, error) {
+	return s.repo.ListAll(ctx, tenantSlug, enterpriseID)
+}
+
 func (s *service) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]BrandList, error) {
 	return s.repo.List(ctx, tenantSlug, enterpriseID)
 }

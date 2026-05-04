@@ -123,12 +123,16 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 
 	tenant := r.db.SchemaPrefix(tenantSlug)
 
-	fmt.Println(tenant, tenantSlug, enterpriseID)
+	conditionActive := "true"
+	if r.isOffline {
+		conditionActive = "1"
+	}
 
 	query := fmt.Sprintf(`
 		SELECT id, name, abbreviation
 		FROM %sunit WHERE enterprise_id = $1 AND deleted_at IS NULL
-		ORDER BY name`, tenant)
+		AND active = %s
+		ORDER BY name`, tenant, conditionActive)
 
 	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
 	if err != nil {
@@ -140,6 +144,41 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	for rows.Next() {
 		var u UnitList
 		if err := rows.Scan(&u.Id, &u.Name, &u.Abbreviation); err != nil {
+			return nil, err
+		}
+		list = append(list, u)
+	}
+	return list, nil
+}
+
+func (r *repository) ListAll(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Unit, error) {
+	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
+	ctx = context.WithoutCancel(ctx)
+
+	tenant := r.db.SchemaPrefix(tenantSlug)
+
+	conditionActive := "true"
+	if r.isOffline {
+		conditionActive = "1"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, name, abbreviation, active, allow_decimals, enterprise_id, created_at, updated_at, deleted_at
+		FROM %sunit WHERE enterprise_id = $1 AND deleted_at IS NULL
+		AND active = %s
+		ORDER BY name`, tenant, conditionActive)
+
+	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list units: %w", err)
+	}
+	defer rows.Close()
+
+	var list []Unit
+	for rows.Next() {
+		var u Unit
+		if err := rows.Scan(&u.ID, &u.Name, &u.Abbreviation, &u.Active, &u.AllowDecimals, &u.EnterpriseID,
+			&u.CreatedAt, &u.UpdatedAt, &u.DeletedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, u)

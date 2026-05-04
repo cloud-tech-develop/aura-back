@@ -2,10 +2,8 @@ package categories
 
 import "github.com/gin-gonic/gin"
 
-func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
-	// Public for offline sync
-
-	// Protected routes
+func Register(protected gin.IRouter, h *Handler) {
+	protected.GET("/catalog/categories/all", h.ListAll)
 	protected.GET("/catalog/categories", h.List)
 	protected.POST("/catalog/categories", h.Create)
 	protected.GET("/catalog/categories/:id", h.GetByID)

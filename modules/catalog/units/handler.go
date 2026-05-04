@@ -78,6 +78,25 @@ func (h *Handler) List(c *gin.Context) {
 	response.OK(c, list)
 }
 
+func (h *Handler) ListAll(c *gin.Context) {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
+
+	if tenantSlug == "" || enterpriseID == 0 {
+		response.BadRequest(c, "tenant no encontrado")
+		return
+	}
+
+	list, err := h.svc.ListAll(c.Request.Context(), tenantSlug, enterpriseID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.OK(c, list)
+}
+
 func (h *Handler) Page(c *gin.Context) {
 	claims, _ := tenant.ClaimsFromContext(c)
 	tenantSlug := claims.Slug
@@ -149,7 +168,7 @@ func (h *Handler) GetByID(c *gin.Context) {
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		response.BadRequest(c, "ID inválido")
+		response.BadRequest(c, "[GetByID] ID inválido")
 		return
 	}
 
@@ -178,7 +197,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		response.BadRequest(c, "ID inválido")
+		response.BadRequest(c, "[Update] ID inválido")
 		return
 	}
 
@@ -229,7 +248,7 @@ func (h *Handler) Delete(c *gin.Context) {
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		response.BadRequest(c, "ID inválido")
+		response.BadRequest(c, "[Delete] ID inválido")
 		return
 	}
 

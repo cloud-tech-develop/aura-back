@@ -376,7 +376,7 @@ func (s *service) syncThirdParties(ctx context.Context, prodURL, token string, s
 }
 
 func (s *service) syncCategories(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
-	url := prodURL + "/catalog/categories"
+	url := prodURL + "/catalog/categories/all"
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -422,7 +422,7 @@ func (s *service) syncCategories(ctx context.Context, prodURL, token string, slu
 }
 
 func (s *service) syncBrands(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
-	url := prodURL + "/catalog/brands"
+	url := prodURL + "/catalog/brands/all"
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -468,7 +468,7 @@ func (s *service) syncBrands(ctx context.Context, prodURL, token string, slug st
 }
 
 func (s *service) syncUnits(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
-	url := prodURL + "/catalog/units"
+	url := prodURL + "/catalog/units/all"
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	req.Header.Set("Content-Type", "application/json")

@@ -92,6 +92,25 @@ func (h *Handler) List(c *gin.Context) {
 	response.OK(c, list)
 }
 
+func (h *Handler) ListAll(c *gin.Context) {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	enterpriseID := claims.EnterpriseID
+
+	if tenantSlug == "" || enterpriseID == 0 {
+		response.BadRequest(c, "tenant no encontrado")
+		return
+	}
+
+	list, err := h.svc.ListAll(c.Request.Context(), tenantSlug, enterpriseID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.OK(c, list)
+}
+
 func (h *Handler) Page(c *gin.Context) {
 	claims, _ := tenant.ClaimsFromContext(c)
 	tenantSlug := claims.Slug

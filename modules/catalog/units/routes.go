@@ -2,9 +2,10 @@ package units
 
 import "github.com/gin-gonic/gin"
 
-func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
+func Register(protected gin.IRouter, h *Handler) {
 	// Public for offline sync
 	// Protected routes
+	protected.GET("/catalog/units/all", h.ListAll)
 	protected.GET("/catalog/units", h.List)
 	protected.POST("/catalog/units", h.Create)
 	protected.GET("/catalog/units/:id", h.GetByID)

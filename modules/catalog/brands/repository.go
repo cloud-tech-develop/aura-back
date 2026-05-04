@@ -113,13 +113,18 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
 
+	conditionActive := "true"
+	if r.isOffline {
+		conditionActive = "1"
+	}
+
 	tenant := r.db.SchemaPrefix(tenantSlug)
 	query := fmt.Sprintf(`
 		SELECT id, name 
 		FROM %sbrand WHERE enterprise_id = $1
 			AND deleted_at IS NULL
-			AND active = true
-		ORDER BY name;`, tenant)
+			AND active = %s
+		ORDER BY name;`, tenant, conditionActive)
 
 	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
 	if err != nil {
@@ -131,6 +136,41 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	for rows.Next() {
 		var b BrandList
 		if err := rows.Scan(&b.ID, &b.Name); err != nil {
+			return nil, err
+		}
+		list = append(list, b)
+	}
+	return list, nil
+}
+
+func (r *repository) ListAll(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Brand, error) {
+	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
+	ctx = context.WithoutCancel(ctx)
+
+	conditionActive := "true"
+	if r.isOffline {
+		conditionActive = "1"
+	}
+
+	tenant := r.db.SchemaPrefix(tenantSlug)
+	query := fmt.Sprintf(`
+		SELECT id, name, description, active, enterprise_id, created_at, updated_at, deleted_at
+		FROM %sbrand WHERE enterprise_id = $1
+			AND deleted_at IS NULL
+			AND active = %s
+		ORDER BY name;`, tenant, conditionActive)
+
+	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list brands: %w", err)
+	}
+	defer rows.Close()
+
+	var list []Brand
+	for rows.Next() {
+		var b Brand
+		if err := rows.Scan(&b.ID, &b.Name, &b.Description, &b.Active, &b.EnterpriseID,
+			&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, b)

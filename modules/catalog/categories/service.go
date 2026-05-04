@@ -31,6 +31,10 @@ func (s *service) List(ctx context.Context, tenantSlug string, enterpriseID int6
 	return s.repo.List(ctx, tenantSlug, enterpriseID)
 }
 
+func (s *service) ListAll(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Category, error) {
+	return s.repo.ListAll(ctx, tenantSlug, enterpriseID)
+}
+
 func (s *service) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	if page < 1 {
 		page = 1

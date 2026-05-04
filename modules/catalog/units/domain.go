@@ -34,6 +34,7 @@ type Repository interface {
 	Create(ctx context.Context, tenantSlug string, u *Unit) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Unit, error)
 	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]UnitList, error)
+	ListAll(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Unit, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
 	Update(ctx context.Context, tenantSlug string, u *Unit) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
@@ -45,6 +46,7 @@ type Service interface {
 	Create(ctx context.Context, tenantSlug string, u *Unit) error
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Unit, error)
 	List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]UnitList, error)
+	ListAll(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Unit, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
 	Update(ctx context.Context, tenantSlug string, id int64, u *Unit) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error

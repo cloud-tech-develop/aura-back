@@ -18,10 +18,10 @@ func NewService(db db.Querier) Service {
 
 func (s *service) Create(ctx context.Context, tenantSlug string, u *Unit) error {
 	if u.Name == "" {
-		return fmt.Errorf("name is required")
+		return fmt.Errorf("[Create] name is required")
 	}
 	if u.Abbreviation == "" {
-		return fmt.Errorf("abbreviation is required")
+		return fmt.Errorf("[Create] abbreviation is required")
 	}
 	return s.repo.Create(ctx, tenantSlug, u)
 }
@@ -32,6 +32,10 @@ func (s *service) GetByID(ctx context.Context, tenantSlug string, id int64) (*Un
 
 func (s *service) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]UnitList, error) {
 	return s.repo.List(ctx, tenantSlug, enterpriseID)
+}
+
+func (s *service) ListAll(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Unit, error) {
+	return s.repo.ListAll(ctx, tenantSlug, enterpriseID)
 }
 
 func (s *service) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {

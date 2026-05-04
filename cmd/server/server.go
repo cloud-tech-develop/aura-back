@@ -87,13 +87,13 @@ func (s *Server) RegisterModules(
 	// Feature Modules
 	enterprise.Register(public, protected, enterpriseH)
 	users.Register(public, protected, userH)
-	categories.Register(public, protected, categoryH)
-	brands.Register(public, protected, brandH)
+	categories.Register(protected, categoryH)
+	brands.Register(protected, brandH)
 	catalogproducts.Register(public, protected, productH)
 	catalogproducts.RegisterProductPresentations(public, protected, productH, presentationH)
 	presentations.Register(protected, presentationH)
 	thirdparties.Register(public, protected, thirdPartiesH)
-	units.Register(public, protected, unitH)
+	units.Register(protected, unitH)
 
 	// Offline sync (only available in offline mode)
 	if offlineH != nil {

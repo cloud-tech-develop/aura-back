@@ -2,11 +2,10 @@ package brands
 
 import "github.com/gin-gonic/gin"
 
-func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
+func Register(protected gin.IRouter, h *Handler) {
 	// Public for offline sync
-	public.GET("/catalog/brands", h.List)
-
-	// Protected routes
+	protected.GET("/catalog/brands/all", h.ListAll)
+	protected.GET("/catalog/brands", h.List)
 	protected.POST("/catalog/brands", h.Create)
 	protected.GET("/catalog/brands/:id", h.GetByID)
 	protected.POST("/catalog/brands/page", h.Page)

@@ -141,6 +141,39 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	return list, nil
 }
 
+func (r *repository) ListAll(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Category, error) {
+	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
+	ctx = context.WithoutCancel(ctx)
+
+	conditionActive := "true"
+	if r.isOffline {
+		conditionActive = "1"
+	}
+
+	tenant := r.db.SchemaPrefix(tenantSlug)
+	query := fmt.Sprintf(`
+		SELECT id, name, description, parent_id, default_tax_rate, active, enterprise_id, created_at, updated_at, deleted_at
+		FROM %scategory WHERE enterprise_id = $1 AND deleted_at IS NULL AND active = %s
+		ORDER BY name`, tenant, conditionActive)
+
+	rows, err := r.db.QueryContext(ctx, query, enterpriseID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list categories: %w", err)
+	}
+	defer rows.Close()
+
+	var list []Category
+	for rows.Next() {
+		var c Category
+		if err := rows.Scan(&c.ID, &c.Name, &c.Description, &c.ParentID, &c.DefaultTaxRate, &c.Active, &c.EnterpriseID,
+			&c.CreatedAt, &c.UpdatedAt, &c.DeletedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, c)
+	}
+	return list, nil
+}
+
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	// Prevents lib/pq connection state corruption when client cancels request (e.g., hot-reload)
 	ctx = context.WithoutCancel(ctx)
