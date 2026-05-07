@@ -21,10 +21,12 @@ func (l *LoggerHandler) Handle(event events.Event) error {
 	payload := event.GetPayload()
 
 	switch e := payload.(type) {
+	case map[string]interface{}:
+		fmt.Printf("[Catalog/Products Logger] Product event: %s - %+v\n", event.GetName(), e)
 	case Product:
 		fmt.Printf("[Catalog/Products Logger] Product event: %s - %+v\n", event.GetName(), e)
 	default:
-		fmt.Printf("[Catalog/Products Logger] Unknown event: %s - %+v\n", event.GetName(), e)
+		fmt.Printf("[Catalog/Products Logger] Unknown event format: %s - %+v\n", event.GetName(), e)
 	}
 
 	return nil

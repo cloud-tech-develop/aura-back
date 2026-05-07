@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloud-tech-develop/aura-back/infrastructure/messaging/rabbit"
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	catalogBrands "github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
 	catalogCategories "github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
@@ -54,6 +55,9 @@ type service struct {
 	categorySvc     catalogCategories.Service
 	brandSvc        catalogBrands.Service
 	unitSvc         catalogUnits.Service
+	mu              sync.RWMutex
+	rabbitActive    bool
+	rabbitBus      *rabbit.RabbitMQEventBus  // El event bus de RabbitMQ cuando se activa
 }
 
 func NewService(
@@ -86,6 +90,9 @@ func NewService(
 		categorySvc:     categorySvc,
 		brandSvc:        brandSvc,
 		unitSvc:         unitSvc,
+		mu:              sync.RWMutex{},
+		rabbitActive:    false,
+		rabbitBus:      nil,
 	}
 }
 
@@ -638,7 +645,79 @@ func (s *service) GetLocalEnterprises(ctx context.Context) ([]Enterprise, error)
 	return s.repo.ListEnterprises(ctx)
 }
 
+// GetActiveEnterprise returns the first (active) enterprise from SQLite
+// Used for automatic sync on app startup when no JWT is available
+func (s *service) GetActiveEnterprise(ctx context.Context) (*Enterprise, error) {
+	enterprises, err := s.repo.ListEnterprises(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error listing enterprises: %w", err)
+	}
+
+	if len(enterprises) == 0 {
+		return nil, fmt.Errorf("no enterprises found in local database")
+	}
+
+	// Return the first enterprise as the active one
+	// In a multi-tenant scenario, you might want to select based on status or user preference
+	return &enterprises[0], nil
+}
+
 // SyncAllBySlug synchronizes all tenant data from production
 func (s *service) SyncAllBySlug(ctx context.Context, prodURL, token, slug string) (*SyncResult, error) {
 	return s.SyncTenantBySlug(ctx, prodURL, token, slug)
+}
+
+// syncActivator is implemented by services that support swapping their sync bus at runtime.
+type syncActivator interface {
+	SetSyncBus(bus events.EventBus)
+}
+
+// ActivateRabbitMQ wires RabbitMQ for a specific tenant after /offline/ping resolves the slug.
+//
+// Sequence:
+//  1. Create a tenant-scoped RabbitMQ bus (routing key suffix = slug).
+//  2. Subscribe catalog service handlers to the "online→offline" events BEFORE Start().
+//  3. Start consumers.
+//  4. Tell catalog services to publish their sync events through RabbitMQ instead of memory.
+func (s *service) ActivateRabbitMQ(ctx context.Context, slug string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.rabbitActive {
+		s.logger.Logf("[offline.Service] RabbitMQ already active for tenant: %s", slug)
+		return nil
+	}
+
+	s.logger.Logf("[offline.Service] Activating RabbitMQ for tenant: %s", slug)
+
+	rb, err := rabbit.NewRabbitMQEventBusWithTenant(slug)
+	if err != nil {
+		return fmt.Errorf("failed to create RabbitMQ event bus: %w", err)
+	}
+
+	// Register catalog event handlers BEFORE Start() so consumer goroutines
+	// are launched for these events when Start() is called.
+	// Products: service.Handle() processes create/update/delete from online.
+	if handler, ok := s.productSvc.(events.EventHandler); ok {
+		rb.Subscribe(catalogProducts.EventProductOfflineCreated, handler)
+		rb.Subscribe(catalogProducts.EventProductOfflineUpdated, handler)
+		rb.Subscribe(catalogProducts.EventProductOfflineDeleted, handler)
+		s.logger.Logf("[offline.Service] Product handler subscribed to offline events for tenant: %s", slug)
+	}
+
+	if err := rb.Start(); err != nil {
+		return fmt.Errorf("failed to start RabbitMQ event bus: %w", err)
+	}
+
+	// Update catalog services so they publish sync events to RabbitMQ (not the memory bus).
+	// The RabbitMQ bus has b.tenant = slug, so routing keys automatically include the slug.
+	if activator, ok := s.productSvc.(syncActivator); ok {
+		activator.SetSyncBus(rb)
+		s.logger.Logf("[offline.Service] Product service sync bus set to RabbitMQ for tenant: %s", slug)
+	}
+
+	s.rabbitBus = rb
+	s.rabbitActive = true
+	s.logger.Logf("[offline.Service] RabbitMQ activated for tenant: %s", slug)
+	return nil
 }

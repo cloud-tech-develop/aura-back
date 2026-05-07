@@ -135,4 +135,6 @@ type Service interface {
 	SyncAllBySlug(ctx context.Context, prodURL, token, slug string) (*SyncResult, error)
 	SyncTenantBySlug(ctx context.Context, prodURL, token, slug string) (*SyncResult, error)
 	GetLocalEnterprises(ctx context.Context) ([]Enterprise, error)
+	GetActiveEnterprise(ctx context.Context) (*Enterprise, error) // Obtiene la enterprise activa (la primera configurada en SQLite)
+	ActivateRabbitMQ(ctx context.Context, slug string) error   // Activa RabbitMQ con el slug del tenant
 }

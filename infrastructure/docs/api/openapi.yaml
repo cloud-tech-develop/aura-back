@@ -460,7 +460,7 @@ components:
           type: integer
           format: int64
 
-    # Response envelope for all endpoints
+# Response envelope for all endpoints
     ResponseEnvelope:
       type: object
       properties:
@@ -474,7 +474,107 @@ components:
           type: boolean
           description: Success indicator
 
-paths:
+    # ============================================
+    # Offline Sync Schemas
+    # ============================================
+    SyncProductItem:
+      type: object
+      required:
+        - product_id
+        - sku
+        - name
+        - action
+        - timestamp
+        - source
+      properties:
+        product_id:
+          type: integer
+          format: int64
+          description: ID local del producto en la base de datos offline
+        sku:
+          type: string
+          description: SKU del producto
+        barcode:
+          type: string
+          description: Codigo de barras del producto
+        name:
+          type: string
+          description: Nombre del producto
+        action:
+          type: string
+          enum: [create, update, delete]
+          description: Accion a realizar en la sincronizacion
+        timestamp:
+          type: string
+          format: date-time
+          description: Marca de tiempo de la modificacion
+        source:
+          type: string
+          enum: [offline]
+          description: Origen de la sincronizacion
+
+    SyncProductsRequest:
+      type: object
+      required:
+        - tenant_slug
+        - products
+      properties:
+        tenant_slug:
+          type: string
+          description: Identificador unico del tenant (schema)
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncProductItem"
+          description: Lista de productos a sincronizar
+
+    SyncResultItem:
+      type: object
+      properties:
+        product_id:
+          type: integer
+          format: int64
+          description: ID del producto procesado
+        sku:
+          type: string
+          description: SKU del producto
+        action:
+          type: string
+          description: Accion ejecutada
+        status:
+          type: string
+          enum: [success, error]
+          description: Estado de la sincronizacion
+        message:
+          type: string
+          description: Mensaje resultado
+
+    SyncProductsResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncResultItem"
+          description: Resultados de cada producto sincronizado
+        total_synced:
+          type: integer
+          format: int64
+          description: Total de productos procesados
+        success_count:
+          type: integer
+          format: int64
+          description: Cantidad de exitosos
+        error_count:
+          type: integer
+          format: int64
+          description: Cantidad de errores
+        sync_time:
+          type: string
+          format: date-time
+          description: Tiempo de sincronizacion
+
+  paths:
   /login:
     post:
       summary: Authenticate user and get JWT token
@@ -1919,3 +2019,66 @@ paths:
                 $ref: "#/components/schemas/UnitPageResult"
         "401":
           description: Unauthorized
+
+  # ============================================
+  # OFFLINE SYNC MODULE
+  # ============================================
+  /offline/sync/products:
+    post:
+      summary: Sincronizar productos desde app offline
+      description: |
+        Recibe productos modificados en la aplicacion offline y los sincroniza con la base de datos online.
+
+        **Flujo de sincronizacion:**
+        - **Online -> Offline**: Cuando se crean/actualizan productos en el backend, se publish un evento a RabbitMQ para que las apps offline reciban los cambios.
+        - **Offline -> Online**: Las apps offline envian sus productos modificados a este endpoint para sincronizarlos con el backend.
+
+        **Acciones soportadas:**
+        - `create`: Crea un nuevo producto
+        - `update`: Actualiza un producto existente
+        - `delete`: Elimina logicamente un producto
+      tags:
+        - Offline Sync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncProductsRequest"
+            example:
+              tenant_slug: "empresa_uno"
+              products:
+                - product_id: 123
+                  sku: "PROD-001"
+                  barcode: "123456789"
+                  name: "Producto prueba"
+                  action: "create"
+                  timestamp: "2026-05-04T12:00:00Z"
+                  source: "offline"
+      responses:
+        "200":
+          description: Sincronizacion completada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponseEnvelope"
+              example:
+                data:
+                  results:
+                    - product_id: 123
+                      sku: "PROD-001"
+                      action: "create"
+                      status: "success"
+                      message: "Product created successfully"
+                  total_synced: 1
+                  success_count: 1
+                  error_count: 0
+                  sync_time: "2026-05-04T12:00:00Z"
+                message: "Sincronizacion completada"
+                success: true
+        "400":
+          description: Solicitud incorrecta - datos invalidos
+        "401">
+          description: No autorizado - token JWT invalido o ausente
+        "500">
+          description: Error interno del servidor

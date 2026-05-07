@@ -1,12 +1,41 @@
 @port = 8081
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJlbnRlcnByaXNlX2lkIjoxLCJ0ZW5hbnRfaWQiOjEsInNsdWciOiJjbG91ZF90ZWNubyIsImVtYWlsIjoic3VwZXItYWRtaW5AY2xvdWR0ZWNuby5jb20iLCJyb2xlcyI6WyJTVVBFUkFETUlOIl0sInJvbGVfbGV2ZWwiOjAsImlwIjoiMTI3LjAuMC4xIiwiZXhwIjoxNzc3OTU3NTM0LCJpYXQiOjE3Nzc4NzExMzR9.b88TIDgIqpoIz5Ca_plIEWJWYjzTfYBUpvU-E3axcOc
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJlbnRlcnByaXNlX2lkIjoxLCJ0ZW5hbnRfaWQiOjEsInNsdWciOiJjbG91ZF90ZWNubyIsImVtYWlsIjoic3VwZXItYWRtaW5AY2xvdWR0ZWNuby5jb20iLCJyb2xlcyI6WyJTVVBFUkFETUlOIl0sInJvbGVfbGV2ZWwiOjAsImlwIjoiMTI3LjAuMC4xIiwiZXhwIjoxNzc4MDQ2MDQ0LCJpYXQiOjE3Nzc5NTk2NDR9.VzjCtf4vF1MieKp2B0ppSuYbMNgZUVVnCLmPpr6ItD0
 
 
 GET http://localhost:8081/catalog/units/all HTTP/1.1
 Authorization: Bearer {{token}}
 
-GET http://localhost:{{port}}/enterprises/cloud_tecno HTTP/1.1
+### Create Product
+POST http://localhost:{{port}}/catalog/products HTTP/1.1
 Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "active": true,
+    "sku": "test-online-2",
+    "barcode": "1231545653",
+    "name": "Producto Online test 2",
+    "description": "descripcion",
+    "category_id": 1,
+    "brand_id": 1,
+    "unit_measure_id": 1,
+    "product_type": "STANDARD",
+    "cost_price": 10000,
+    "sale_price": 11000,
+    "price_2": 12000,
+    "price_3": 13000,
+    "iva_percentage": 0,
+    "consumption_tax": 0,
+    "manages_inventory": true,
+    "manages_batches": false,
+    "manages_serial": false,
+    "allow_negative_stock": false,
+    "visible_in_pos": true,
+    "min_stock": 0,
+    "image_url": "",
+    "status": "ACTIVE",
+    "presentations": []
+}
 
 ### Create Enterprise
 # POST https://back.cloudtecnology.cloud/enterprises  HTTP/1.1

@@ -52,48 +52,8 @@ func (r *repository) Exists(ctx context.Context, tenantSlug string, id *int64) (
 	return exists, nil
 }
 
-// // Create inserts a new product into the database and retrieves the generated ID
-// func (r *repository) Create(ctx context.Context, tenantSlug string, p *Product) error {
-// 	tenant := r.db.SchemaPrefix(tenantSlug)
-
-// 	now := vo.Now()
-// 	p.CreatedAt = now
-// 	p.UpdatedAt = &now
-
-// 	cols := []string{
-// 		"sku", "barcode", "name", "description", "category_id", "brand_id", "unit_id",
-// 		"product_type", "active", "visible_in_pos",
-// 		"cost_price", "sale_price", "price_2", "price_3",
-// 		"iva_percentage", "consumption_tax_value",
-// 		"current_stock", "min_stock", "max_stock",
-// 		"manages_inventory", "manages_batches", "manages_serial", "allow_negative_stock",
-// 		"image_url", "enterprise_id", "created_at", "updated_at", "deleted_at",
-// 	}
-// 	args := productArgs(p, false)
-
-// 	if p.ID != 0 {
-// 		cols = append([]string{"id"}, cols...)
-// 		args = productArgs(p, true)
-// 	}
-
-// 	placeholders := make([]string, len(cols))
-// 	for i := range cols {
-// 		placeholders[i] = fmt.Sprintf("$%d", i+1)
-// 	}
-
-// 	query := fmt.Sprintf(
-// 		"INSERT INTO %sproduct (%s) VALUES (%s) RETURNING id",
-// 		tenant,
-// 		strings.Join(cols, ", "),
-// 		strings.Join(placeholders, ", "),
-// 	)
-
-// 	return nil
-// }
-
 func (r *repository) Upsert(ctx context.Context, tenantSlug string, p *Product) error {
 	exists, err := r.Exists(ctx, tenantSlug, &p.ID)
-	fmt.Println("exists:", exists, err)
 	if err != nil {
 		return err
 	}
@@ -214,30 +174,17 @@ func (r *repository) GetByBarcode(ctx context.Context, tenantSlug string, barcod
 }
 
 // List retrieves a list of products with filters
-func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Product, error) {
+func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Product, error) {
 	// Prevents lib/pq connection state corruption when client cancels request
 	ctx = context.WithoutCancel(ctx)
+	conditionActive := "true"
+	if r.isOffline {
+		conditionActive = "1"
+	}
 
 	tenant := r.db.SchemaPrefix(tenantSlug)
-	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL AND active = true`, enterpriseID)
+	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL AND active = %s`, enterpriseID, conditionActive)
 
-	// Apply search filter
-	if filters.Search != "" {
-		safeSearch := strings.ReplaceAll(filters.Search, "'", "''")
-		baseWhere += fmt.Sprintf(" AND (name ILIKE '%%%s%%' OR sku ILIKE '%%%s%%' OR barcode ILIKE '%%%s%%')", safeSearch, safeSearch, safeSearch)
-	}
-
-	// Apply category filter
-	if filters.CategoryID != nil {
-		baseWhere += fmt.Sprintf(" AND category_id = %d", *filters.CategoryID)
-	}
-
-	// Apply brand filter
-	if filters.BrandID != nil {
-		baseWhere += fmt.Sprintf(" AND brand_id = %d", *filters.BrandID)
-	}
-
-	offset := (filters.Page - 1) * filters.Limit
 	query := fmt.Sprintf(`
 		SELECT 
 			id, sku, barcode, name, description, category_id, brand_id, unit_id,
@@ -248,7 +195,7 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 			manages_inventory, manages_batches, manages_serial, allow_negative_stock,
 			image_url, enterprise_id,
 			created_at, updated_at, deleted_at
-		FROM %sproduct WHERE `+baseWhere+` ORDER BY name LIMIT %d OFFSET %d`, tenant, filters.Limit, offset)
+		FROM %sproduct WHERE `+baseWhere+` ORDER BY id`, tenant)
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -453,9 +400,10 @@ func (r *repository) Update(ctx context.Context, tenantSlug string, p *Product) 
 func (r *repository) Delete(ctx context.Context, tenantSlug string, id int64) error {
 	skuDel := "DEL-" + time.Now().Format("20060102150405")
 	tenant := r.db.SchemaPrefix(tenantSlug)
-	query := fmt.Sprintf(`UPDATE %sproduct SET deleted_at = NOW(), sku = $1 WHERE id = $2`, tenant)
-	_, err := r.db.ExecContext(ctx, query, skuDel, id)
+	query := fmt.Sprintf(`UPDATE %sproduct SET deleted_at = NOW(), sku = $1, barcode = $2 WHERE id = $3`, tenant)
+	_, err := r.db.ExecContext(ctx, query, skuDel, skuDel, id)
 	if err != nil {
+		fmt.Println("Error al eliminar producto offline", err.Error())
 		return fmt.Errorf("failed to delete product: %w", err)
 	}
 	return nil

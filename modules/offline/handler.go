@@ -3,6 +3,7 @@ package offline
 import (
 	"os"
 
+	"github.com/cloud-tech-develop/aura-back/shared/logging"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/cloud-tech-develop/aura-back/tenant"
 	"github.com/gin-gonic/gin"
@@ -10,16 +11,17 @@ import (
 
 // Handler handles offline sync requests
 type Handler struct {
-	svc Service
+	svc    Service
+	logger *logging.LoggerHandler
 }
 
 func NewHandler(svc Service) *Handler {
-	return &Handler{svc: svc}
+	return &Handler{svc: svc, logger: logging.NewLoggerHandler("logs")}
 }
 
 // Ping handles GET /offline/ping
 // This endpoint only works in offline mode (SQLite)
-// Gets the enterprise slug from the JWT token (set by AuthMiddleware)
+// Gets the enterprise slug from JWT token OR from local SQLite database
 func (h *Handler) Ping(c *gin.Context) {
 	driver := os.Getenv("DATABASE_DRIVER")
 	dsn := os.Getenv("DATABASE_URL")
@@ -34,10 +36,26 @@ func (h *Handler) Ping(c *gin.Context) {
 		return
 	}
 
-	slug, ok := tenant.SlugFromContext(c)
-	if !ok || slug == "" {
-		response.BadRequest(c, "No se pudo obtener el slug del token")
-		return
+	var slug string
+	var token string
+	var syncSource string // "token" o "local_db"
+
+	// Try to get slug from JWT token first
+	slugFromToken, ok := tenant.SlugFromContext(c)
+	if ok && slugFromToken != "" {
+		slug = slugFromToken
+		syncSource = "token"
+	} else {
+		// Fallback: get slug from local SQLite enterprises table
+		enterprise, err := h.svc.GetActiveEnterprise(c.Request.Context())
+		if err != nil {
+			response.BadRequest(c, "No hay enterprise configurada. Primero sincronice con /offline/sync-tenant")
+			return
+		}
+		slug = enterprise.Slug
+		syncSource = "local_db"
+
+		h.logger.Logf("[offline.Handler] No se encontró slug en token, usando slug local: %s", slug)
 	}
 
 	prodURL := os.Getenv("URL_PROD")
@@ -45,7 +63,7 @@ func (h *Handler) Ping(c *gin.Context) {
 		prodURL = "http://localhost:8081"
 	}
 
-	token := ""
+	// Get token from header
 	authHeader := c.GetHeader("Authorization")
 	if authHeader != "" {
 		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
@@ -55,18 +73,28 @@ func (h *Handler) Ping(c *gin.Context) {
 		}
 	}
 
+	h.logger.Logf("[offline.Handler] Iniciando sincronizacion para slug: %s (fuente: %s)", slug, syncSource)
+
 	result, err := h.svc.SyncAllBySlug(c.Request.Context(), prodURL, token, slug)
 	if err != nil {
 		response.OK(c, "Error al sincronizar: "+err.Error())
 		return
 	}
 
+	// After successful sync, activate RabbitMQ with the tenant slug
+	// This will subscribe to tenant-specific events
+	if err := h.svc.ActivateRabbitMQ(c.Request.Context(), slug); err != nil {
+		h.logger.Logf("[offline.Handler] Warning: Failed to activate RabbitMQ: %v", err)
+		// Don't fail the response - sync was successful
+	}
+
 	response.OK(c, gin.H{
-		"slug":    slug,
-		"source":  prodURL,
-		"mode":    "offline",
-		"result":  result,
-		"message": "Sincronización completada",
+		"slug":        slug,
+		"source":      prodURL,
+		"mode":        "offline",
+		"sync_source": syncSource,
+		"result":      result,
+		"message":     "Sincronización completada",
 	})
 }
 

@@ -52,8 +52,8 @@ func (m *MockRepository) Page(ctx context.Context, tenantSlug string, enterprise
 	return args.Get(0).(domain.PageResult), args.Error(1)
 }
 
-func (m *MockRepository) List(ctx context.Context, tenantSlug string, enterpriseID int64, filters ListFilters) ([]Product, error) {
-	args := m.Called(ctx, tenantSlug, enterpriseID, filters)
+func (m *MockRepository) List(ctx context.Context, tenantSlug string, enterpriseID int64) ([]Product, error) {
+	args := m.Called(ctx, tenantSlug, enterpriseID)
 	return args.Get(0).([]Product), args.Error(1)
 }
 
@@ -80,13 +80,13 @@ func TestService_Create_ValidInput(t *testing.T) {
 	svc := &service{repo: mockRepo}
 
 	product := &Product{
-		SKU:         "sk-u1",
-		Name:        "Producto test",
-		Barcode:     "1123255241",
-		UnitID:      6,
-		ProductType: "STANDARD",
-		CostPrice:   17000,
-		SalePrice:   18558,
+		SKU:          "sk-u1",
+		Name:         "Producto test",
+		Barcode:      "1123255241",
+		UnitID:       6,
+		ProductType:  "STANDARD",
+		CostPrice:    17000,
+		SalePrice:    18558,
 		EnterpriseID: 1,
 	}
 
@@ -483,7 +483,7 @@ func TestService_List_EmptyList(t *testing.T) {
 
 	mockRepo.On("List", mock.Anything, "test_tenant", int64(1), mock.Anything).Return([]Product{}, nil).Once()
 
-	result, err := svc.List(context.Background(), "test_tenant", 1, ListFilters{})
+	result, err := svc.List(context.Background(), "test_tenant", 1)
 
 	assert.NoError(t, err)
 	assert.Empty(t, result)
@@ -497,7 +497,7 @@ func TestIsValidProductType_ValidTypes(t *testing.T) {
 	tests := []struct {
 		name        string
 		productType string
-		want       bool
+		want        bool
 	}{
 		{"STANDARD is valid", "STANDARD", true},
 		{"WEIGHTABLE is valid", "WEIGHTABLE", true},

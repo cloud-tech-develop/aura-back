@@ -3,6 +3,7 @@ package products
 import (
 	"database/sql"
 	"strconv"
+	"time"
 
 	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/cloud-tech-develop/aura-back/tenant"
@@ -12,12 +13,18 @@ import (
 // Handler handles HTTP requests for products
 // Converts JSON requests to domain entities and calls the service layer
 type Handler struct {
-	svc Service
+	svc         Service
+	syncHandler *SyncHandler
 }
 
 // NewHandler creates a new product handler instance
 func NewHandler(svc Service) *Handler {
 	return &Handler{svc: svc}
+}
+
+// NewHandlerWithSync creates a new product handler instance with sync support
+func NewHandlerWithSync(svc Service, syncHandler *SyncHandler) *Handler {
+	return &Handler{svc: svc, syncHandler: syncHandler}
 }
 
 // Create handles POST /products
@@ -205,31 +212,7 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	search := c.Query("search")
-
-	var categoryID, brandID *int64
-	if catIDStr := c.Query("category_id"); catIDStr != "" {
-		if id, err := strconv.ParseInt(catIDStr, 10, 64); err == nil {
-			categoryID = &id
-		}
-	}
-	if brandIDStr := c.Query("brand_id"); brandIDStr != "" {
-		if id, err := strconv.ParseInt(brandIDStr, 10, 64); err == nil {
-			brandID = &id
-		}
-	}
-
-	filters := ListFilters{
-		Page:       page,
-		Limit:      limit,
-		Search:     search,
-		CategoryID: categoryID,
-		BrandID:    brandID,
-	}
-
-	list, err := h.svc.List(c.Request.Context(), tenantSlug, enterpriseID, filters)
+	list, err := h.svc.List(c.Request.Context(), tenantSlug, enterpriseID)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -495,4 +478,59 @@ func (h *Handler) Delete(c *gin.Context) {
 	}
 
 	c.Status(204)
+}
+
+// SyncProductsFromOffline handles POST /offline/sync/products
+// Receives products modified from offline and syncs them to online
+func (h *Handler) SyncProductsFromOffline(c *gin.Context) {
+	// For offline sync, we can accept requests without JWT
+	// The tenant slug is extracted from the request body or header
+	var req struct {
+		TenantSlug string               `json:"tenant_slug"`
+		Products   []SyncProductPayload `json:"products"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	// Use tenant from claims or from request body
+	tenantSlug := req.TenantSlug
+	if tenantSlug == "" {
+		claims, _ := tenant.ClaimsFromContext(c)
+		tenantSlug = claims.Slug
+	}
+
+	if tenantSlug == "" {
+		response.BadRequest(c, "tenant_slug is required")
+		return
+	}
+
+	if len(req.Products) == 0 {
+		response.BadRequest(c, "no products to sync")
+		return
+	}
+
+	// Process the sync
+	results := h.syncHandler.ProductSyncFromOffline(c.Request.Context(), tenantSlug, req.Products)
+
+	// Count success and errors
+	successCount := 0
+	errorCount := 0
+	for _, r := range results {
+		if r.Status == "success" {
+			successCount++
+		} else {
+			errorCount++
+		}
+	}
+
+	response.OK(c, gin.H{
+		"results":       results,
+		"total_synced":  len(req.Products),
+		"success_count": successCount,
+		"error_count":   errorCount,
+		"sync_time":     time.Now(),
+	})
 }

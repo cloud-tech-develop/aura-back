@@ -9,6 +9,9 @@ func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
 	// Public for offline sync
 	public.GET("/catalog/products", h.List)
 
+	// Offline sync endpoint (public, no JWT required)
+	public.POST("/offline/sync/products", h.SyncProductsFromOffline)
+
 	// Protected routes
 	protected.POST("/catalog/products", h.Create)
 	protected.GET("/catalog/products/exist/:sku", h.GetBySKU)
