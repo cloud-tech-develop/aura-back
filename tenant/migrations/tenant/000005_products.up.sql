@@ -58,8 +58,7 @@ CREATE TABLE IF NOT EXISTS product (
     CONSTRAINT product_category_fk FOREIGN KEY (category_id) REFERENCES category(id),
     CONSTRAINT product_brand_fk FOREIGN KEY (brand_id) REFERENCES brand(id),
     CONSTRAINT product_unit_fk FOREIGN KEY (unit_id) REFERENCES unit(id),
-    CONSTRAINT product_sku_unique UNIQUE (enterprise_id, sku),
-    CONSTRAINT product_barcode_unique UNIQUE (enterprise_id, barcode)
+    CONSTRAINT product_sku_unique UNIQUE (enterprise_id, sku)
 );
 
 -- Indexes for performance optimization
