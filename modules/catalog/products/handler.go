@@ -452,6 +452,173 @@ func (h *Handler) Update(c *gin.Context) {
 	response.OK(c, product)
 }
 
+// Patch handles PATCH /catalog/products/:id
+// Partial update: only updates fields present in the request body
+func (h *Handler) Patch(c *gin.Context) {
+	claims, _ := tenant.ClaimsFromContext(c)
+	tenantSlug := claims.Slug
+	if tenantSlug == "" {
+		response.BadRequest(c, "tenant not found")
+		return
+	}
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "invalid ID")
+		return
+	}
+
+	// Decode into a map to know exactly which fields were sent
+	var body map[string]interface{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	// Get existing product to merge with
+	existing, err := h.svc.GetByID(c.Request.Context(), tenantSlug, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			response.NotFound(c, "product not found")
+			return
+		}
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	// Only overwrite fields present in the request body
+	if v, ok := body["sku"]; ok {
+		existing.SKU, _ = v.(string)
+	}
+	if v, ok := body["name"]; ok {
+		existing.Name, _ = v.(string)
+	}
+	if v, ok := body["barcode"]; ok {
+		existing.Barcode, _ = v.(string)
+	}
+	if v, ok := body["description"]; ok {
+		existing.Description, _ = v.(string)
+	}
+	if v, ok := body["image_url"]; ok {
+		existing.ImageURL, _ = v.(string)
+	}
+	if v, ok := body["product_type"]; ok {
+		if s, ok := v.(string); ok {
+			existing.ProductType = s
+		}
+	}
+	if v, ok := body["category_id"]; ok {
+		if f, ok := v.(float64); ok {
+			id := int64(f)
+			existing.CategoryID = &id
+		} else if v == nil {
+			existing.CategoryID = nil
+		}
+	}
+	if v, ok := body["brand_id"]; ok {
+		if f, ok := v.(float64); ok {
+			id := int64(f)
+			existing.BrandID = &id
+		} else if v == nil {
+			existing.BrandID = nil
+		}
+	}
+	if v, ok := body["unit_measure_id"]; ok {
+		if f, ok := v.(float64); ok {
+			existing.UnitID = int64(f)
+		}
+	}
+	if v, ok := body["cost_price"]; ok {
+		if f, ok := v.(float64); ok {
+			existing.CostPrice = f
+		}
+	}
+	if v, ok := body["sale_price"]; ok {
+		if f, ok := v.(float64); ok {
+			existing.SalePrice = f
+		}
+	}
+	if v, ok := body["price_2"]; ok {
+		if f, ok := v.(float64); ok {
+			existing.Price2 = f
+		}
+	}
+	if v, ok := body["price_3"]; ok {
+		if f, ok := v.(float64); ok {
+			existing.Price3 = &f
+		} else if v == nil {
+			existing.Price3 = nil
+		}
+	}
+	if v, ok := body["iva_percentage"]; ok {
+		if f, ok := v.(float64); ok {
+			existing.IVAPercentage = f
+		}
+	}
+	if v, ok := body["consumption_tax"]; ok {
+		if f, ok := v.(float64); ok {
+			existing.ConsumptionTax = f
+		}
+	}
+	if v, ok := body["active"]; ok {
+		if b, ok := v.(bool); ok {
+			existing.Active = b
+		}
+	}
+	if v, ok := body["visible_in_pos"]; ok {
+		if b, ok := v.(bool); ok {
+			existing.VisibleInPOS = b
+		}
+	}
+	if v, ok := body["manages_inventory"]; ok {
+		if b, ok := v.(bool); ok {
+			existing.ManagesInventory = b
+		}
+	}
+	if v, ok := body["manages_batches"]; ok {
+		if b, ok := v.(bool); ok {
+			existing.ManagesBatches = b
+		}
+	}
+	if v, ok := body["manages_serial"]; ok {
+		if b, ok := v.(bool); ok {
+			existing.ManagesSerial = b
+		}
+	}
+	if v, ok := body["allow_negative_stock"]; ok {
+		if b, ok := v.(bool); ok {
+			existing.AllowNegativeStock = b
+		}
+	}
+	if v, ok := body["min_stock"]; ok {
+		if f, ok := v.(float64); ok {
+			existing.MinStock = int(f)
+		}
+	}
+	if v, ok := body["max_stock"]; ok {
+		if f, ok := v.(float64); ok {
+			existing.MaxStock = int(f)
+		}
+	}
+	if v, ok := body["current_stock"]; ok {
+		if f, ok := v.(float64); ok {
+			existing.CurrentStock = int(f)
+		}
+	}
+
+	// Call existing service Update with the merged product
+	if err := h.svc.Update(c.Request.Context(), tenantSlug, id, existing); err != nil {
+		if err == sql.ErrNoRows {
+			response.NotFound(c, "product not found")
+			return
+		}
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.OK(c, existing)
+}
+
 // Delete handles DELETE /products/:id
 // Performs a soft delete of a product
 func (h *Handler) Delete(c *gin.Context) {

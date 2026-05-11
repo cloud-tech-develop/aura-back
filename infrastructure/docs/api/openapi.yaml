@@ -1539,6 +1539,103 @@ paths:
         "401":
           description: Unauthorized
 
+    patch:
+      summary: Partially update product
+      description: Only updates the fields present in the request body. All other fields remain unchanged.
+      tags:
+        - Catalog - Products
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sku:
+                  type: string
+                name:
+                  type: string
+                barcode:
+                  type: string
+                  nullable: true
+                description:
+                  type: string
+                image_url:
+                  type: string
+                category_id:
+                  type: integer
+                  format: int64
+                  nullable: true
+                brand_id:
+                  type: integer
+                  format: int64
+                  nullable: true
+                unit_measure_id:
+                  type: integer
+                  format: int64
+                product_type:
+                  type: string
+                  enum: [STANDARD, SERVICE, KIT, WEIGHTABLE]
+                active:
+                  type: boolean
+                visible_in_pos:
+                  type: boolean
+                cost_price:
+                  type: number
+                  format: decimal
+                sale_price:
+                  type: number
+                  format: decimal
+                price_2:
+                  type: number
+                  format: decimal
+                price_3:
+                  type: number
+                  format: decimal
+                  nullable: true
+                iva_percentage:
+                  type: number
+                  format: decimal
+                consumption_tax:
+                  type: number
+                  format: decimal
+                manages_inventory:
+                  type: boolean
+                manages_batches:
+                  type: boolean
+                manages_serial:
+                  type: boolean
+                allow_negative_stock:
+                  type: boolean
+                min_stock:
+                  type: integer
+                max_stock:
+                  type: integer
+                current_stock:
+                  type: integer
+      responses:
+        "200":
+          description: Product updated with only the provided fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
     delete:
       summary: Delete product
       tags:

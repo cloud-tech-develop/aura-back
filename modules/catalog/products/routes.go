@@ -18,6 +18,7 @@ func Register(public gin.IRouter, protected gin.IRouter, h *Handler) {
 	protected.GET("/catalog/products/:id", h.GetByID)
 	protected.POST("/catalog/products/page", h.Page)
 	protected.PUT("/catalog/products/:id", h.Update)
+	protected.PATCH("/catalog/products/:id", h.Patch)
 	protected.DELETE("/catalog/products/:id", h.Delete)
 }
 
