@@ -312,6 +312,13 @@ func TestService_Delete_Valid(t *testing.T) {
 	mockRepo := new(MockRepository)
 	svc := &service{repo: mockRepo}
 
+	now := vo.Now()
+	deletedBrand := &Brand{
+		ID:        1,
+		Name:      "Test Brand",
+		CreatedAt: now,
+	}
+	mockRepo.On("GetByID", mock.Anything, "test_tenant", int64(1)).Return(deletedBrand, nil).Once()
 	mockRepo.On("Delete", mock.Anything, "test_tenant", int64(1)).Return(nil).Once()
 
 	err := svc.Delete(context.Background(), "test_tenant", 1)

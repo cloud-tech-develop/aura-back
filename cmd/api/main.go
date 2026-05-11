@@ -17,6 +17,7 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/admin/users"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
+	catalogPresentations "github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	catalogProducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
@@ -157,10 +158,10 @@ func main() {
 	_ = eventBus.Subscribe(users.EventUpdated, usersLogger)
 
 	// Catalog modules
-	categorySvc := categories.NewService(database)
+	categorySvc := categories.NewService(database, eventBus)
 	categoryHandler := categories.NewHandler(categorySvc)
 
-	brandSvc := brands.NewService(database)
+	brandSvc := brands.NewService(database, eventBus)
 	brandHandler := brands.NewHandler(brandSvc)
 
 	unitSvc := units.NewService(database)
@@ -193,6 +194,7 @@ func main() {
 			categorySvc,
 			brandSvc,
 			unitSvc,
+			catalogPresentations.NewRepository(database),
 		)
 		offlineHandler = offline.NewHandler(offlineSvc)
 	}

@@ -31,13 +31,6 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	// Get product ID from URL parameter
-	productID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "invalid product ID")
-		return
-	}
-
 	// Request structure for list of presentations
 	var req PresentationListRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -45,10 +38,16 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
+	// Get product ID from URL parameter
+	productID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	// Validate product ID is provided and valid
-	if productID == 0 {
-		response.BadRequest(c, "product_id is required")
-		return
+	if err != nil {
+		if req.Presentations[0].ProductID != nil && *req.Presentations[0].ProductID > 0 {
+			productID = *req.Presentations[0].ProductID
+		} else {
+			response.BadRequest(c, "product_id is required")
+			return
+		}
 	}
 
 	if err := h.svc.Create(c.Request.Context(), tenantSlug, enterpriseID, productID, req.Presentations); err != nil {

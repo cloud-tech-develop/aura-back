@@ -165,23 +165,36 @@ func (r *repository) GetByProductID(ctx context.Context, tenantSlug string, prod
 	return list, nil
 }
 
-// List retrieves a list of presentations with filters
-func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, ProductID int64) ([]Presentation, error) {
+// List retrieves a list of presentations with filters and product info
+func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID int64, ProductID int64) ([]PresentationWithProductInfo, error) {
 	ctx = context.WithoutCancel(ctx)
 
 	tenant := r.db.SchemaPrefix(tenantSlug)
-	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL`, enterpriseID)
+	joint := r.db.SchemaPrefix(tenantSlug)
+
+	baseWhere := fmt.Sprintf("pre.enterprise_id = %d AND pre.deleted_at IS NULL", enterpriseID)
 
 	if ProductID > 0 {
-		baseWhere += fmt.Sprintf(" AND product_id = %d", ProductID)
+		baseWhere += fmt.Sprintf(" AND pre.product_id = %d", ProductID)
 	}
 
 	query := fmt.Sprintf(`
-		SELECT 
-			id, product_id, name, factor, barcode, cost_price, sale_price,
-			default_purchase, default_sale, enterprise_id,
-			created_at, updated_at, deleted_at
-		FROM %spresentation WHERE `+baseWhere+` ORDER BY name`, tenant)
+		SELECT
+			pre.id, pre.product_id,
+			COALESCE(pr.name, '') AS product_name,
+			COALESCE(pr.sku, '') AS sku,
+			COALESCE(pr.product_type, '') AS product_type,
+			c.name AS category_name,
+			b.name AS brand_name,
+			pre.name, pre.factor, pre.barcode,
+			pre.cost_price, pre.sale_price,
+			pre.default_purchase, pre.default_sale,
+			pre.enterprise_id
+		FROM %spresentation pre
+		LEFT JOIN %sproduct pr ON pr.id = pre.product_id
+		LEFT JOIN %scategory c ON c.id = pr.category_id
+		LEFT JOIN %sbrand b ON b.id = pr.brand_id
+		WHERE `+baseWhere+` ORDER BY pre.name`, tenant, joint, joint, joint)
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -189,13 +202,17 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	}
 	defer rows.Close()
 
-	var list []Presentation
+	var list []PresentationWithProductInfo
 	for rows.Next() {
-		var p Presentation
+		var p PresentationWithProductInfo
 		if err := rows.Scan(
-			&p.ID, &p.ProductID, &p.Name, &p.Factor, &p.Barcode,
-			&p.CostPrice, &p.SalePrice, &p.DefaultPurchase, &p.DefaultSale,
-			&p.EnterpriseID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+			&p.ID, &p.ProductID,
+			&p.ProductName, &p.SKU, &p.ProductType,
+			&p.CategoryName, &p.BrandName,
+			&p.Name, &p.Factor, &p.Barcode,
+			&p.CostPrice, &p.SalePrice,
+			&p.DefaultPurchase, &p.DefaultSale,
+			&p.EnterpriseID,
 		); err != nil {
 			return nil, err
 		}
@@ -204,12 +221,14 @@ func (r *repository) List(ctx context.Context, tenantSlug string, enterpriseID i
 	return list, nil
 }
 
-// Page retrieves a paginated list of presentations
+// Page retrieves a paginated list of presentations with product info
 func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error) {
 	ctx = context.WithoutCancel(ctx)
 
 	tenant := r.db.SchemaPrefix(tenantSlug)
-	baseWhere := fmt.Sprintf(`enterprise_id = %d AND deleted_at IS NULL`, enterpriseID)
+	joint := r.db.SchemaPrefix(tenantSlug)
+
+	baseWhere := fmt.Sprintf("pre.enterprise_id = %d AND pre.deleted_at IS NULL", enterpriseID)
 
 	// Apply filters from params
 	if params != nil {
@@ -221,7 +240,7 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 			case int64:
 				pID = v
 			}
-			baseWhere += fmt.Sprintf(" AND product_id = %d", pID)
+			baseWhere += fmt.Sprintf(" AND pre.product_id = %d", pID)
 		}
 	}
 
@@ -229,11 +248,11 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	searchCond := ""
 	if search != "" {
 		safeSearch := strings.ReplaceAll(search, "'", "''")
-		searchCond = fmt.Sprintf(" AND name ILIKE '%%%s%%'", safeSearch)
+		searchCond = fmt.Sprintf(" AND pre.name ILIKE '%%%s%%'", safeSearch)
 	}
 
 	// COUNT query
-	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %spresentation WHERE `+baseWhere+searchCond, tenant)
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM %spresentation pre WHERE `+baseWhere+searchCond, tenant)
 
 	var total int64
 	if err := r.db.QueryRowContext(ctx, countQuery).Scan(&total); err != nil {
@@ -242,15 +261,15 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 
 	// Validate sort column
 	validSorts := map[string]string{
-		"id":         "id",
-		"name":       "name",
-		"sale_price": "sale_price",
-		"created_at": "created_at",
+		"id":         "pre.id",
+		"name":       "pre.name",
+		"sale_price": "pre.sale_price",
+		"created_at": "pre.created_at",
 	}
 	if sortCol, ok := validSorts[sort]; ok {
 		sort = sortCol
 	} else {
-		sort = "id"
+		sort = "pre.id"
 	}
 	if order != "asc" && order != "desc" {
 		order = "asc"
@@ -259,13 +278,23 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	// SELECT query with pagination
 	offset := (page - 1) * limit
 	selectQuery := fmt.Sprintf(`
-		SELECT 
-			id, product_id, name, factor, barcode, cost_price, sale_price,
-			default_purchase, default_sale, enterprise_id,
-			created_at, updated_at, deleted_at
-		FROM %spresentation 
+		SELECT
+			pre.id, pre.product_id,
+			COALESCE(pr.name, '') AS product_name,
+			COALESCE(pr.sku, '') AS sku,
+			COALESCE(pr.product_type, '') AS product_type,
+			c.name AS category_name,
+			b.name AS brand_name,
+			pre.name, pre.factor, pre.barcode,
+			pre.cost_price, pre.sale_price,
+			pre.default_purchase, pre.default_sale,
+			pre.enterprise_id
+		FROM %spresentation pre
+		LEFT JOIN %sproduct pr ON pr.id = pre.product_id
+		LEFT JOIN %scategory c ON c.id = pr.category_id
+		LEFT JOIN %sbrand b ON b.id = pr.brand_id
 		WHERE `+baseWhere+searchCond+` ORDER BY %s %s LIMIT %d OFFSET %d`,
-		tenant, sort, order, limit, offset)
+		tenant, joint, joint, joint, sort, order, limit, offset)
 
 	resultRows, err := r.db.QueryContext(ctx, selectQuery)
 	if err != nil {
@@ -273,13 +302,17 @@ func (r *repository) Page(ctx context.Context, tenantSlug string, enterpriseID i
 	}
 	defer resultRows.Close()
 
-	var list []Presentation
+	var list []PresentationWithProductInfo
 	for resultRows.Next() {
-		var p Presentation
+		var p PresentationWithProductInfo
 		if err := resultRows.Scan(
-			&p.ID, &p.ProductID, &p.Name, &p.Factor, &p.Barcode,
-			&p.CostPrice, &p.SalePrice, &p.DefaultPurchase, &p.DefaultSale,
-			&p.EnterpriseID, &p.CreatedAt, &p.UpdatedAt, &p.DeletedAt,
+			&p.ID, &p.ProductID,
+			&p.ProductName, &p.SKU, &p.ProductType,
+			&p.CategoryName, &p.BrandName,
+			&p.Name, &p.Factor, &p.Barcode,
+			&p.CostPrice, &p.SalePrice,
+			&p.DefaultPurchase, &p.DefaultSale,
+			&p.EnterpriseID,
 		); err != nil {
 			return domain.PageResult{}, err
 		}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	"github.com/cloud-tech-develop/aura-back/shared/domain"
@@ -14,13 +16,181 @@ import (
 // service implements the Service interface
 // Contains business logic for presentation management
 type service struct {
-	repo     Repository
-	eventBus events.EventBus
+	repo      Repository
+	eventBus  events.EventBus
+	syncBus   events.EventBus // Cross-server sync bus (RabbitMQ)
+	syncMu    sync.RWMutex
+	logger    *logging.LoggerHandler
+	isOffline bool
 }
 
 // NewService creates a new presentation service instance
 func NewService(db *db.DB, eventBus events.EventBus) Service {
-	return &service{repo: NewRepository(db), eventBus: eventBus}
+	logger := logging.NewLoggerHandler("sync")
+	logger.Log("[Presentation Service] Initializing service")
+
+	svc := &service{
+		repo:      NewRepository(db),
+		eventBus:  eventBus,
+		logger:    logger,
+		isOffline: db.IsSQLite(),
+	}
+
+	svc.subscribeToRabbitMQEvents()
+
+	return svc
+}
+
+// subscribeToRabbitMQEvents registers cross-server sync subscriptions.
+func (s *service) subscribeToRabbitMQEvents() {
+	if s.eventBus == nil {
+		return
+	}
+
+	if s.isOffline {
+		s.logger.Log("[Presentation Service] Offline mode: RabbitMQ sync deferred until /offline/ping")
+		return
+	}
+
+	// Online: wildcard binding receives offline events from all tenants.
+	s.eventBus.Subscribe(EventPresentationOnlineCreated+".*", s)
+	s.eventBus.Subscribe(EventPresentationOnlineUpdated+".*", s)
+	s.eventBus.Subscribe(EventPresentationOnlineDeleted+".*", s)
+	s.logger.Log("[Presentation Service] Online mode: Subscribed to offline presentation events (wildcard)")
+}
+
+// SetSyncBus sets the RabbitMQ event bus for cross-server sync publishing.
+func (s *service) SetSyncBus(bus events.EventBus) {
+	s.syncMu.Lock()
+	defer s.syncMu.Unlock()
+	s.syncBus = bus
+	s.logger.Log("[Presentation Service] Sync bus updated to RabbitMQ")
+}
+
+// Handle implements events.EventHandler for RabbitMQ events
+func (s *service) Handle(event events.Event) error {
+	s.logger.Logf("[Presentation Service] Received event from RabbitMQ: %s", event.GetName())
+
+	payload, ok := event.GetPayload().(map[string]interface{})
+	if !ok {
+		s.logger.Log("[Presentation Service] Invalid payload type in event")
+		return fmt.Errorf("invalid payload type")
+	}
+
+	tenantSlug, ok := payload["tenant_slug"].(string)
+	if !ok || tenantSlug == "" {
+		s.logger.Log("[Presentation Service] No tenant_slug in event, skipping")
+		return fmt.Errorf("tenant_slug is required")
+	}
+
+	s.logger.Logf("[Presentation Service] Processing %s event for tenant: %s", event.GetName(), tenantSlug)
+
+	ctx := context.Background()
+
+	switch event.GetName() {
+	case EventPresentationOfflineCreated, EventPresentationOnlineCreated:
+		return s.handleRemoteCreate(ctx, tenantSlug, payload)
+	case EventPresentationOfflineUpdated, EventPresentationOnlineUpdated:
+		return s.handleRemoteUpdate(ctx, tenantSlug, payload)
+	case EventPresentationOfflineDeleted, EventPresentationOnlineDeleted:
+		return s.handleRemoteDelete(ctx, tenantSlug, payload)
+	}
+
+	return nil
+}
+
+func (s *service) handleRemoteCreate(ctx context.Context, tenantSlug string, payload map[string]interface{}) error {
+	p := presentationFromPayload(payload)
+	s.logger.Logf("[Presentation Service] Remote create: ID %d", p.ID)
+
+	existing, err := s.repo.GetByID(ctx, tenantSlug, p.ID)
+	if err == nil {
+		var eventTime time.Time
+		if tStr, ok := payload["timestamp"].(string); ok {
+			eventTime, _ = time.Parse(time.RFC3339, tStr)
+		}
+
+		if existing.UpdatedAt != nil && time.Time(*existing.UpdatedAt).After(eventTime) {
+			s.logger.Logf("[Presentation Service] Conflict: local version is newer for presentation ID %d, skipping", p.ID)
+			return nil
+		}
+
+		p.CreatedAt = existing.CreatedAt
+		if err := s.repo.Update(ctx, tenantSlug, p); err != nil {
+			return fmt.Errorf("failed to update presentation: %w", err)
+		}
+		s.logger.Logf("[Presentation Service] Presentation updated from remote (resolved conflict): ID %d", p.ID)
+		return nil
+	}
+	if err != sql.ErrNoRows {
+		return fmt.Errorf("error checking presentation existence: %w", err)
+	}
+
+	if err := s.repo.Create(ctx, tenantSlug, p.EnterpriseID, p); err != nil {
+		return fmt.Errorf("failed to create presentation: %w", err)
+	}
+	s.logger.Logf("[Presentation Service] Presentation created from remote: ID %d", p.ID)
+	return nil
+}
+
+func (s *service) handleRemoteUpdate(ctx context.Context, tenantSlug string, payload map[string]interface{}) error {
+	p := presentationFromPayload(payload)
+	s.logger.Logf("[Presentation Service] Remote update: ID %d", p.ID)
+
+	existing, err := s.repo.GetByID(ctx, tenantSlug, p.ID)
+	if err == sql.ErrNoRows {
+		if err := s.repo.Create(ctx, tenantSlug, p.EnterpriseID, p); err != nil {
+			return fmt.Errorf("failed to create presentation on remote update: %w", err)
+		}
+		s.logger.Logf("[Presentation Service] Presentation created from remote update: ID %d", p.ID)
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("error fetching presentation: %w", err)
+	}
+
+	var eventTime time.Time
+	if tStr, ok := payload["timestamp"].(string); ok {
+		eventTime, _ = time.Parse(time.RFC3339, tStr)
+	}
+
+	if existing.UpdatedAt != nil && time.Time(*existing.UpdatedAt).After(eventTime) {
+		s.logger.Logf("[Presentation Service] Conflict: local version is newer for ID %d, skipping update", p.ID)
+		return nil
+	}
+
+	if err := s.repo.Update(ctx, tenantSlug, p); err != nil {
+		return fmt.Errorf("failed to update presentation: %w", err)
+	}
+	s.logger.Logf("[Presentation Service] Presentation updated from remote: ID %d", p.ID)
+	return nil
+}
+
+func (s *service) handleRemoteDelete(ctx context.Context, tenantSlug string, payload map[string]interface{}) error {
+	presentationID := int64(payload["presentation_id"].(float64))
+	s.logger.Logf("[Presentation Service] Remote delete: ID %d", presentationID)
+
+	existing, err := s.repo.GetByID(ctx, tenantSlug, presentationID)
+	if err == sql.ErrNoRows {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("error fetching presentation: %w", err)
+	}
+
+	var eventTime time.Time
+	if tStr, ok := payload["timestamp"].(string); ok {
+		eventTime, _ = time.Parse(time.RFC3339, tStr)
+	}
+
+	if existing.UpdatedAt != nil && time.Time(*existing.UpdatedAt).After(eventTime) {
+		s.logger.Logf("[Presentation Service] Conflict: local version is newer for ID %d, skipping delete", presentationID)
+		return nil
+	}
+
+	if err := s.repo.Delete(ctx, tenantSlug, presentationID); err != nil {
+		return fmt.Errorf("failed to delete presentation: %w", err)
+	}
+	s.logger.Logf("[Presentation Service] Presentation deleted from remote: ID %d", presentationID)
+	return nil
 }
 
 // Create creates multiple presentations for a product
@@ -79,6 +249,15 @@ func (s *service) Create(ctx context.Context, tenantSlug string, enterpriseID in
 	if err != nil {
 		logger.Logf("[Presentation Service] Repository create failed: %v", err)
 		return err
+	}
+
+	// Publish sync events for each created presentation
+	for _, p := range entities {
+		if s.isOffline {
+			s.publishSync(NewSyncCreatedEventFromOffline(tenantSlug, p))
+		} else {
+			s.publishSync(NewSyncCreatedEvent(tenantSlug, p))
+		}
 	}
 
 	logger.Logf("[Presentation Service] Created %d presentations successfully", len(presentations))
@@ -174,6 +353,14 @@ func (s *service) Upsert(ctx context.Context, tenantSlug string, enterpriseID in
 			logger.Logf("[Presentation Service] Repository create failed: %v", err)
 			return fmt.Errorf("failed to create presentations: %w", err)
 		}
+		// Publish sync events for created presentations
+		for _, p := range toCreate {
+			if s.isOffline {
+				s.publishSync(NewSyncCreatedEventFromOffline(tenantSlug, p))
+			} else {
+				s.publishSync(NewSyncCreatedEvent(tenantSlug, p))
+			}
+		}
 	}
 
 	// Update existing presentations
@@ -203,50 +390,29 @@ func (s *service) Upsert(ctx context.Context, tenantSlug string, enterpriseID in
 		err = s.repo.Update(ctx, tenantSlug, existing)
 		if err != nil {
 			logger.Logf("[Presentation Service] Repository update failed: %v", err)
-			return fmt.Errorf("failed to update presentation: %w", err)
+			return err
+		}
+
+		// Publish sync event for updated presentation
+		if s.isOffline {
+			s.publishSync(NewSyncUpdatedEventFromOffline(tenantSlug, existing))
+		} else {
+			s.publishSync(NewSyncUpdatedEvent(tenantSlug, existing))
 		}
 	}
 
-	logger.Logf("[Presentation Service] Upsert completed: %d created, %d updated", len(toCreate), len(toUpdate))
+	logger.Logf("[Presentation Service] Upsert completed successfully")
 	return nil
 }
 
 // GetByID retrieves a presentation by its ID
 func (s *service) GetByID(ctx context.Context, tenantSlug string, id int64) (*Presentation, error) {
-	logger := logging.NewLoggerHandler("logs")
-	logger.Logf("[Presentation Service] Fetching presentation by ID: %d", id)
-
-	presentation, err := s.repo.GetByID(ctx, tenantSlug, id)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			logger.Logf("[Presentation Service] Presentation not found with ID: %d", id)
-			return nil, sql.ErrNoRows
-		}
-		logger.Logf("[Presentation Service] Error fetching presentation: %v", err)
-		return nil, fmt.Errorf("error fetching presentation: %w", err)
-	}
-
-	logger.Logf("[Presentation Service] Presentation found: ID=%d, Name=%s", presentation.ID, presentation.Name)
-	return presentation, nil
+	return s.repo.GetByID(ctx, tenantSlug, id)
 }
 
 // GetByProductID retrieves all presentations for a product
 func (s *service) GetByProductID(ctx context.Context, tenantSlug string, productID int64) ([]Presentation, error) {
-	logger := logging.NewLoggerHandler("logs")
-	logger.Logf("[Presentation Service] Fetching presentations for product ID: %d", productID)
-
-	if productID == 0 {
-		return nil, fmt.Errorf("product_id is required")
-	}
-
-	presentations, err := s.repo.GetByProductID(ctx, tenantSlug, productID)
-	if err != nil {
-		logger.Logf("[Presentation Service] Error fetching presentations: %v", err)
-		return nil, fmt.Errorf("error fetching presentations: %w", err)
-	}
-
-	logger.Logf("[Presentation Service] Found %d presentations", len(presentations))
-	return presentations, nil
+	return s.repo.GetByProductID(ctx, tenantSlug, productID)
 }
 
 // Page retrieves a paginated list of presentations
@@ -260,8 +426,8 @@ func (s *service) Page(ctx context.Context, tenantSlug string, enterpriseID int6
 	return s.repo.Page(ctx, tenantSlug, enterpriseID, page, limit, search, sort, order, params)
 }
 
-// List retrieves a list of presentations with filters
-func (s *service) List(ctx context.Context, tenantSlug string, enterpriseID int64, productID int64) ([]Presentation, error) {
+// List retrieves a list of presentations with product info
+func (s *service) List(ctx context.Context, tenantSlug string, enterpriseID int64, productID int64) ([]PresentationWithProductInfo, error) {
 	return s.repo.List(ctx, tenantSlug, enterpriseID, productID)
 }
 
@@ -270,7 +436,7 @@ func (s *service) Update(ctx context.Context, tenantSlug string, id int64, p *Pr
 	logger := logging.NewLoggerHandler("logs")
 	logger.Logf("[Presentation Service] Starting presentation update for ID: %d", id)
 
-	// Get existing to validate and preserve values
+	// Get existing presentation
 	existing, err := s.repo.GetByID(ctx, tenantSlug, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -281,29 +447,26 @@ func (s *service) Update(ctx context.Context, tenantSlug string, id int64, p *Pr
 		return fmt.Errorf("error fetching presentation: %w", err)
 	}
 
-	// Preserve unchanged values
-	if p.Name == "" {
-		p.Name = existing.Name
-	}
-	if p.Factor == 0 {
-		p.Factor = existing.Factor
-	}
-	if p.SalePrice == 0 {
-		p.SalePrice = existing.SalePrice
-	}
-	if p.CostPrice == 0 {
-		p.CostPrice = existing.CostPrice
-	}
+	// Update fields
+	existing.Name = p.Name
+	existing.Factor = p.Factor
+	existing.Barcode = p.Barcode
+	existing.CostPrice = p.CostPrice
+	existing.SalePrice = p.SalePrice
+	existing.DefaultPurchase = p.DefaultPurchase
+	existing.DefaultSale = p.DefaultSale
 
-	p.ID = id
-	p.ProductID = existing.ProductID
-	p.EnterpriseID = existing.EnterpriseID
-
-	logger.Logf("[Presentation Service] Updating presentation in repository")
-	err = s.repo.Update(ctx, tenantSlug, p)
+	err = s.repo.Update(ctx, tenantSlug, existing)
 	if err != nil {
 		logger.Logf("[Presentation Service] Repository update failed: %v", err)
 		return err
+	}
+
+	// Publish sync event
+	if s.isOffline {
+		s.publishSync(NewSyncUpdatedEventFromOffline(tenantSlug, existing))
+	} else {
+		s.publishSync(NewSyncUpdatedEvent(tenantSlug, existing))
 	}
 
 	logger.Logf("[Presentation Service] Presentation updated successfully")
@@ -315,7 +478,7 @@ func (s *service) Delete(ctx context.Context, tenantSlug string, id int64) error
 	logger := logging.NewLoggerHandler("logs")
 	logger.Logf("[Presentation Service] Starting presentation deletion for ID: %d", id)
 
-	_, err := s.repo.GetByID(ctx, tenantSlug, id)
+	presentation, err := s.repo.GetByID(ctx, tenantSlug, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logger.Logf("[Presentation Service] Presentation not found with ID: %d", id)
@@ -331,6 +494,68 @@ func (s *service) Delete(ctx context.Context, tenantSlug string, id int64) error
 		return err
 	}
 
+	// Publish sync event
+	if s.isOffline {
+		s.publishSync(NewSyncDeletedEventFromOffline(tenantSlug, presentation))
+	} else {
+		s.publishSync(NewSyncDeletedEvent(tenantSlug, presentation))
+	}
+
 	logger.Logf("[Presentation Service] Presentation deleted successfully")
 	return nil
+}
+
+// ─── sync helpers ─────────────────────────────────────────────────────────
+
+// publishSync publishes a cross-server sync event.
+// Uses the RabbitMQ sync bus if available (set after /offline/ping), falls back to local eventBus.
+func (s *service) publishSync(event events.Event) {
+	s.syncMu.RLock()
+	bus := s.syncBus
+	s.syncMu.RUnlock()
+
+	if bus == nil {
+		bus = s.eventBus
+	}
+	if bus == nil {
+		return
+	}
+	if err := bus.Publish(event); err != nil {
+		s.logger.Logf("[Presentation Service] warn: sync publish failed: %v", err)
+	}
+}
+
+func presentationFromPayload(payload map[string]interface{}) *Presentation {
+	return &Presentation{
+		ID:              int64FromPayload(payload, "presentation_id"),
+		ProductID:       int64FromPayload(payload, "product_id"),
+		Name:            strFromPayload(payload, "name"),
+		Factor:          floatFromPayload(payload, "factor"),
+		Barcode:         strFromPayload(payload, "barcode"),
+		CostPrice:       floatFromPayload(payload, "cost_price"),
+		SalePrice:       floatFromPayload(payload, "sale_price"),
+		DefaultPurchase: boolFromPayload(payload, "default_purchase"),
+		DefaultSale:     boolFromPayload(payload, "default_sale"),
+		EnterpriseID:    int64FromPayload(payload, "enterprise_id"),
+	}
+}
+
+func strFromPayload(m map[string]interface{}, k string) string {
+	v, _ := m[k].(string)
+	return v
+}
+
+func floatFromPayload(m map[string]interface{}, k string) float64 {
+	v, _ := m[k].(float64)
+	return v
+}
+
+func int64FromPayload(m map[string]interface{}, k string) int64 {
+	v, _ := m[k].(float64)
+	return int64(v)
+}
+
+func boolFromPayload(m map[string]interface{}, k string) bool {
+	v, _ := m[k].(bool)
+	return v
 }

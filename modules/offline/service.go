@@ -45,19 +45,20 @@ type EventPayload struct {
 
 // service implements Service
 type service struct {
-	repo            Repository
-	http            *http.Client
-	eventBus        events.EventBus
-	tenantMgr       *tenant.Manager
-	logger          *logging.LoggerHandler
-	productSvc      catalogProducts.Service
-	presentationSvc catalogPresentations.Service
-	categorySvc     catalogCategories.Service
-	brandSvc        catalogBrands.Service
-	unitSvc         catalogUnits.Service
-	mu              sync.RWMutex
-	rabbitActive    bool
-	rabbitBus      *rabbit.RabbitMQEventBus  // El event bus de RabbitMQ cuando se activa
+	repo                 Repository
+	http                 *http.Client
+	eventBus             events.EventBus
+	tenantMgr            *tenant.Manager
+	logger                *logging.LoggerHandler
+	productSvc           catalogProducts.Service
+	presentationSvc      catalogPresentations.Service
+	categorySvc          catalogCategories.Service
+	brandSvc             catalogBrands.Service
+	unitSvc              catalogUnits.Service
+	presentationRepo     catalogPresentations.Repository // Repo para sync handler
+	mu                   sync.RWMutex
+	rabbitActive         bool
+	rabbitBus            *rabbit.RabbitMQEventBus // El event bus de RabbitMQ cuando se activa
 }
 
 func NewService(
@@ -69,6 +70,7 @@ func NewService(
 	categorySvc catalogCategories.Service,
 	brandSvc catalogBrands.Service,
 	unitSvc catalogUnits.Service,
+	presentationRepo catalogPresentations.Repository,
 ) Service {
 	return &service{
 		repo: NewRepository(
@@ -82,17 +84,18 @@ func NewService(
 		http: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		eventBus:        eventBus,
-		tenantMgr:       tenantMgr,
-		logger:          logging.NewLoggerHandler("logs"),
-		productSvc:      productSvc,
-		presentationSvc: presentationSvc,
-		categorySvc:     categorySvc,
-		brandSvc:        brandSvc,
-		unitSvc:         unitSvc,
-		mu:              sync.RWMutex{},
-		rabbitActive:    false,
-		rabbitBus:      nil,
+		eventBus:         eventBus,
+		tenantMgr:        tenantMgr,
+		logger:           logging.NewLoggerHandler("logs"),
+		productSvc:       productSvc,
+		presentationSvc:  presentationSvc,
+		categorySvc:      categorySvc,
+		brandSvc:         brandSvc,
+		unitSvc:          unitSvc,
+		presentationRepo: presentationRepo,
+		mu:               sync.RWMutex{},
+		rabbitActive:     false,
+		rabbitBus:        nil,
 	}
 }
 
@@ -592,6 +595,11 @@ func (s *service) syncPresentations(ctx context.Context, prodURL, token string, 
 
 	fmt.Println("Total presentations: ", len(apiResp.Data))
 
+	// Si no hay presentaciones, no hay nada que sincronizar
+	if len(apiResp.Data) == 0 {
+		return nil
+	}
+
 	item := apiResp.Data[0]
 	presentations := make([]catalogPresentations.PresentationRequest, len(apiResp.Data))
 	for i, p := range apiResp.Data {
@@ -704,6 +712,29 @@ func (s *service) ActivateRabbitMQ(ctx context.Context, slug string) error {
 		rb.Subscribe(catalogProducts.EventProductOfflineDeleted, handler)
 		s.logger.Logf("[offline.Service] Product handler subscribed to offline events for tenant: %s", slug)
 	}
+
+	// Categories sync handler
+	if categoryHandler, ok := s.categorySvc.(events.EventHandler); ok {
+		rb.Subscribe(catalogCategories.EventCategoryOfflineCreated, categoryHandler)
+		rb.Subscribe(catalogCategories.EventCategoryOfflineUpdated, categoryHandler)
+		rb.Subscribe(catalogCategories.EventCategoryOfflineDeleted, categoryHandler)
+		s.logger.Logf("[offline.Service] Category handler subscribed to offline events for tenant: %s", slug)
+	}
+
+	// Brands sync handler
+	if brandHandler, ok := s.brandSvc.(events.EventHandler); ok {
+		rb.Subscribe(catalogBrands.EventBrandOfflineCreated, brandHandler)
+		rb.Subscribe(catalogBrands.EventBrandOfflineUpdated, brandHandler)
+		rb.Subscribe(catalogBrands.EventBrandOfflineDeleted, brandHandler)
+		s.logger.Logf("[offline.Service] Brand handler subscribed to offline events for tenant: %s", slug)
+	}
+
+	// Presentations sync handler - presentations use a separate SyncHandler
+	presSyncHandler := catalogPresentations.NewSyncHandler(s.presentationRepo)
+	rb.Subscribe(catalogPresentations.EventPresentationOfflineCreated, presSyncHandler)
+	rb.Subscribe(catalogPresentations.EventPresentationOfflineUpdated, presSyncHandler)
+	rb.Subscribe(catalogPresentations.EventPresentationOfflineDeleted, presSyncHandler)
+	s.logger.Logf("[offline.Service] Presentation handler subscribed to offline events for tenant: %s", slug)
 
 	if err := rb.Start(); err != nil {
 		return fmt.Errorf("failed to start RabbitMQ event bus: %w", err)

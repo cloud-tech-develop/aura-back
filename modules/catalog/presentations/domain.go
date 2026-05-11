@@ -26,11 +26,15 @@ type Presentation struct {
 	DeletedAt       *vo.DateTime `json:"deleted_at"`       // Soft delete timestamp
 }
 
-// PresentationWithProductInfo contains presentation data with product info for Page response
+// PresentationWithProductInfo contains presentation data with product info for Page/List responses
 type PresentationWithProductInfo struct {
 	ID              int64   `json:"id"`
 	ProductID       int64   `json:"product_id"`
 	ProductName     string  `json:"product_name"`
+	SKU             string  `json:"sku"`
+	ProductType     string  `json:"product_type"`
+	CategoryName    *string `json:"category_name,omitempty"`
+	BrandName       *string `json:"brand_name,omitempty"`
 	Name            string  `json:"name"`
 	Factor          float64 `json:"factor"`
 	Barcode         string  `json:"barcode"`
@@ -38,6 +42,7 @@ type PresentationWithProductInfo struct {
 	SalePrice       float64 `json:"sale_price"`
 	DefaultPurchase bool    `json:"default_purchase"`
 	DefaultSale     bool    `json:"default_sale"`
+	EnterpriseID    int64   `json:"enterprise_id"`
 }
 
 // ListFilters for presentation queries
@@ -51,6 +56,7 @@ type ListFilters struct {
 // PresentationRequest represents the JSON structure for creating presentations
 type PresentationRequest struct {
 	ID              *int64  `json:"id"`
+	ProductID       *int64  `json:"product_id"`
 	Name            string  `json:"name" binding:"required"`
 	Factor          float64 `json:"factor" binding:"required"`
 	Barcode         string  `json:"barcode"`
@@ -73,7 +79,7 @@ type Repository interface {
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Presentation, error)
 	GetByProductID(ctx context.Context, tenantSlug string, productID int64) ([]Presentation, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
-	List(ctx context.Context, tenantSlug string, enterpriseID int64, ProductID int64) ([]Presentation, error)
+	List(ctx context.Context, tenantSlug string, enterpriseID int64, ProductID int64) ([]PresentationWithProductInfo, error)
 	Update(ctx context.Context, tenantSlug string, p *Presentation) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
 }
@@ -86,7 +92,7 @@ type Service interface {
 	GetByID(ctx context.Context, tenantSlug string, id int64) (*Presentation, error)
 	GetByProductID(ctx context.Context, tenantSlug string, productID int64) ([]Presentation, error)
 	Page(ctx context.Context, tenantSlug string, enterpriseID int64, page int64, limit int64, search string, sort string, order string, params map[string]any) (domain.PageResult, error)
-	List(ctx context.Context, tenantSlug string, enterpriseID int64, ProductID int64) ([]Presentation, error)
+	List(ctx context.Context, tenantSlug string, enterpriseID int64, ProductID int64) ([]PresentationWithProductInfo, error)
 	Update(ctx context.Context, tenantSlug string, id int64, p *Presentation) error
 	Delete(ctx context.Context, tenantSlug string, id int64) error
 }
