@@ -111,6 +111,7 @@ type SyncResult struct {
 	Units         int      `json:"units"`
 	Products      int      `json:"products"`
 	Presentations int      `json:"presentations"`
+	Compositions  int      `json:"compositions"`
 	Errors        []string `json:"errors,omitempty"`
 }
 

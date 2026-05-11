@@ -10,6 +10,7 @@ import (
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	catalogproducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
+	catalogcompositions "github.com/cloud-tech-develop/aura-back/modules/catalog/compositions"
 	"github.com/cloud-tech-develop/aura-back/modules/offline"
 	"github.com/cloud-tech-develop/aura-back/shared/response"
 	"github.com/cloud-tech-develop/aura-back/tenant"
@@ -58,6 +59,7 @@ func (s *Server) RegisterModules(
 	presentationH *presentations.Handler,
 	thirdPartiesH *thirdparties.Handler,
 	unitH *units.Handler,
+	compositionH *catalogcompositions.Handler,
 	offlineH *offline.Handler,
 ) {
 	// Health Check
@@ -94,6 +96,7 @@ func (s *Server) RegisterModules(
 	presentations.Register(protected, presentationH)
 	thirdparties.Register(public, protected, thirdPartiesH)
 	units.Register(protected, unitH)
+	catalogcompositions.Register(protected, compositionH)
 
 	// Offline sync (only available in offline mode)
 	if offlineH != nil {

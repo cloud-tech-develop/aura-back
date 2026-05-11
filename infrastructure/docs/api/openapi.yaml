@@ -432,6 +432,66 @@ components:
           type: integer
           format: int64
 
+    # Composition schema
+    Composition:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        parent_product_id:
+          type: integer
+          format: int64
+          description: Parent product ID (the composite product)
+        child_product_id:
+          type: integer
+          format: int64
+          description: Child product ID (component product)
+        parent_name:
+          type: string
+          description: Parent product name
+        child_name:
+          type: string
+          description: Child product name
+        quantity:
+          type: number
+          format: decimal
+          description: Quantity of child product needed
+        type:
+          type: string
+          enum: [KIT, RECETA]
+          description: Composition type (KIT = packaged, RECETA = manufactured)
+        enterprise_id:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CompositionPageResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Composition"
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int64
+        limit:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int64
+
     # Presentation schema
     Presentation:
       type: object
@@ -2081,6 +2141,207 @@ paths:
                 $ref: "#/components/schemas/UnitPageResult"
         "401":
           description: Unauthorized
+
+  # ============================================
+  # CATALOG MODULE - COMPOSITIONS
+  # ============================================
+  /catalog/compositions:
+    get:
+      summary: List compositions
+      description: Returns compositions, optionally filtered by parent product
+      tags:
+        - Catalog - Compositions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: parent_product_id
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: List of compositions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Composition"
+        "401":
+          description: Unauthorized
+
+    post:
+      summary: Create composition
+      tags:
+        - Catalog - Compositions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - parent_product_id
+                - child_product_id
+              properties:
+                parent_product_id:
+                  type: integer
+                  format: int64
+                child_product_id:
+                  type: integer
+                  format: int64
+                quantity:
+                  type: number
+                  default: 1
+                type:
+                  type: string
+                  enum: [KIT, RECETA]
+                  default: KIT
+      responses:
+        "201":
+          description: Composition created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Composition"
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+
+  /catalog/compositions/all:
+    get:
+      summary: List all compositions for enterprise
+      description: Returns all compositions (unpaginated, for offline sync)
+      tags:
+        - Catalog - Compositions
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All compositions for the enterprise
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Composition"
+        "401":
+          description: Unauthorized
+
+  /catalog/compositions/page:
+    post:
+      summary: Paginated compositions list
+      description: Returns paginated compositions with product names
+      tags:
+        - Catalog - Compositions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageParams"
+      responses:
+        "200":
+          description: Paginated compositions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompositionPageResult"
+        "401":
+          description: Unauthorized
+
+  /catalog/compositions/{id}:
+    get:
+      summary: Get composition by ID
+      tags:
+        - Catalog - Compositions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Composition details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Composition"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+    put:
+      summary: Update composition
+      description: Only quantity and type can be updated (products are not changed)
+      tags:
+        - Catalog - Compositions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity:
+                  type: number
+                type:
+                  type: string
+                  enum: [KIT, RECETA]
+      responses:
+        "200":
+          description: Composition updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Composition"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+    delete:
+      summary: Delete composition
+      description: Hard delete (permanent removal)
+      tags:
+        - Catalog - Compositions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Composition deleted
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
 
   # ============================================
   # CATALOG MODULE - PRESENTATIONS

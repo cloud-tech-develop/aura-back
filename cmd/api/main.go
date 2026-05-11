@@ -20,6 +20,7 @@ import (
 	catalogPresentations "github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	catalogProducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
+	catalogCompositions "github.com/cloud-tech-develop/aura-back/modules/catalog/compositions"
 	"github.com/cloud-tech-develop/aura-back/modules/catalog/units"
 	"github.com/cloud-tech-develop/aura-back/modules/offline"
 	"github.com/cloud-tech-develop/aura-back/shared/events"
@@ -167,6 +168,9 @@ func main() {
 	unitSvc := units.NewService(database)
 	unitHandler := units.NewHandler(unitSvc)
 
+	compositionSvc := catalogCompositions.NewService(database)
+	compositionHandler := catalogCompositions.NewHandler(compositionSvc)
+
 	productsLogger := catalogProducts.NewLoggerHandler("logs")
 	_ = eventBus.Subscribe(catalogProducts.EventCreated, productsLogger)
 	_ = eventBus.Subscribe(catalogProducts.EventUpdated, productsLogger)
@@ -194,6 +198,7 @@ func main() {
 			categorySvc,
 			brandSvc,
 			unitSvc,
+			compositionSvc,
 			catalogPresentations.NewRepository(database),
 		)
 		offlineHandler = offline.NewHandler(offlineSvc)
@@ -201,7 +206,7 @@ func main() {
 
 	// HTTP Server
 	srv := server.NewServer(database, tenantMgr)
-	srv.RegisterModules(enterpriseHandler, usersHandler, categoryHandler, brandHandler, productHandler, presHandler, thirdPartiesHandler, unitHandler, offlineHandler)
+	srv.RegisterModules(enterpriseHandler, usersHandler, categoryHandler, brandHandler, productHandler, presHandler, thirdPartiesHandler, unitHandler, compositionHandler, offlineHandler)
 
 	log.Println("servidor en :" + port)
 

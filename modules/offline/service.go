@@ -12,6 +12,7 @@ import (
 	"github.com/cloud-tech-develop/aura-back/internal/db"
 	catalogBrands "github.com/cloud-tech-develop/aura-back/modules/catalog/brands"
 	catalogCategories "github.com/cloud-tech-develop/aura-back/modules/catalog/categories"
+	catalogCompositions "github.com/cloud-tech-develop/aura-back/modules/catalog/compositions"
 	catalogPresentations "github.com/cloud-tech-develop/aura-back/modules/catalog/presentations"
 	catalogProducts "github.com/cloud-tech-develop/aura-back/modules/catalog/products"
 	catalogUnits "github.com/cloud-tech-develop/aura-back/modules/catalog/units"
@@ -32,6 +33,7 @@ const (
 	EventUnitSynced         = "offline.unit_synced"
 	EventProductSynced      = "offline.product_synced"
 	EventPresentationSynced = "offline.presentation_synced"
+	EventCompositionSynced  = "offline.composition_synced"
 )
 
 // EventPayload represents the sync event payload
@@ -55,6 +57,7 @@ type service struct {
 	categorySvc          catalogCategories.Service
 	brandSvc             catalogBrands.Service
 	unitSvc              catalogUnits.Service
+	compositionSvc       catalogCompositions.Service
 	presentationRepo     catalogPresentations.Repository // Repo para sync handler
 	mu                   sync.RWMutex
 	rabbitActive         bool
@@ -70,6 +73,7 @@ func NewService(
 	categorySvc catalogCategories.Service,
 	brandSvc catalogBrands.Service,
 	unitSvc catalogUnits.Service,
+	compositionSvc catalogCompositions.Service,
 	presentationRepo catalogPresentations.Repository,
 ) Service {
 	return &service{
@@ -92,6 +96,7 @@ func NewService(
 		categorySvc:      categorySvc,
 		brandSvc:         brandSvc,
 		unitSvc:          unitSvc,
+		compositionSvc:   compositionSvc,
 		presentationRepo: presentationRepo,
 		mu:               sync.RWMutex{},
 		rabbitActive:     false,
@@ -150,6 +155,9 @@ func (s *service) SyncTenantBySlug(ctx context.Context, prodURL, token, slug str
 		{"products", func() error { return s.syncProducts(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu) }},
 		{"presentations", func() error {
 			return s.syncPresentations(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu)
+		}},
+		{"compositions", func() error {
+			return s.syncCompositions(ctx, prodURL, token, enterprise.Slug, enterpriseID, result, &mu)
 		}},
 	}
 
@@ -624,6 +632,51 @@ func (s *service) syncPresentations(ctx context.Context, prodURL, token string, 
 	mu.Unlock()
 	if count > 0 {
 		s.publishEvent(EventPresentationSynced, count, slug, true, "")
+	}
+	return nil
+}
+
+func (s *service) syncCompositions(ctx context.Context, prodURL, token string, slug string, enterpriseID int64, result *SyncResult, mu *sync.Mutex) error {
+	url := prodURL + "/catalog/compositions/all"
+
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status: %d", resp.StatusCode)
+	}
+
+	var apiResp struct {
+		Data []catalogCompositions.Composition `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return fmt.Errorf("decode compositions: %w", err)
+	}
+
+	count := 0
+	for _, c := range apiResp.Data {
+		c.EnterpriseID = enterpriseID
+		if err := s.compositionSvc.Create(ctx, slug, &c); err != nil {
+			continue
+		}
+		count++
+	}
+
+	mu.Lock()
+	result.Compositions = count
+	mu.Unlock()
+	if count > 0 {
+		s.publishEvent(EventCompositionSynced, count, slug, true, "")
 	}
 	return nil
 }
